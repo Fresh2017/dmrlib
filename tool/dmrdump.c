@@ -11,8 +11,6 @@
 #include <arpa/inet.h>
 
 #include <dmr.h>
-#include <dmr/packet.h>
-#include <dmr/payload.h>
 #include <dmr/proto/homebrew.h>
 #include <dmrfec.h>
 
@@ -69,11 +67,6 @@ void dump_hex(void *mem, unsigned int len)
             putchar('\n');
         }
     }
-}
-
-void dump_bit(void *mem, unsigned int len)
-{
-
 }
 
 void dump_dmr_packet(dmr_packet_t *packet)

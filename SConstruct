@@ -6,6 +6,8 @@ env['CCFLAGS'] = [
     '-std=c99',
     '-Wall',
     '-Wextra',
+    '-Wno-gnu-binary-literal',
+    '-pedantic',
     '-D_GNU_SOURCE',
 ]
 env['LIBPATH'] = [
@@ -15,15 +17,17 @@ env.VariantDir('build', 'src')
 conf = Configure(env)
 
 # Build targets
+bits = env.SharedObject('build/shared/bits.c')
 libdmrfec = env.SharedLibrary('build/dmrfec', [
     Glob('build/dmrfec/*.c'),
-    'build/dmr/bits.c'
+    bits,
 ])
 libdmr = env.SharedLibrary('build/dmr', [
     Glob('build/dmr/*.c'),
     Glob('build/dmr/packet/*.c'),
     Glob('build/dmr/payload/*.c'),
     Glob('build/dmr/proto/*.c'),
+    bits,
 ], LIBS=['dmrfec'])
 Depends(libdmr, libdmrfec)
 

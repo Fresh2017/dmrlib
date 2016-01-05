@@ -78,8 +78,11 @@ void dump_bit(void *mem, unsigned int len)
 
 void dump_dmr_packet(dmr_packet_t *packet)
 {
+    dmr_payload_info_bits_t *info_bits;
     dmr_payload_sync_pattern_t sync_pattern;
     dmr_payload_sync_bits_t *sync_bits;
+    dmrfec_bptc_196_96_data_bits_t *data_bits;
+    dmr_csbk_t *csbk;
 
     printf("[ts%d][%u->%u(%u)] %s\n",
         packet->ts + 1,
@@ -88,11 +91,31 @@ void dump_dmr_packet(dmr_packet_t *packet)
         dmr_packet_get_slot_type_name(packet->slot_type));
 
     switch (packet->slot_type) {
+    case DMR_SLOT_TYPE_CSBK:
+        info_bits = dmr_payload_get_info_bits(&packet->payload);
+        info_bits = dmr_info_bits_deinterleave(info_bits);
+        data_bits = dmrfec_bptc_196_96_extractdata(info_bits->bits);
+        if (data_bits == NULL) {
+            fprintf(stderr, "csbk: BPTC(196, 96) extract failed\n");
+            break;
+        }
+        csbk = dmr_csbk_decode(data_bits);
+        if (csbk == NULL) {
+            fprintf(stderr, "csbk: decode failed\n");
+            break;
+        }
+        printf("csbk: %s, %u->%u, last %d\n",
+            dmr_csbk_opcode_name(csbk->opcode),
+            csbk->src_id, csbk->dst_id,
+            csbk->last);
+        break;
+
     case DMR_SLOT_TYPE_VOICE_LC:
         sync_bits = dmr_payload_get_sync_bits(&packet->payload);
         sync_pattern = dmr_sync_bits_get_sync_pattern(sync_bits);
         printf("sync pattern: %s\n", dmr_payload_get_sync_pattern_name(sync_pattern));
         break;
+
     case DMR_SLOT_TYPE_VOICE_BURST_A:
     case DMR_SLOT_TYPE_VOICE_BURST_B:
     case DMR_SLOT_TYPE_VOICE_BURST_C:
@@ -112,6 +135,10 @@ void dump_dmr_packet(dmr_packet_t *packet)
             }
             printf("embedded signalling: color code %d, lcss %d (%s)\n",
                 emb->color_code, emb->lcss, dmr_emb_lcss_name(emb->lcss));
+
+            if (emb->lcss == DMR_EMB_LCSS_SINGLE_FRAGMENT) {
+
+            }
         }
         break;
     }

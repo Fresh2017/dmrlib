@@ -1,6 +1,7 @@
 env = Environment()
 env['CC'] = 'clang'
 env['CCFLAGS'] = [
+    '-g',
     '-Iinclude',
     '-std=c99',
     '-Wall',

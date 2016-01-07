@@ -19,11 +19,12 @@ dmr_payload_info_bits_t *dmr_payload_get_info_bits(dmr_payload_t *payload)
 dmr_payload_info_bits_t *dmr_info_bits_deinterleave(dmr_payload_info_bits_t *info_bits)
 {
     static dmr_payload_info_bits_t deinterleaved_bits;
+    uint8_t i;
 
     if (info_bits == NULL)
         return NULL;
 
-    for (uint8_t i = 0; i < DMR_PAYLOAD_INFO_BITS; i++)
+    for (i = 0; i < DMR_PAYLOAD_INFO_BITS; i++)
         deinterleaved_bits.bits[i] = info_bits->bits[(i * 181) % DMR_PAYLOAD_INFO_BITS];
 
     return &deinterleaved_bits;

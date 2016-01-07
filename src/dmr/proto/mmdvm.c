@@ -1,12 +1,16 @@
 #include <errno.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <ctype.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <termios.h>
+#endif
 
 #include "dmr/proto/mmdvm.h"
 
@@ -16,6 +20,16 @@ struct baud_mapping {
 };
 
 static struct baud_mapping baud_lookup_table[] = {
+#if defined(DMR_PLATFORM_WINDOWS)
+    { 1200,   CBR_1200 },
+    { 2400,   CBR_2400 },
+    { 4800,   CBR_4800 },
+    { 9600,   CBR_9600 },
+    { 19200,  CBR_19200 },
+    { 38400,  CBR_38400 },
+    { 57600,  CBR_57600 },
+    { 115200, CBR_115200 },
+#else
     { 1200,   B1200 },
     { 2400,   B2400 },
     { 4800,   B4800 },
@@ -30,6 +44,7 @@ static struct baud_mapping baud_lookup_table[] = {
 #endif
 #ifdef B230400
     { 230400, B230400 },
+#endif
 #endif
     { 0,      0 }                 /* Terminator. */
 };
@@ -181,6 +196,8 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes)
         return NULL;
     }
 
+#if defined(DMR_PLATFORM_WINDOWS)
+#else
     if ((modem->fd = open(modem->port, O_RDWR | O_NOCTTY | O_NONBLOCK)) < 0) {
         modem->error = errno;
         fprintf(stderr, "mmdvm open %s failed: %s\n", modem->port, strerror(modem->error));
@@ -235,6 +252,7 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes)
         fprintf(stderr, "mmdvm tcflush failed: %s\n", strerror(modem->error));
         return modem;
     }
+#endif
 
     return modem;
 }
@@ -370,13 +388,18 @@ void dmr_mmdvm_poll(dmr_mmdvm_t *modem)
 bool dmr_mmdvm_sync(dmr_mmdvm_t *modem)
 {
     int ret;
+    uint8_t i;
 
     if (modem == NULL)
         return false;
 
+#if defined(DMR_PLATFORM_WINDOWS)
+    Sleep(DMR_MMDVM_DELAY_MS);
+#else
     usleep(DMR_MMDVM_DELAY_US);
+#endif
 
-    for (uint8_t i = 0; i < 6; i++) {
+    for (i = 0; i < 6; i++) {
         uint8_t buf[3] = {DMR_MMDVM_FRAME_START, 3, DMR_MMDVM_GET_VERSION};
 
         fprintf(stderr, "mmdvm write: DMR_MMDVM_FRAME_START, 3, DMR_MMDVM_GET_VERSION\n");

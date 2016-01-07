@@ -3,12 +3,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <dmr/platform.h>
 
 #include <pcap.h>
+#if defined(DMR_PLATFORM_WINDOWS)
+#include <winsock2.h>
+#else
 #include <net/ethernet.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
+#endif
 
 #include <dmr.h>
 #include <dmr/proto/homebrew.h>
@@ -18,6 +23,43 @@
 #define HEXDUMP_COLS  16
 #define HEXDUMP_BREAK 8
 
+#if defined(DMR_PLATFORM_WINDOWS)
+#include <sys/param.h>
+/* Internet address.  */
+typedef uint32_t in_addr_t;
+#define ETH_ALEN       6               /* Octets in one ethernet addr   */
+struct ether_header
+{
+    u_int8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
+    u_int8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
+    u_int16_t ether_type;                 /* packet type ID field */
+} __attribute__ ((__packed__));
+struct ip {
+#if BYTE_ORDER == LITTLE_ENDIAN
+    unsigned int ip_hl:4;               /* header length */
+    unsigned int ip_v:4;                /* version */
+#else
+    unsigned int ip_v:4;                /* version */
+    unsigned int ip_hl:4;               /* header length */
+#endif
+  	u_char	ip_tos;			// Type of service
+  	u_short ip_len;			// Total length
+  	u_short ip_id;      // Identification
+  	u_short ip_off;		  // Flags (3 bits) + Fragment offset (13 bits)
+  	u_char	ip_ttl;			// Time to live
+  	u_char	ip_p;			  // Protocol
+  	u_short ip_sum;			// Header checksum
+  	struct in_addr ip_src, ip_dst;      /* source and dest address */
+  	u_int	op_pad;			  // Option + Padding
+};
+struct udphdr {
+	u_short uh_sport;			// Source port
+	u_short uh_dport;			// Destination port
+	u_short uh_len;			// Datagram length
+	u_short uh_crc;			// Checksum
+};
+#endif
+
 static struct option long_options[] = {
     {"source", required_argument, NULL, 'r'},
     {NULL, 0, NULL, 0} /* Sentinel */
@@ -25,6 +67,7 @@ static struct option long_options[] = {
 
 void init(void)
 {
+    fprintf(stderr, "initializing dmrfec\n");
     dmrfec_init();
 }
 
@@ -202,10 +245,13 @@ int main(int argc, char **argv)
 
     init();
 
+    size_t packets = 0;
     while ((packet = pcap_next(handle, &header)) != NULL) {
-        if (header.caplen < 14)
+        packets++;
+        if (header.caplen < 14) {
+            fprintf(stderr, "skipping non-ethernet frame\n");
             continue; // No an Ethernet frame
-
+        }
         unsigned int caplen = header.caplen;
         uint8_t *pkt_ptr = (uint8_t *)packet;
         int ether_type = ((int)(pkt_ptr[12]) << 8) | (int)pkt_ptr[13];
@@ -223,8 +269,10 @@ int main(int argc, char **argv)
         if (caplen < ip_headerlen)
             continue;
 
-        if (ip_hdr->ip_v != 4 || ip_hdr->ip_p != IPPROTO_UDP)
+        if (ip_hdr->ip_v != 4 || ip_hdr->ip_p != 23) {
+            fprintf(stderr, "skipping packet IP version %d, protocol %d\n", ip_hdr->ip_v, ip_hdr->ip_p);
             continue;
+        }
 
         pkt_ptr += ip_headerlen;
         caplen -= ip_headerlen;
@@ -240,5 +288,6 @@ int main(int argc, char **argv)
     }
 
     pcap_close(handle);
+    fprintf(stderr, "processed %lu packets\n", packets);
     return 0;
 }

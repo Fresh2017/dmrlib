@@ -2,11 +2,11 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
-#include <openssl/sha.h>
+//#include <openssl/sha.h>
 
 #include "dmr/proto/homebrew.h"
 #include "dmr/type.h"
+#include "sha256.h"
 
 const char dmr_homebrew_data_signature[4]   = "DMRD";
 const char dmr_homebrew_master_ack[6]       = "MSTACK";
@@ -63,8 +63,9 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
 bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 {
     uint8_t buf[328], digest[SHA256_DIGEST_LENGTH];
+    int i, j;
     uint16_t len;
-    SHA256_CTX sha256ctx;
+    sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
     fprintf(stderr, "homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x\n",
@@ -78,7 +79,7 @@ bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
         switch (homebrew->auth) {
         case DMR_HOMEBREW_AUTH_NONE:
             memcpy(buf, dmr_homebrew_repeater_login, 4);
-            for (int i = 0, j = 0; i < 4; i++, j += 2) {
+            for (i = 0, j = 0; i < 4; i++, j += 2) {
                 buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
@@ -111,17 +112,17 @@ bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
         case DMR_HOMEBREW_AUTH_INIT:
             memcpy(&buf, &homebrew->random, 8);
             memcpy(&buf[8], &secret, strlen(secret));
-            SHA256_Init(&sha256ctx);
-            SHA256_Update(&sha256ctx, homebrew->random, 8);
-            SHA256_Update(&sha256ctx, secret, strlen(secret));
-            SHA256_Final(&digest[0], &sha256ctx);
+            sha256_init(&sha256ctx);
+            sha256_update(&sha256ctx, (const uint8_t *)homebrew->random, 8);
+            sha256_update(&sha256ctx, (const uint8_t *)secret, strlen(secret));
+            sha256_final(&sha256ctx, &digest[0]);
 
             memcpy(&buf, &dmr_homebrew_repeater_key, 4);
-            for (int i = 0, j = 0; i < 4; i++, j += 2) {
+            for (i = 0, j = 0; i < 4; i++, j += 2) {
                 buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
-            for (int i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
+            for (i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
                 buf[12 + j] = hex[(digest[i] >> 4)];
                 buf[13 + j] = hex[(digest[i] & 0x0f)];
             }
@@ -158,7 +159,7 @@ bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             uint16_t pos = 4;
 #define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
             C(homebrew->config->callsign);
-            for (int i = 0; i < 4; i++) {
+            for (i = 0; i < 4; i++) {
                 buf[pos++] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[pos++] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
@@ -244,7 +245,7 @@ bool dmr_homebrew_send(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t le
 
     fprintf(stderr, "homebrew: send(%s, %d): ", inet_ntoa(homebrew->remote.sin_addr), len);
     dump_hex((void *)buf, len);
-    if (sendto(homebrew->fd, buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
+    if (sendto(homebrew->fd, (const char *)buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
         fprintf(stderr, "homebrew: send to %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
@@ -257,8 +258,10 @@ bool dmr_homebrew_send(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t le
 bool dmr_homebrew_recv(dmr_homebrew_t *homebrew, uint16_t *len)
 {
     struct sockaddr_in peer;
-    socklen_t peerlen;
-    if ((*len = recvfrom(homebrew->fd, &homebrew->buffer, 64, 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
+    int peerlen, ilen;
+    uint16_t olen;
+    if ((ilen = recvfrom(homebrew->fd, (char *)&homebrew->buffer, 64, 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
+        *len = 0;
         fprintf(stderr, "homebrew: recv from %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
@@ -266,6 +269,8 @@ bool dmr_homebrew_recv(dmr_homebrew_t *homebrew, uint16_t *len)
         return false;
     }
 
+    olen = ilen;
+    *len = olen;
     dump_hex(homebrew->buffer, *len);
     return true;
 }

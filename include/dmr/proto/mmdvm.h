@@ -1,9 +1,16 @@
 #ifndef _DMR_PROTO_MMDVM
 #define _DMR_PROTO_MMDVM
 
+#include <dmr/platform.h>
+
 #include <inttypes.h>
 #include <stdbool.h>
+#if defined(DMR_PLATFORM_WINDOWS)
+#include <windows.h>
+#else
 #include <termios.h>
+#include <unistd.h>
+#endif
 
 #include <dmr/buffer/ring.h>
 #include <dmr/type.h>

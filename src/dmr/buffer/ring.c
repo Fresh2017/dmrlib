@@ -85,7 +85,7 @@ static uint8_t *dmr_ring_nextp(dmr_ring_t *ring, const uint8_t *p)
 size_t dmr_ring_memset(dmr_ring_t *ring, int c, size_t len)
 {
     const uint8_t *end = dmr_ring_end(ring);
-    size_t n = 0, count = min(len, dmr_ring_buffer_size(ring));
+    size_t n = 0, count = min((size_t)len, dmr_ring_buffer_size(ring));
     bool overflow = count > dmr_ring_bytes_free(ring);
 
     while (n != count) {
@@ -93,7 +93,7 @@ size_t dmr_ring_memset(dmr_ring_t *ring, int c, size_t len)
         if (end >= ring->head)
             break;
 
-        size_t i = min(end - ring->head, count - n);
+        size_t i = min((size_t)(end - ring->head), (size_t)(count - n));
         memset(ring->head, c, i);
         ring->head += i;
         n += i;
@@ -111,11 +111,13 @@ size_t dmr_ring_memset(dmr_ring_t *ring, int c, size_t len)
 
 size_t dmr_ring_write(dmr_ring_t *ring, uint8_t *buffer, size_t len)
 {
+    size_t i;
+
     if (len > dmr_ring_bytes_free(ring))
         return 0;
 
     const uint8_t *end = dmr_ring_end(ring);
-    for (size_t i = 0; i < len; i++) {
+    for (i = 0; i < len; i++) {
         *ring->head = buffer[i];
         ring->head++;
 

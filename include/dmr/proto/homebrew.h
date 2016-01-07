@@ -1,11 +1,17 @@
 #ifndef _DMR_PROTO_HOMEBREW_H
 #define _DMR_PROTO_HOMEBREW_H
 
+#include <dmr/platform.h>
+
+#if defined(DMR_PLATFORM_WINDOWS)
+#include <winsock2.h>
+#else
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
 
 #include <dmr/type.h>
 #include <dmr/packet.h>
-#include <openssl/sha.h>
 
 #define DMR_HOMEBREW_PORT               62030
 #define DMR_HOMEBREW_DMR_DATA_SIZE      53
@@ -14,10 +20,10 @@
 #define DMR_HOMEBREW_DMR_DATA_FRAME     0x10
 typedef uint8_t dmr_homebrew_frame_type_t;
 
-#define DMR_HOMEBREW_DATA_TYPE_VOICE      0b00
-#define DMR_HOMEBREW_DATA_TYPE_VOICE_SYNC 0b01
-#define DMR_HOMEBREW_DATA_TYPE_DATA_SYNC  0b10
-#define DMR_HOMEBREW_DATA_TYPE_INVALID    0b11
+#define DMR_HOMEBREW_DATA_TYPE_VOICE      0x00
+#define DMR_HOMEBREW_DATA_TYPE_VOICE_SYNC 0x01
+#define DMR_HOMEBREW_DATA_TYPE_DATA_SYNC  0x02
+#define DMR_HOMEBREW_DATA_TYPE_INVALID    0x03
 
 typedef enum {
     DMR_HOMEBREW_AUTH_NONE,

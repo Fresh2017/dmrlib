@@ -66,7 +66,7 @@ if sys.platform in ('linux2', 'darwin'):
         'netinet/udp.h',
     )
     required_libraries += (
-        ('pcap', 'libpcap.h', 'c'),
+        ('pcap', 'pcap.h', 'c'),
     )
     required_pkgconfig += (
         'openssl',
@@ -75,7 +75,17 @@ if sys.platform in ('linux2', 'darwin'):
         'pcap',
     ])
 
-elif sys.platform == 'win32':
+if sys.platform == 'darwin':
+    env.Append(
+        CCFLAGS=[
+            '-Isupport/darwin/pcap/include',
+        ],
+        LINKFLAGS=[
+            '-Lsupport/darwin/pcap/lib',
+        ],
+    )
+
+if sys.platform == 'win32':
     Tool('mingw')(env)
     #os.environ['PATH'] += ';C:\\MinGW\\bin\\'
     #env['CC'] = which('gcc.exe')
@@ -86,13 +96,13 @@ elif sys.platform == 'win32':
     env.Append(
         CCFLAGS=[
             '-D_CRT_NONSTDC_NO_DEPRECATE',
-            '-Isupport\\wpcap\\Include',
+            '-Isupport\\windows\\wpcap\\Include',
         ],
         LINKFLAGS=[
             '-static-libgcc',
         ],
         LIBPATH=[
-            'support\\wpcap\\Lib',
+            'support\\windows\\wpcap\\Lib',
         ],
     )
     linked_libraries['libdmr'].extend([

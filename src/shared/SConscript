@@ -1,0 +1,3 @@
+Import('env')
+
+env['shared'] = env.Object('bits.c')

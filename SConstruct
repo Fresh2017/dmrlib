@@ -1,4 +1,5 @@
 import os
+import sys
 
 env = Environment(
     BUILDDIR='#build',
@@ -15,7 +16,17 @@ env = Environment(
         '-ffast-math',
     ],
 )
+
+if sys.platform == 'win32':
+    env.Tool('mingw')
+
 Export('env')
+
+shared = env.SConscript(
+    os.path.join('src', 'shared', 'SConscript'),
+    variant_dir='build/shared',
+    duplicate=0,
+)
 
 dmrfec = env.SConscript(
     os.path.join('src', 'dmrfec', 'SConscript'),

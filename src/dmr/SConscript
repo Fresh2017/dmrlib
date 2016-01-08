@@ -3,12 +3,6 @@ import sys
 
 Import('env')
 
-if sys.platform in ('linux2', 'darwin'):
-    env['libdmr_name'] = 'dmr'
-
-elif sys.platform == 'win32':
-    env['libdmr_name'] = 'dmr.dll'
-
 localenv = env.Clone()
 localenv.Append(
     CPPPATH=[
@@ -20,7 +14,24 @@ localenv.Append(
     LIBPATH=[
         '#build/libdmrfec',
     ],
+    LINKFLAGS=[
+        '-static-libgcc',
+    ],
 )
+
+if sys.platform in ('linux2', 'darwin'):
+    env['libdmr_name'] = 'dmr'
+
+elif sys.platform == 'win32':
+    env['libdmr_name'] = 'dmr'
+    localenv.Append(
+        CPPDEFINES=[
+            '_CRT_NONSTDC_NO_DEPRECATE',
+        ],
+        LIBS=[
+            'ws2_32',
+        ],
+    )
 
 src = [
     Glob('*.c'),

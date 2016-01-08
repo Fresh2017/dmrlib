@@ -3,12 +3,6 @@ import sys
 
 Import('env')
 
-if sys.platform in ('linux2', 'darwin'):
-    name = 'dmrdump'
-
-elif sys.platform == 'win32':
-    name = 'dmrdump.exe'
-
 localenv = env.Clone()
 localenv.Append(
     CPPPATH=[
@@ -17,17 +11,48 @@ localenv.Append(
     LIBS=[
         env['libdmrfec_name'],
         env['libdmr_name'],
-        'pcap',
     ],
     LIBPATH=[
         '#build/libdmr',
         '#build/libdmrfec',
     ],
 )
-conf = Configure(localenv)
-if not conf.CheckLibWithHeader('pcap', 'pcap.h', 'c'):
-    print('libpcap is required, check config.log')
-    Exit(1)
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'dmrdump'
+
+    localenv.Append(
+        LIBS=['pcap'],
+    )
+
+    conf = Configure(localenv)
+    if not conf.CheckLibWithHeader('pcap', 'pcap.h', 'c'):
+        print('libpcap is required, check config.log')
+        Exit(1)
+    conf.Finish()
+
+elif sys.platform == 'win32':
+    name = 'dmrdump.exe'
+
+    localenv.Append(
+        CPPPATH=[
+            os.path.join('#support', 'windows', 'wpcap', 'Include'),
+        ],
+        LIBS=[
+            'ws2_32',
+            'wpcap',
+        ],
+        LIBPATH=[
+            os.path.join('#support', 'windows', 'wpcap', 'Lib'),
+        ]
+    )
+
+    #conf = Configure(localenv)
+    #if not conf.CheckLibWithHeader('wpcap', 'pcap.h', 'c'):
+    #    print('wpcap is required, check config.log')
+    #    Exit(1)
+    #conf.Finish()
+
 
 src = [
     'main.c',

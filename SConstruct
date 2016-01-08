@@ -53,6 +53,10 @@ linked_libraries = {
         'dmr',
         'dmrfec',
     ],
+    'mmdvmtest': [
+        'dmr',
+        'dmrfec',
+    ],
 }
 required_libraries = ()
 required_pkgconfig = ()
@@ -168,8 +172,13 @@ dmrdump = binenv.Program(
 )
 Depends(dmrdump, libdmr)
 
-dmrmmdvm = binenv.Program('build/dmrmmdvm', 'build/tool/dmrmmdvm.c')
-Depends(dmrmmdvm, libdmr)
+mmdvmtest = binenv.Program(
+    'build/mmdvmtest', [
+        'build/tool/mmdvmtest.c',
+    ],
+    LIBS=linked_libraries['mmdvmtest'],
+)
+Depends(mmdvmtest, libdmr)
 
 noisebridge = binenv.Program('build/noisebridge', 'build/tool/noisebridge.c')
 Depends(noisebridge, libdmr)

@@ -25,11 +25,13 @@ if sys.platform in ('linux2', 'darwin'):
         LIBS=['pcap'],
     )
 
+    '''
     conf = Configure(localenv)
     if not conf.CheckLibWithHeader('pcap', 'pcap.h', 'c'):
         print('libpcap is required, check config.log')
         Exit(1)
-    conf.Finish()
+    localenv = conf.Finish()
+    '''
 
 elif sys.platform == 'win32':
     name = 'dmrdump.exe'

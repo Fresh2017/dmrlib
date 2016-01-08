@@ -16,6 +16,8 @@
 #include "dmr/proto/mmdvm.h"
 #include "tinycthread.h"
 
+static const char *dmr_mmdvm_proto_name = "mmdvm";
+
 struct baud_mapping {
   long    baud;
   speed_t speed;
@@ -69,37 +71,100 @@ static speed_t serial_baud_lookup(long baud)
      return baud;
 }
 
-#define HEXDUMP_COLS 16
-static void dump_hex(void *mem, unsigned int len)
+
+static dmr_proto_status_t mmdvm_proto_init(void *modemptr)
 {
-    unsigned int i, j;
-    for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
-        /* print offset */
-        if (i % HEXDUMP_COLS == 0) {
-            printf("0x%06x: ", i);
-        }
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return DMR_PROTO_CONF;
 
-        /* print hex data */
-        if (i < len) {
-            printf("%02x ", 0xFF & ((char*)mem)[i]);
-        } else { /* end of block, just aligning for ASCII dump */
-            printf("   ");
-        }
+    return dmr_mmdvm_sync(modem) ? DMR_PROTO_OK : DMR_PROTO_NOT_READY;
+}
 
-        /* print ASCII dump */
-        if (i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
-            for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
-                if (j >= len) { /* end of block, not really printing */
-                    putchar(' ');
-                } else if (isprint(((char*)mem)[j])) { /* printable char */
-                    putchar(0xff & ((char*)mem)[j]);
-                } else { /* other char */
-                    putchar('.');
-                }
-            }
-            putchar('\n');
-        }
+static int mmdvm_proto_start_thread(void *modemptr)
+{
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL) {
+        fprintf(stderr, "mmdvm: start thread called without modem?!\n");
+        return dmr_thread_error;
     }
+
+    while (modem->active) {
+        dmr_mmdvm_poll(modem);
+#if defined(DMR_PLATFORM_WINDOWS)
+        Sleep(250);
+#else
+        usleep(250000);
+#endif
+    }
+
+    return dmr_thread_success;
+}
+
+static bool mmdvm_proto_start(void *modemptr)
+{
+    int ret;
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return false;
+
+    if (modem->thread != NULL) {
+        fprintf(stderr, "mmdvm: can't start, already active\n");
+        return false;
+    }
+
+    modem->thread = malloc(sizeof(dmr_thread_t));
+    if (modem->thread == NULL) {
+        fprintf(stderr, "mmdvm: can't start, out of memory\n");
+        return false;
+    }
+
+    switch ((ret = dmr_thread_create(modem->thread, mmdvm_proto_start_thread, modemptr))) {
+    case dmr_thread_success:
+        break;
+    default:
+        fprintf(stderr, "mmdvm: can't create thread\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool mmdvm_proto_stop(void *modemptr)
+{
+    int ret;
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return false;
+
+    if (modem->thread == NULL) {
+        fprintf(stderr, "mmdvm: not active\n");
+        return true;
+    }
+
+    modem->active = false;
+    switch ((ret = dmr_thread_join(*modem->thread, NULL))) {
+    case dmr_thread_success:
+        break;
+    default:
+        fprintf(stderr, "mmdvm: can't stop thread\n");
+        return false;
+    }
+
+    free(modem->thread);
+    modem->thread = NULL;
+
+    dmr_mmdvm_close(modem);
+    return true;
+}
+
+static bool mmdvm_proto_active(void *modemptr)
+{
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return false;
+
+    return modem->thread != NULL && modem->active;
 }
 
 static char *dmr_mmdvm_command_name(uint8_t command)
@@ -173,6 +238,15 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes)
         return NULL;
 
     memset(modem, 0, sizeof(dmr_mmdvm_t));
+
+    // Setup MMDVM protocol
+    modem->proto.name = dmr_mmdvm_proto_name;
+    modem->proto.init = mmdvm_proto_init;
+    modem->proto.start = mmdvm_proto_start;
+    modem->proto.stop = mmdvm_proto_stop;
+    modem->proto.active = mmdvm_proto_active;
+
+    // Setup MMDVM modem
     modem->version = 0;
     modem->firmware = NULL;
     modem->baud = serial_baud_lookup(baud);
@@ -435,7 +509,7 @@ bool dmr_mmdvm_sync(dmr_mmdvm_t *modem)
 
 dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length)
 {
-    int ret, retry = 0;
+    int ret = 0;
     struct timeval timeout;
     uint8_t offset = 0;
     fd_set rfds;
@@ -625,109 +699,3 @@ void dmr_mmdvm_close(dmr_mmdvm_t *modem)
     }
     modem->fd = 0;
 }
-
-static bool dmr_proto_mmdvm_init(void *modemptr)
-{
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    return dmr_mmdvm_sync(modem);
-}
-
-static int dmr_proto_mmdvm_start_thread(void *modemptr)
-{
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL) {
-        fprintf(stderr, "mmdvm: start thread called without modem?!\n");
-        return thrd_error;
-    }
-
-    while (modem->active) {
-        dmr_mmdvm_poll(modem);
-#if defined(DMR_PLATFORM_WINDOWS)
-        Sleep(250);
-#else
-        usleep(250000);
-#endif
-    }
-
-    return thrd_success;
-}
-
-static bool dmr_proto_mmdvm_start(void *modemptr)
-{
-    int ret;
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    if (modem->thread != NULL) {
-        fprintf(stderr, "mmdvm: can't start, already active\n");
-        return false;
-    }
-
-    modem->thread = malloc(sizeof(thrd_t));
-    if (modem->thread == NULL) {
-        fprintf(stderr, "mmdvm: can't start, out of memory\n");
-        return false;
-    }
-
-    switch ((ret = thrd_create(modem->thread, dmr_proto_mmdvm_start_thread, modemptr))) {
-    case thrd_success:
-        break;
-    default:
-        fprintf(stderr, "mmdvm: can't create thread\n");
-        return false;
-    }
-
-    return true;
-}
-
-static bool dmr_proto_mmdvm_stop(void *modemptr)
-{
-    int ret;
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    if (modem->thread == NULL) {
-        fprintf(stderr, "mmdvm: not active\n");
-        return true;
-    }
-
-    modem->active = false;
-    switch ((ret = thrd_join(*modem->thread, NULL))) {
-    case thrd_success:
-        break;
-    default:
-        fprintf(stderr, "mmdvm: can't stop thread\n");
-        return false;
-    }
-
-    free(modem->thread);
-    modem->thread = NULL;
-
-    dmr_mmdvm_close(modem);
-    return true;
-}
-
-static bool dmr_proto_mmdvm_active(void *modemptr)
-{
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    return modem->thread != NULL && modem->active;
-}
-
-dmr_proto_t mmdvm_proto = {
-    "mmdvm",                /* name */
-    dmr_proto_mmdvm_init,   /* init */
-    dmr_proto_mmdvm_start,  /* start */
-    dmr_proto_mmdvm_stop,   /* stop */
-    dmr_proto_mmdvm_active, /* active */
-    NULL,                   /* process_data */
-    NULL,                   /* process_voice */
-    NULL                    /* relay */
-};

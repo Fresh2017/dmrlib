@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Control Block payload.
+ */
 #ifndef _DMR_PAYLOAD_CSBK_H
 #define _DMR_PAYLOAD_CSBK_H
 

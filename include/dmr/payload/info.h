@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Payload info data.
+ */
 #ifndef _DMR_PAYLOAD_INFO_H
 #define _DMR_PAYLOAD_INFO_H
 

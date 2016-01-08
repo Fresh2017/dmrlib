@@ -1,3 +1,6 @@
+/**
+ * @file
+ */
 #ifndef _DMR_PAYLOAD_H
 #define _DMR_PAYLOAD_H
 

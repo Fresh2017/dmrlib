@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Multi-Mode Digital Voice Modem protocol. Protocol implementation as
+ * specified by G4KLX.
+ */
 #ifndef _DMR_PROTO_MMDVM
 #define _DMR_PROTO_MMDVM
 
@@ -14,6 +19,8 @@
 
 #include <dmr/buffer/ring.h>
 #include <dmr/type.h>
+#include <dmr/thread.h>
+#include <dmr/proto.h>
 
 #include "tinycthread.h"
 
@@ -121,20 +128,22 @@ typedef struct {
         uint8_t dmr_ts2;
         uint8_t ysf;
     } space;
-    dmr_ring_t *dstar_rx_buffer;
-    dmr_ring_t *dstar_tx_buffer;
-    dmr_ring_t *dmr_ts1_rx_buffer;
-    dmr_ring_t *dmr_ts1_tx_buffer;
-    dmr_ring_t *dmr_ts2_rx_buffer;
-    dmr_ring_t *dmr_ts2_tx_buffer;
-    dmr_ring_t *ysf_rx_buffer;
-    dmr_ring_t *ysf_tx_buffer;
-    thrd_t     *thread;
-    bool       active;
+    dmr_ring_t   *dstar_rx_buffer;
+    dmr_ring_t   *dstar_tx_buffer;
+    dmr_ring_t   *dmr_ts1_rx_buffer;
+    dmr_ring_t   *dmr_ts1_tx_buffer;
+    dmr_ring_t   *dmr_ts2_rx_buffer;
+    dmr_ring_t   *dmr_ts2_tx_buffer;
+    dmr_ring_t   *ysf_rx_buffer;
+    dmr_ring_t   *ysf_tx_buffer;
+    dmr_thread_t *thread;
+    bool         active;
+    dmr_proto_t  proto;
 } dmr_mmdvm_t;
 
 extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes);
 extern bool dmr_mmdvm_sync(dmr_mmdvm_t *modem);
+extern void dmr_mmdvm_poll(dmr_mmdvm_t *modem);
 extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *len);
 extern void dmr_mmdvm_free(dmr_mmdvm_t *modem);
 extern void dmr_mmdvm_close(dmr_mmdvm_t *modem);

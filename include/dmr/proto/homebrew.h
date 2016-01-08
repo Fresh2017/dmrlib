@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Homebrew repeater protocol.
+ * Protocol implementation as specified by DL5DI, G4KLX and DG1HT.
+ */
 #ifndef _DMR_PROTO_HOMEBREW_H
 #define _DMR_PROTO_HOMEBREW_H
 
@@ -8,10 +13,13 @@
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #endif
 
 #include <dmr/type.h>
 #include <dmr/packet.h>
+#include <dmr/proto.h>
+#include <dmr/thread.h>
 
 #define DMR_HOMEBREW_PORT               62030
 #define DMR_HOMEBREW_DMR_DATA_SIZE      53
@@ -68,26 +76,26 @@ typedef struct {
     uint8_t               random[8];
     dmr_homebrew_config_t *config;
     bool                  run;
+    dmr_thread_t          *thread;
+    dmr_proto_t           proto;
+    struct {
+        uint8_t  seq;
+        uint32_t stream_id;
+        dmr_id_t src_id;
+        dmr_id_t dst_id;
+        dmr_call_type_t call_type;
+        dmr_slot_type_t slot_type;
+    } tx[2];
 } dmr_homebrew_t;
-
-typedef struct __attribute__((__packed__)) {
-    union {
-        struct {
-            uint8_t  signature[6];
-            dmr_id_t repeater_id;
-        } ack;
-        struct {
-            uint8_t  signature[6];
-            dmr_id_t repeater_id;
-        } nak;
-    } response;
-} dmr_homebrew_master_packet_t;
 
 extern dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer);
 extern bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
+extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
+extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_loop(dmr_homebrew_t *homebrew);
-extern bool dmr_homebrew_send(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t len);
-extern bool dmr_homebrew_recv(dmr_homebrew_t *homebrew, uint16_t *len);
+extern bool dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
+extern bool dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t len);
+extern bool dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, uint16_t *len);
 extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
 extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
-
+#include <stdio.h>
+#include <ctype.h>
 #include "dmr/bits.h"
 
 uint8_t bits_to_byte(bit_t bits[8])
@@ -35,4 +36,36 @@ void bytes_to_bits(uint8_t *bytes, size_t bytes_length, bit_t *bits, size_t bits
     uint16_t i = 0;
     for (; i < min(bits_length/8, bytes_length); i++)
         byte_to_bits(bytes[i], &bits[i * 8]);
+}
+
+void dump_hex(void *mem, size_t len)
+{
+    size_t i, j;
+    for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
+        /* print offset */
+        if (i % HEXDUMP_COLS == 0) {
+            printf("0x%06zx: ", i);
+        }
+
+        /* print hex data */
+        if (i < len) {
+            printf("%02x ", 0xFF & ((char*)mem)[i]);
+        } else { /* end of block, just aligning for ASCII dump */
+            printf("   ");
+        }
+
+        /* print ASCII dump */
+        if (i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
+            for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
+                if (j >= len) { /* end of block, not really printing */
+                    putchar(' ');
+                } else if (isprint(((char*)mem)[j])) { /* printable char */
+                    putchar(0xff & ((char*)mem)[j]);
+                } else { /* other char */
+                    putchar('.');
+                }
+            }
+            putchar('\n');
+        }
+    }
 }

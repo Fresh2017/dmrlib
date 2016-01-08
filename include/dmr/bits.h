@@ -4,6 +4,8 @@
 #include <inttypes.h>
 #include <stddef.h>
 
+#define HEXDUMP_COLS 16
+
 #ifndef min
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
@@ -19,5 +21,6 @@ uint8_t bits_to_byte(bit_t bits[8]);
 void bits_to_bytes(bit_t *bits, size_t bits_length, uint8_t *bytes, size_t bytes_length);
 void byte_to_bits(uint8_t byte, bit_t bits[8]);
 void bytes_to_bits(uint8_t *bytes, size_t bytes_length, bit_t *bits, size_t bits_length);
+void dump_hex(void *mem, size_t len);
 
 #endif // _DMR_BITS_H

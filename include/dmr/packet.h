@@ -1,3 +1,6 @@
+/**
+ * @file
+ */
 #ifndef _DMRLIB_PACKET_H
 #define _DMRLIB_PACKET_H
 
@@ -27,6 +30,7 @@ typedef struct {
     dmr_id_t src_id;
     dmr_id_t dst_id;
     dmr_id_t repeater_id;
+    dmr_call_type_t call_type;
     dmr_slot_type_t slot_type;
     dmr_payload_t payload;
 } dmr_packet_t;

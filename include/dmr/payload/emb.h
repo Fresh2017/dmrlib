@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Embedded Signalling.
+ */
 #ifndef _DMR_PAYLOAD_EMB_H
 #define _DMR_PAYLOAD_EMB_H
 

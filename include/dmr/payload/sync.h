@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Payload SYNC data.
+ */
 #ifndef _DMR_PAYLOAD_SYNC_H
 #define _DMR_PAYLOAD_SYNC_H
 

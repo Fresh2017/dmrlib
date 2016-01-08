@@ -20,8 +20,6 @@
 #include <dmrfec.h>
 
 #define ETHER_TYPE_IP (0x0800)
-#define HEXDUMP_COLS  16
-#define HEXDUMP_BREAK 8
 
 #if defined(DMR_PLATFORM_WINDOWS)
 #include <sys/param.h>
@@ -78,38 +76,6 @@ void usage(const char *program)
     fprintf(stderr, "\t-?, -h\t\t\tShow this help.\n");
     fprintf(stderr, "\t--source <source>\tPCAP source file.\n");
     fprintf(stderr, "\t-r <source>\n");
-}
-
-void dump_hex(void *mem, unsigned int len)
-{
-    unsigned int i, j;
-    for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
-        /* print offset */
-        if (i % HEXDUMP_COLS == 0) {
-            printf("0x%06x: ", i);
-        }
-
-        /* print hex data */
-        if (i < len) {
-            printf("%02x ", 0xFF & ((char*)mem)[i]);
-        } else { /* end of block, just aligning for ASCII dump */
-            printf("   ");
-        }
-
-        /* print ASCII dump */
-        if (i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
-            for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
-                if (j >= len) { /* end of block, not really printing */
-                    putchar(' ');
-                } else if (isprint(((char*)mem)[j])) { /* printable char */
-                    putchar(0xff & ((char*)mem)[j]);
-                } else { /* other char */
-                    putchar('.');
-                }
-            }
-            putchar('\n');
-        }
-    }
 }
 
 void dump_dmr_packet(dmr_packet_t *packet)

@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @author Igor Pavlov
+ * @date 2010-06-11
+ */
 #ifndef _SHA256_H
 #define _SHA256_H
 

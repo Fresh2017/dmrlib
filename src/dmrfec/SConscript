@@ -1,0 +1,16 @@
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    env['libdmrfec_name'] = 'dmrfec'
+
+elif sys.platform == 'win32':
+    env['libdmrfec_name'] = 'dmrfec.dll'
+
+src = [
+    Glob('*.c'),
+]
+dmrfec = env.SharedLibrary(env['libdmrfec_name'], src)
+#env.StaticLibrary(name, src)
+Return('dmrfec')

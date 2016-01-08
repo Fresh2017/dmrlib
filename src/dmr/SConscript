@@ -1,0 +1,32 @@
+import os
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    env['libdmr_name'] = 'dmr'
+
+elif sys.platform == 'win32':
+    env['libdmr_name'] = 'dmr.dll'
+
+localenv = env.Clone()
+localenv.Append(
+    CPPPATH=[
+        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
+    ],
+    LIBS=[
+        env['libdmrfec_name'],
+    ],
+    LIBPATH=[
+        '#build/libdmrfec',
+    ],
+)
+
+src = [
+    Glob('*.c'),
+    Glob('*/*.c'),
+    Glob('support/tinycthread/source/*.c'),
+]
+dmr = localenv.SharedLibrary(env['libdmr_name'], src)
+#env.StaticLibrary(name, src)
+Return('dmr')

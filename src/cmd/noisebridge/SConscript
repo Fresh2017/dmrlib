@@ -1,0 +1,28 @@
+import os
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'noisebridge'
+
+elif sys.platform == 'win32':
+    name = 'noisebridge.exe'
+
+localenv = env.Clone()
+localenv.Append(
+    CPPPATH=[
+        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
+    ],
+    LIBS=[
+        env['libdmrfec_name'],
+        env['libdmr_name'],
+    ],
+    LIBPATH=[
+        '#build/libdmr',
+        '#build/libdmrfec',
+    ],
+)
+
+noisebridge = localenv.Program(name, Glob('*.c'))
+Return('noisebridge')

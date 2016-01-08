@@ -15,6 +15,8 @@
 #include <dmr/buffer/ring.h>
 #include <dmr/type.h>
 
+#include "tinycthread.h"
+
 #define DMR_MMDVM_BAUD_RATE     115200
 
 #define DMR_MMDVM_FRAME_START   0xE0U
@@ -127,6 +129,8 @@ typedef struct {
     dmr_ring_t *dmr_ts2_tx_buffer;
     dmr_ring_t *ysf_rx_buffer;
     dmr_ring_t *ysf_tx_buffer;
+    thrd_t     *thread;
+    bool       active;
 } dmr_mmdvm_t;
 
 extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes);

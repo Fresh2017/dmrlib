@@ -1,0 +1,37 @@
+import os
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'dmrdump'
+
+elif sys.platform == 'win32':
+    name = 'dmrdump.exe'
+
+localenv = env.Clone()
+localenv.Append(
+    CPPPATH=[
+        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
+    ],
+    LIBS=[
+        env['libdmrfec_name'],
+        env['libdmr_name'],
+        'pcap',
+    ],
+    LIBPATH=[
+        '#build/libdmr',
+        '#build/libdmrfec',
+    ],
+)
+conf = Configure(localenv)
+if not conf.CheckLibWithHeader('pcap', 'pcap.h', 'c'):
+    print('libpcap is required, check config.log')
+    Exit(1)
+
+src = [
+    'main.c',
+]
+dmrdump = localenv.Program(name, src)
+#env.StaticLibrary(name, src)
+Return('dmrdump')

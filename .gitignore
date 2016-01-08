@@ -24,3 +24,7 @@
 .sconsign.dblite
 build/
 config.log
+
+# Scons build
+bin/
+lib/

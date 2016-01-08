@@ -1,0 +1,32 @@
+import os
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'mmdvmtest'
+
+elif sys.platform == 'win32':
+    name = 'mmdvmtest.exe'
+
+localenv = env.Clone()
+localenv.Append(
+    CPPPATH=[
+        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
+    ],
+    LIBS=[
+        env['libdmrfec_name'],
+        env['libdmr_name'],
+    ],
+    LIBPATH=[
+        '#build/libdmr',
+        '#build/libdmrfec',
+    ],
+)
+
+src = [
+    'main.c',
+]
+mmdvmtest = localenv.Program(name, src)
+#env.StaticLibrary(name, src)
+Return('mmdvmtest')

@@ -37,8 +37,9 @@ typedef struct {
 } dmr_payload_voice_bytes_t;
 
 #include <dmr/payload/csbk.h>
-#include <dmr/payload/emb.h>
 #include <dmr/payload/info.h>
 #include <dmr/payload/sync.h>
+#include <dmr/payload/voice.h>
+#include <dmr/payload/voice_emb.h>
 
 #endif // _DMR_PAYLOAD_H

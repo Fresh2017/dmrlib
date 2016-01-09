@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Logging.
+ */
 #ifndef _DMR_LOG_H
 #define _DMR_LOG_H
 

@@ -2,8 +2,8 @@
  * @file
  * @brief Embedded Signalling.
  */
-#ifndef _DMR_PAYLOAD_EMB_H
-#define _DMR_PAYLOAD_EMB_H
+#ifndef _DMR_PAYLOAD_VOICE_EMB_H
+#define _DMR_PAYLOAD_VOICE_EMB_H
 
 #include <dmr/type.h>
 #include <dmr/payload/sync.h>
@@ -36,4 +36,4 @@ extern dmr_emb_bits_t *dmr_emb_from_payload_sync_bits(dmr_payload_sync_bits_t *s
 extern dmr_emb_t *dmr_emb_decode(dmr_emb_bits_t *emb_bits);
 extern char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss);
 
-#endif // _DMR_PAYLOAD_EMB_H
+#endif // _DMR_PAYLOAD_VOICE_EMB_H

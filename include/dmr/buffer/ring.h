@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Ring buffer.
+ */
 #ifndef _DMR_BUFFER_RING_H
 #define _DMR_BUFFER_RING_H
 

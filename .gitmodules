@@ -1,3 +1,0 @@
-[submodule "src/dmr/support/tinycthread"]
-	path = src/dmr/support/tinycthread
-	url = https://github.com/tehmaze/tinycthread

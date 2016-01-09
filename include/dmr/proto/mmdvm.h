@@ -21,8 +21,7 @@
 #include <dmr/type.h>
 #include <dmr/thread.h>
 #include <dmr/proto.h>
-
-#include "tinycthread.h"
+#include <dmr/thread.h>
 
 #define DMR_MMDVM_BAUD_RATE     115200
 

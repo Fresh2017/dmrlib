@@ -5,7 +5,7 @@
 #include "dmr/log.h"
 #include "dmr/thread.h"
 
-_dmr_thread_local static dmr_error_t error;
+static _dmr_thread_local dmr_error_t error;
 static const char *dmr_error_enomem      = "out of memory";
 static const char *dmr_error_einval      = "invalid argument";
 static const char *dmr_error_ewrite      = "write failed";
@@ -52,7 +52,7 @@ int dmr_error_set(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(error.msg, DMR_ERR_MAX_STRLEN, fmt, ap);
     va_end(ap);
-    
+
     return -1;
 }
 

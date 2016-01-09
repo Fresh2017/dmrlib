@@ -22,8 +22,8 @@ freely, subject to the following restrictions:
     distribution.
 */
 
-#ifndef _TINYCTHREAD_H_
-#define _TINYCTHREAD_H_
+#ifndef _DMR_THREAD_H
+#define _DMR_THREAD_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -445,4 +445,4 @@ int dmr_locals_set(dmr_locals_t key, void *val);
 }
 #endif
 
-#endif /* _TINYTHREAD_H_ */
+#endif /* _DMR_THREAD_H */

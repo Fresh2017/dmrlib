@@ -23,6 +23,7 @@ freely, subject to the following restrictions:
 */
 
 #include <stdlib.h>
+#include "dmr/platform.h"
 #include "dmr/thread.h"
 
 /* Platform specific includes */
@@ -471,61 +472,61 @@ int dmr_cond_timedwait(dmr_cond_t *cond, dmr_mutext *mtx, const struct timespec 
 }
 
 #if defined(_DMR_THREAD_WIN32_)
-struct TinyCThreadTSSData {
+struct dmr_thread_tss_data {
   void* value;
   dmr_locals_t key;
-  struct TinyCThreadTSSData* next;
+  struct dmr_thread_tss_data* next;
 };
 
-static dmr_locals_dtor_t _tinycthread_dmr_locals_dtors[1088] = { NULL, };
+static dmr_locals_dtor_t _dmr_thread_locals_dtors[1088] = { NULL, };
 
-static _Thread_local struct TinyCThreadTSSData* _tinycthread_dmr_locals_head = NULL;
-static _Thread_local struct TinyCThreadTSSData* _tinycthread_dmr_locals_tail = NULL;
+static _dmr_thread_local struct dmr_thread_tss_data* _dmr_thread_locals_head = NULL;
+static _dmr_thread_local struct dmr_thread_tss_data* _dmr_thread_locals_tail = NULL;
 
-static void _tinycthread_dmr_locals_cleanup (void);
+static void _dmr_thread_locals_cleanup (void);
 
-static void _tinycthread_dmr_locals_cleanup (void) {
-  struct TinyCThreadTSSData* data;
+static void _dmr_thread_locals_cleanup (void) {
+  struct dmr_thread_tss_data* data;
   int iteration;
   unsigned int again = 1;
   void* value;
 
-  for (iteration = 0 ; iteration < TSS_DTOR_ITERATIONS && again > 0 ; iteration++)
+  for (iteration = 0 ; iteration < DMR_LOCALS_DTOR_ITERATIONS && again > 0 ; iteration++)
   {
     again = 0;
-    for (data = _tinycthread_dmr_locals_head ; data != NULL ; data = data->next)
+    for (data = _dmr_thread_locals_head ; data != NULL ; data = data->next)
     {
       if (data->value != NULL)
       {
         value = data->value;
         data->value = NULL;
 
-        if (_tinycthread_dmr_locals_dtors[data->key] != NULL)
+        if (_dmr_thread_locals_dtors[data->key] != NULL)
         {
           again = 1;
-          _tinycthread_dmr_locals_dtors[data->key](value);
+          _dmr_thread_locals_dtors[data->key](value);
         }
       }
     }
   }
 
-  while (_tinycthread_dmr_locals_head != NULL) {
-    data = _tinycthread_dmr_locals_head->next;
-    free (_tinycthread_dmr_locals_head);
-    _tinycthread_dmr_locals_head = data;
+  while (_dmr_thread_locals_head != NULL) {
+    data = _dmr_thread_locals_head->next;
+    free (_dmr_thread_locals_head);
+    _dmr_thread_locals_head = data;
   }
-  _tinycthread_dmr_locals_head = NULL;
-  _tinycthread_dmr_locals_tail = NULL;
+  _dmr_thread_locals_head = NULL;
+  _dmr_thread_locals_tail = NULL;
 }
 
-static void NTAPI _tinycthread_dmr_locals_callback(PVOID h, DWORD dwReason, PVOID pv)
+static void NTAPI _dmr_thread_locals_callback(PVOID h, DWORD dwReason, PVOID pv)
 {
   (void)h;
   (void)pv;
 
-  if (_tinycthread_dmr_locals_head != NULL && (dwReason == DLL_THREAD_DETACH || dwReason == DLL_PROCESS_DETACH))
+  if (_dmr_thread_locals_head != NULL && (dwReason == DLL_THREAD_DETACH || dwReason == DLL_PROCESS_DETACH))
   {
-    _tinycthread_dmr_locals_cleanup();
+    _dmr_thread_locals_cleanup();
   }
 }
 
@@ -535,14 +536,14 @@ static void NTAPI _tinycthread_dmr_locals_callback(PVOID h, DWORD dwReason, PVOI
   #else
     #pragma data_seg(".CRT$XLB")
   #endif
-  PIMAGE_TLS_CALLBACK p_thread_callback = _tinycthread_dmr_locals_callback;
+  PIMAGE_TLS_CALLBACK p_thread_callback = _dmr_thread_locals_callback;
   #ifdef _M_X64
     #pragma data_seg()
   #else
     #pragma const_seg()
   #endif
 #else
-  PIMAGE_TLS_CALLBACK p_thread_callback __attribute__((section(".CRT$XLB"))) = _tinycthread_dmr_locals_callback;
+  PIMAGE_TLS_CALLBACK p_thread_callback __attribute__((section(".CRT$XLB"))) = _dmr_thread_locals_callback;
 #endif
 
 #endif /* defined(_DMR_THREAD_WIN32_) */
@@ -576,9 +577,9 @@ static void * _dmr_thread_wrapper_function(void * aArg)
   res = fun(arg);
 
 #if defined(_DMR_THREAD_WIN32_)
-  if (_tinycthread_dmr_locals_head != NULL)
+  if (_dmr_thread_locals_head != NULL)
   {
-    _tinycthread_dmr_locals_cleanup();
+    _dmr_thread_locals_cleanup();
   }
 
   return (DWORD)res;
@@ -650,9 +651,9 @@ int dmr_thread_equal(dmr_thread_t thr0, dmr_thread_t thr1)
 void dmr_thread_exit(int res)
 {
 #if defined(_DMR_THREAD_WIN32_)
-  if (_tinycthread_dmr_locals_head != NULL)
+  if (_dmr_thread_locals_head != NULL)
   {
-    _tinycthread_dmr_locals_cleanup();
+    _dmr_thread_locals_cleanup();
   }
 
   ExitThread(res);
@@ -747,7 +748,7 @@ int dmr_locals_create(dmr_locals_t *key, dmr_locals_dtor_t dtor)
   {
     return dmr_thread_error;
   }
-  _tinycthread_dmr_locals_dtors[*key] = dtor;
+  _dmr_thread_locals_dtors[*key] = dtor;
 #else
   if (pthread_key_create(key, dtor) != 0)
   {
@@ -760,17 +761,17 @@ int dmr_locals_create(dmr_locals_t *key, dmr_locals_dtor_t dtor)
 void dmr_locals_delete(dmr_locals_t key)
 {
 #if defined(_DMR_THREAD_WIN32_)
-  struct TinyCThreadTSSData* data = (struct TinyCThreadTSSData*) TlsGetValue (key);
-  struct TinyCThreadTSSData* prev = NULL;
+  struct dmr_thread_tss_data* data = (struct dmr_thread_tss_data*) TlsGetValue (key);
+  struct dmr_thread_tss_data* prev = NULL;
   if (data != NULL)
   {
-    if (data == _tinycthread_dmr_locals_head)
+    if (data == _dmr_thread_locals_head)
     {
-      _tinycthread_dmr_locals_head = data->next;
+      _dmr_thread_locals_head = data->next;
     }
     else
     {
-      prev = _tinycthread_dmr_locals_head;
+      prev = _dmr_thread_locals_head;
       if (prev != NULL)
       {
         while (prev->next != data)
@@ -780,14 +781,14 @@ void dmr_locals_delete(dmr_locals_t key)
       }
     }
 
-    if (data == _tinycthread_dmr_locals_tail)
+    if (data == _dmr_thread_locals_tail)
     {
-      _tinycthread_dmr_locals_tail = prev;
+      _dmr_thread_locals_tail = prev;
     }
 
     free (data);
   }
-  _tinycthread_dmr_locals_dtors[key] = NULL;
+  _dmr_thread_locals_dtors[key] = NULL;
   TlsFree(key);
 #else
   pthread_key_delete(key);
@@ -797,7 +798,7 @@ void dmr_locals_delete(dmr_locals_t key)
 void *dmr_locals_get(dmr_locals_t key)
 {
 #if defined(_DMR_THREAD_WIN32_)
-  struct TinyCThreadTSSData* data = (struct TinyCThreadTSSData*)TlsGetValue(key);
+  struct dmr_thread_tss_data* data = (struct dmr_thread_tss_data*)TlsGetValue(key);
   if (data == NULL)
   {
     return NULL;
@@ -811,10 +812,10 @@ void *dmr_locals_get(dmr_locals_t key)
 int dmr_locals_set(dmr_locals_t key, void *val)
 {
 #if defined(_DMR_THREAD_WIN32_)
-  struct TinyCThreadTSSData* data = (struct TinyCThreadTSSData*)TlsGetValue(key);
+  struct dmr_thread_tss_data* data = (struct dmr_thread_tss_data*)TlsGetValue(key);
   if (data == NULL)
   {
-    data = (struct TinyCThreadTSSData*)malloc(sizeof(struct TinyCThreadTSSData));
+    data = (struct dmr_thread_tss_data*)malloc(sizeof(struct dmr_thread_tss_data));
     if (data == NULL)
     {
       return dmr_thread_error;
@@ -824,18 +825,18 @@ int dmr_locals_set(dmr_locals_t key, void *val)
     data->key = key;
     data->next = NULL;
 
-    if (_tinycthread_dmr_locals_tail != NULL)
+    if (_dmr_thread_locals_tail != NULL)
     {
-      _tinycthread_dmr_locals_tail->next = data;
+      _dmr_thread_locals_tail->next = data;
     }
     else
     {
-      _tinycthread_dmr_locals_tail = data;
+      _dmr_thread_locals_tail = data;
     }
 
-    if (_tinycthread_dmr_locals_head == NULL)
+    if (_dmr_thread_locals_head == NULL)
     {
-      _tinycthread_dmr_locals_head = data;
+      _dmr_thread_locals_head = data;
     }
 
     if (!TlsSetValue(key, data))
@@ -885,7 +886,7 @@ int _dmr_thread_timespec_get(struct timespec *ts, int base)
 #endif /* _DMR_THREAD_EMULATE_TIMESPEC_GET_ */
 
 #if defined(_DMR_THREAD_WIN32_)
-void call_once(once_flag *flag, void (*func)(void))
+void dmr_call_once(dmr_once_flag *flag, void (*func)(void))
 {
   /* The idea here is that we use a spin lock (via the
      InterlockedCompareExchange function) to restrict access to the

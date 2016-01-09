@@ -1,0 +1,15 @@
+import sys
+
+Import('env')
+
+localenv = env.Clone()
+
+if sys.platform == 'win32':
+    localenv.Append(
+        LINKFLAGS=[
+            '-static-libgcc',
+        ],
+    )
+
+mbelib = localenv.SharedLibrary('mbe', Glob('*.c'))
+Return('mbelib')

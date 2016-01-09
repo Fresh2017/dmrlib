@@ -14,7 +14,7 @@
 
 #include "dmr/proto.h"
 #include "dmr/proto/mmdvm.h"
-#include "tinycthread.h"
+#include "dmr/thread.h"
 
 static const char *dmr_mmdvm_proto_name = "mmdvm";
 

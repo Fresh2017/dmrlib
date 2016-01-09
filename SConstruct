@@ -17,6 +17,16 @@ env = Environment(
     ],
 )
 
+if sys.platform == 'darwin':
+    # To support Homebrew, http://brew.sh/
+    env.Append(
+        CPPPATH=[
+            '/usr/local/include',
+        ],
+        LIBPATH=[
+            '/usr/local/lib',
+        ],
+    )
 if sys.platform == 'win32':
     env.Tool('mingw')
 

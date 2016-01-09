@@ -3,12 +3,6 @@ import sys
 
 Import('env')
 
-if sys.platform in ('linux2', 'darwin'):
-    name = 'noisebridge'
-
-elif sys.platform == 'win32':
-    name = 'noisebridge.exe'
-
 localenv = env.Clone()
 localenv.Append(
     CPPPATH=[
@@ -17,12 +11,27 @@ localenv.Append(
     LIBS=[
         env['libdmrfec_name'],
         env['libdmr_name'],
+        'SDL2',
     ],
     LIBPATH=[
         '#build/libdmr',
         '#build/libdmrfec',
     ],
 )
+
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'noisebridge'
+
+if sys.platform == 'darwin':
+    localenv.Append(
+        LINKFLAGS=[
+            '-framework', 'CoreServices',
+        ],
+    )
+
+if sys.platform == 'win32':
+    name = 'noisebridge.exe'
 
 noisebridge = localenv.Program(name, Glob('*.c'))
 Return('noisebridge')

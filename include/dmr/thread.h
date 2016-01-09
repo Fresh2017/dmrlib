@@ -108,16 +108,16 @@ int _dmr_thread_timespec_get(struct timespec *ts, int base);
 #define TINYCTHREAD_VERSION (TINYCTHREAD_VERSION_MAJOR * 100 + TINYCTHREAD_VERSION_MINOR)
 
 /**
-* @def _Thread_local
+* @def _dmr_thread_local
 * Thread local storage keyword.
-* A variable that is declared with the @c _Thread_local keyword makes the
+* A variable that is declared with the @c _dmr_thread_local keyword makes the
 * value of the variable local to each thread (known as thread-local storage,
 * or TLS). Example usage:
 * @code
 * // This variable is local to each thread.
-* _Thread_local int variable;
+* _dmr_thread_local int variable;
 * @endcode
-* @note The @c _Thread_local keyword is a macro that maps to the corresponding
+* @note The @c _dmr_thread_local keyword is a macro that maps to the corresponding
 * compiler directive (e.g. @c __declspec(thread)).
 * @note This directive is currently not supported on Mac OS X (it will give
 * a compiler error), since compile-time TLS is not supported in the Mac OS X
@@ -126,14 +126,14 @@ int _dmr_thread_timespec_get(struct timespec *ts, int base);
 * @hideinitializer
 */
 
-#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L)) && !defined(_Thread_local)
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L)) && !defined(_dmr_thread_local)
  #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__SUNPRO_CC) || defined(__IBMCPP__)
-  #define _Thread_local __thread
+  #define _dmr_thread_local __thread
  #else
-  #define _Thread_local __declspec(thread)
+  #define _dmr_thread_local __declspec(thread)
  #endif
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) < ((4 << 8) | 9))
- #define _Thread_local __thread
+ #define _dmr_thread_local __thread
 #endif
 
 /* Macros */

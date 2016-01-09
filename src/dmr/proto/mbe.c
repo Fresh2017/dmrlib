@@ -49,13 +49,36 @@ static uint8_t mbe_decode_deinterleave_matrix_z[36] = {
     0x0d, 0x02, 0x0c, 0x01, 0x0b, 0x00
 };
 
+static dmr_proto_status_t mbe_proto_init(void *mbeptr)
+{
+    if (mbeptr == NULL)
+        return DMR_PROTO_CONF;
+    else
+        return DMR_PROTO_OK;
+}
+
+static void mbe_proto_process_voice(void *mbeptr, dmr_voice_t *voice, float *samples)
+{
+    dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
+
+    if (mbe == NULL || voice == NULL || samples == NULL)
+        return;
+
+    dmr_mbe_decode(mbe, voice, samples);
+}
+
 dmr_mbe_t *dmr_mbe_new(uint8_t quality)
 {
     dmr_mbe_t *mbe = malloc(sizeof(dmr_mbe_t));
     if (mbe == NULL)
         return NULL;
 
+    // Setup protocol
     mbe->proto.name = dmr_mbe_proto_name;
+    mbe->proto.type = DMR_PROTO_MBE;
+    mbe->proto.init = mbe_proto_init;
+    mbe->proto.process_voice = mbe_proto_process_voice;
+
     mbe->quality = quality;
     mbe_initMbeParms(
         &mbe->curr_mp,
@@ -131,24 +154,6 @@ void dmr_mbe_free(dmr_mbe_t *mbe)
         return;
 
     free(mbe);
-}
-
-static dmr_proto_status_t dmr_proto_mbe_init(void *mbeptr)
-{
-    if (mbeptr == NULL)
-        return DMR_PROTO_CONF;
-    else
-        return DMR_PROTO_OK;
-}
-
-static void mbe_process_voice(void *mbeptr, dmr_voice_t *voice, float *samples)
-{
-    dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
-
-    if (mbe == NULL || voice == NULL || samples == NULL)
-        return;
-
-    dmr_mbe_decode(mbe, voice, samples);
 }
 
 #endif // DMR_PLATFORM_WINDOWS

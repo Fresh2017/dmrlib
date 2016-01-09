@@ -44,4 +44,7 @@ typedef uint8_t dmr_ts_t;
 typedef uint32_t dmr_id_t;
 typedef uint8_t dmr_color_code_t;
 
+// Portable version
+#define DMR_UNUSED(x) (void)(x)
+
 #endif // _DMR_TYPE_H

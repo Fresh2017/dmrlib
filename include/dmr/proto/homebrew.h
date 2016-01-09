@@ -89,13 +89,13 @@ typedef struct {
 } dmr_homebrew_t;
 
 extern dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer);
-extern bool dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
+extern int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
 extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_loop(dmr_homebrew_t *homebrew);
-extern bool dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
-extern bool dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t len);
-extern bool dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, uint16_t *len);
+extern int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
+extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t len);
+extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, uint16_t *len);
 extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
 extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
 

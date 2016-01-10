@@ -3,8 +3,18 @@
 #include <sys/time.h>
 #include <time.h>
 #include "dmr/log.h"
+#include "dmr/bits.h"
 #include "dmr/type.h"
 
+static const char *dmr_log_priority_names[] = {
+    "NULL",
+    "verbose",
+    "debug",
+    "info",
+    "warn",
+    "error",
+    "critical"
+};
 static const char *dmr_log_priority_tags[] = {
     NULL,
     "DEBUG",
@@ -85,7 +95,8 @@ dmr_log_priority_t dmr_log_priority(void)
 
 void dmr_log_priority_set(dmr_log_priority_t priority)
 {
-    log_priority = priority;
+    log_priority = min(DMR_LOG_PRIORITY_VERBOSE, max(priority, DMR_LOG_PRIORITIES - 1));
+    dmr_log_info("log: priority set to %s", dmr_log_priority_names[log_priority]);
 }
 
 const char *dmr_log_prefix(void)

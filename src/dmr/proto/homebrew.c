@@ -190,7 +190,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 {
     uint8_t buf[328], digest[SHA256_DIGEST_LENGTH];
     int i, j, ret;
-    uint16_t len;
+    ssize_t len;
     sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
@@ -210,7 +210,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
-            dmr_log_verbose("homebrew: sending repeater id\n");
+            dmr_log_verbose("homebrew: sending repeater id");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
                 return ret;
 
@@ -224,7 +224,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 }
                 if (len == 22 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
                     memcpy(&homebrew->random, &homebrew->buffer[14], 8);
-                    dmr_log_verbose("homebrew: master sent nonce %.*s\n",
+                    dmr_log_verbose("homebrew: master sent nonce %.*s",
                         8, homebrew->random);
                     dmr_log_debug("homebrew: master accepted our repeater id");
                     homebrew->auth = DMR_HOMEBREW_AUTH_INIT;
@@ -254,8 +254,8 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[13 + j] = hex[(digest[i] & 0x0f)];
             }
 
-            dmr_log_verbose("homebrew: sending nonce\n");
-            if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
+            dmr_log_verbose("homebrew: sending nonce");
+            if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12 + 64)) < 0)
                 return ret;
 
             while (true) {
@@ -267,7 +267,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                     return dmr_error_set("homebrew: master authentication failed");
                 }
                 if (len == 14 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
-                    dmr_log_debug("homebrew: master accepted nonce, logged in\n");
+                    dmr_log_debug("homebrew: master accepted nonce, logged in");
                     homebrew->auth = DMR_HOMEBREW_AUTH_DONE;
                     break;
                 }
@@ -279,7 +279,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             return dmr_error_set("homebrew: master authentication failed");
 
         case DMR_HOMEBREW_AUTH_DONE:
-            dmr_log_verbose("homebrew: logged in, sending our configuration\n");
+            dmr_log_verbose("homebrew: logged in, sending our configuration");
             memcpy(&buf, &dmr_homebrew_repeater_config, 4);
             uint16_t pos = 4;
 #define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
@@ -362,7 +362,7 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
 void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
 {
     uint8_t buf[53];
-    uint16_t len, pos;
+    ssize_t len, pos;
     dmr_packet_t packet, *p;
 
     if (homebrew == NULL)
@@ -464,14 +464,15 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     return dmr_homebrew_sendraw(homebrew, buf, DMR_PAYLOAD_BYTES + 20);
 }
 
-int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t len)
+int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, ssize_t len)
 {
     if (homebrew == NULL)
         return dmr_error(DMR_EINVAL);
 
     dmr_log_debug("homebrew: %d bytes to %s:%d", len, inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
-    //dump_hex((void *)buf, len);
-    if (sendto(homebrew->fd, (const char *)buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
+    if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
+        dump_hex((void *)buf, len);
+    if (sendto(homebrew->fd, buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
         fprintf(stderr, "homebrew: send to %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
@@ -482,29 +483,27 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t 
     return 0;
 }
 
-int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, uint16_t *len)
+int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len)
 {
     struct sockaddr_in peer;
-    int ilen;
 #ifdef DMR_PLATFORM_WINDOWS
     int peerlen;
 #else
     socklen_t peerlen;
 #endif
-    uint16_t olen;
-    if ((ilen = recvfrom(homebrew->fd, (char *)&homebrew->buffer, 64, 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
-        *len = 0;
+    if ((*len = recvfrom(homebrew->fd, homebrew->buffer, sizeof(homebrew->buffer), 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
         dmr_log_error("homebrew: recv from %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
             strerror(errno));
         return dmr_error_set("homebrew: recvfrom(): %s", strerror(errno));
     }
-    dmr_log_debug("homebrew: recv %d bytes from %s:%d", len,
+    dmr_log_debug("homebrew: recv %d bytes from %s:%d", *len,
         inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
-    olen = ilen;
-    *len = olen;
-    dump_hex(homebrew->buffer, *len);
+
+    if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
+        dump_hex(homebrew->buffer, *len);
+
     return 0;
 }
 

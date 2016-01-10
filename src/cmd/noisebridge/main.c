@@ -9,7 +9,9 @@
 #include <SDL2/SDL.h>
 
 #include <dmr/log.h>
+#include <dmr/proto.h>
 #include <dmr/proto/homebrew.h>
+#include <dmr/proto/mbe.h>
 #include <dmr/proto/mmdvm.h>
 #include <dmr/proto/repeater.h>
 #include <dmr/payload/voice.h>
@@ -24,6 +26,7 @@ const char *package_id = "NoiseBridge-git";
 typedef enum {
     PEER_NONE,
     PEER_HOMEBREW,
+    PEER_MBE,
     PEER_MMDVM
 } peer_t;
 
@@ -42,6 +45,8 @@ typedef struct config_s {
     dmr_mmdvm_t        *mmdvm;
     char               *mmdvm_port;
     int                mmdvm_rate;
+    dmr_mbe_t          *mbe;
+    uint8_t            mbe_quality;
     char               *audio_device;
     dmr_log_priority_t log_level;
 } config_t;
@@ -85,6 +90,7 @@ config_t *configure(const char *filename)
     memset(&config, 0, sizeof(config_t));
     config.filename = filename;
     config.log_level = DMR_LOG_PRIORITY_INFO;
+    config.mbe_quality = 3;
 
     if ((fp = fopen(filename, "r")) == NULL) {
         dmr_log_critical("failed to open %s: %s", filename, strerror(errno));
@@ -149,11 +155,18 @@ config_t *configure(const char *filename)
         } else if (!strcmp(k, "modem_type")) {
             if (!strcmp(v, "mmdvm")) {
                 config.modem = PEER_MMDVM;
+
+            } else if (!strcmp(v, "mbe")) {
+                config.modem = PEER_MBE;
+
             } else {
                 dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s\n", filename, lineno, v);
                 valid = false;
                 break;
             }
+
+        } else if (!strcmp(k, "mbe_quality")) {
+            config.mbe_quality = atoi(v);
 
         } else if (!strcmp(k, "mmdvm_port")) {
             config.mmdvm_port = strdup(v);
@@ -242,6 +255,15 @@ bool init_dmr(config_t *config)
     bool valid = true;
 
     switch (config->modem) {
+    case PEER_MBE:
+        dmr_log_info("noisebridge: MBE decoder with quality %d", config->mbe_quality);
+        config->mbe = dmr_mbe_new(config->mbe_quality);
+        if (config->mbe == NULL) {
+            valid = false;
+            break;
+        }
+        break;
+
     case PEER_MMDVM:
         if (!(valid = (config->mmdvm_port != NULL))) {
             dmr_log_critical("noisebridge: %s: mmdvm_port required\n", config->filename);
@@ -341,8 +363,11 @@ bool init_dmr(config_t *config)
                 }
             }
             */
-            dump_hex(&config->homebrew->config, sizeof(dmr_homebrew_config_t));
-            if (dmr_homebrew_auth(config->homebrew, config->homebrew_auth))
+            if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
+                dmr_log_debug("noisebridge: dumping homebrew config struct:");
+                dump_hex(config->homebrew->config, sizeof(dmr_homebrew_config_t));
+            }
+            if (!(valid = (dmr_homebrew_auth(config->homebrew, config->homebrew_auth) == 0)))
                 break;
 
             free(config->homebrew);
@@ -381,6 +406,14 @@ bool init_repeater(config_t *config)
             return false;
         dmr_repeater_add(repeater, config->mmdvm, &config->mmdvm->proto);
     }
+    if (config->mbe != NULL) {
+        dmr_log_info("noisebridge: starting mbe proto");
+        if (!dmr_proto_init(config->mbe))
+            return false;
+        if (!dmr_proto_start(config->mbe))
+            return false;
+        dmr_repeater_add(repeater, config->mbe, &config->mbe->proto);
+    }
 
     if (!dmr_proto_init(repeater))
         return false;
@@ -390,35 +423,55 @@ bool init_repeater(config_t *config)
 
 int main(int argc, char **argv)
 {
-    config_t *config;
-    SDL_AudioDeviceID dev;
-
+    config_t *config = NULL;
+    SDL_AudioDeviceID dev = 0;
+    int status = 0;
 
     dmr_log_priority_set(DMR_LOG_PRIORITY_VERBOSE);
     if (argc != 2) {
         fprintf(stderr, "%s <config>\n", argv[0]);
-        return 1;
+        status = 1;
+        goto bail;
     }
 
     config = configure(argv[1]);
-    if (config == NULL)
-        return 1;
+    if (config == NULL) {
+        status = 1;
+        goto bail;
+    }
 
     dmr_log_priority_set(config->log_level);
 
-    if (!init_audio(config))
-        return 1;
+    if (!init_audio(config)) {
+        status = 1;
+        goto bail;
+    }
 
     if ((dev = boot_audio(config->audio_device)) == 0) {
         dmr_log_critical("failed to boot audio: %s", SDL_GetError());
-        return 1;
+        status = 1;
+        goto bail;
     }
 
-    if (!init_dmr(config))
-        return 1;
+    if (!init_dmr(config)) {
+        status = 1;
+        goto bail;
+    }
 
-    if (!init_repeater(config))
-        return 1;
+    if (!init_repeater(config)) {
+        status = 1;
+        goto bail;
+    }
 
-    return 0;
+bail:
+    if (config != NULL) {
+        if (config->homebrew != NULL) {
+            dmr_homebrew_free(config->homebrew);
+        }
+        if (config->mbe != NULL) {
+            dmr_mbe_free(config->mbe);
+        }
+    }
+
+    return status;
 }

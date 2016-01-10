@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "dmr/bits.h"
+#include "dmr/log.h"
 
 uint8_t bits_to_byte(bit_t bits[8])
 {
@@ -38,9 +39,15 @@ void bytes_to_bits(uint8_t *bytes, size_t bytes_length, bit_t *bits, size_t bits
         byte_to_bits(bytes[i], &bits[i * 8]);
 }
 
-void dump_hex(void *mem, size_t len)
+void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
 {
     size_t i, j;
+
+    if (file == NULL)
+        printf("hex dump of %p+%zu:\n", mem, len);
+    else
+        printf("hex dump of %p+%zu in %s:%zu:\n", mem, len, file, line);
+
     for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
         /* print offset */
         if (i % HEXDUMP_COLS == 0) {
@@ -57,7 +64,7 @@ void dump_hex(void *mem, size_t len)
         /* print ASCII dump */
         if (i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
             for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
-                if (j >= len) { /* end of block, not really printing */
+                if (j >= len - 1) { /* end of block, not really printing */
                     putchar(' ');
                 } else if (isprint(((char*)mem)[j])) { /* printable char */
                     putchar(0xff & ((char*)mem)[j]);
@@ -68,4 +75,6 @@ void dump_hex(void *mem, size_t len)
             putchar('\n');
         }
     }
+
+    fflush(stdout);
 }

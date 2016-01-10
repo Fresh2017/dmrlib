@@ -21,6 +21,8 @@ uint8_t bits_to_byte(bit_t bits[8]);
 void bits_to_bytes(bit_t *bits, size_t bits_length, uint8_t *bytes, size_t bytes_length);
 void byte_to_bits(uint8_t byte, bit_t bits[8]);
 void bytes_to_bits(uint8_t *bytes, size_t bytes_length, bit_t *bits, size_t bits_length);
-void dump_hex(void *mem, size_t len);
+void _dmr_dump_hex(void *mem, size_t len, const char *func, size_t line);
+
+#define dump_hex(mem, len)      _dmr_dump_hex(mem, len, __FILE__, __LINE__)
 
 #endif // _DMR_BITS_H

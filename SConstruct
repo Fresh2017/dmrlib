@@ -18,12 +18,36 @@ env = Environment(
 )
 
 AddOption(
+    '--with-debug',
+    dest='with_debug',
+    action='store_true',
+    default=False,
+    help='Compile with debug symbols',
+)
+AddOption(
     '--with-dmalloc',
     dest='with_dmalloc',
     action='store_true',
     default=False,
     help='Compile with dmalloc',
 )
+
+if GetOption('with_debug'):
+    env.Append(
+        CCFLAGS=[
+            '-g',
+        ],
+        LINKFLAGS=[
+            '-g',
+        ],
+    )
+
+else:
+    env.Append(
+        CCFLAGS=[
+            '-O2',
+        ],
+    )
 
 if GetOption('with_dmalloc'):
     env.Append(

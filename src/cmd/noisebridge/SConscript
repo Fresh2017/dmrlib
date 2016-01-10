@@ -5,14 +5,11 @@ Import('env')
 
 localenv = env.Clone()
 localenv.Append(
-    CPPPATH=[
-        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
-    ],
     LIBS=[
         env['libdmrfec_name'],
         env['libdmr_name'],
         'mbe',
-        'SDL2',
+        'portaudio',
     ],
     LIBPATH=[
         '#build/libdmr',
@@ -26,6 +23,12 @@ if sys.platform in ('linux2', 'darwin'):
 
 if sys.platform == 'darwin':
     localenv.Append(
+        CPPPATH=[
+            '#support/darwin/portaudio/include',
+        ],
+        LIBPATH=[
+            '#support/darwin/portaudio/lib',
+        ],
         LINKFLAGS=[
             '-framework', 'CoreServices',
         ],

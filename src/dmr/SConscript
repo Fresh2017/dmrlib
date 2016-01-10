@@ -45,7 +45,6 @@ if sys.platform == 'win32':
 src = [
     Glob('*.c'),
     Glob('*/*.c'),
-    Glob('support/tinycthread/source/*.c'),
 ]
 dmr = localenv.SharedLibrary(env['libdmr_name'], src)
 #env.StaticLibrary(name, src)

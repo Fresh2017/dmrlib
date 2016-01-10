@@ -11,9 +11,6 @@ elif sys.platform == 'win32':
 
 localenv = env.Clone()
 localenv.Append(
-    CPPPATH=[
-        os.path.join('#src', 'dmr', 'support', 'tinycthread', 'source'),
-    ],
     LIBS=[
         env['libdmrfec_name'],
         env['libdmr_name'],

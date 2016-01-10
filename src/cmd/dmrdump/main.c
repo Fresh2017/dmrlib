@@ -254,6 +254,6 @@ int main(int argc, char **argv)
     }
 
     pcap_close(handle);
-    fprintf(stderr, "processed %lu packets\n", packets);
+    fprintf(stderr, "processed %zu packets\n", packets);
     return 0;
 }

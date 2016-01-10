@@ -1,0 +1,22 @@
+# Logging
+#log_level=0
+
+# Our upstream peer
+upstream_type=homebrew
+homebrew_host=brandmeister.pd0zry.ampr.org
+homebrew_auth=secret
+homebrew_call=N0CALL
+homebrew_id=123456
+homebrew_cc=1
+
+# Our "LF" side
+modem_type=mmdvm
+mmdvm_rate=115200
+# Linux:
+mmdvm_port=/dev/ttyACM0
+# OS X:
+#mmdvm_port=/dev/cu.usbmodem1421
+# OS X (Chinese knock-off CH340 chip)
+#mmdvm_port=/dev/cu.wchusbserial1420
+# Windows:
+#mmdvm_port=COM5

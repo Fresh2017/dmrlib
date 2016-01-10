@@ -4,9 +4,23 @@
 #include <inttypes.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-
 #define DMR_PLATFORM_WINDOWS
 
+#elif defined(__APPLE__) || defined(__MACH__)
+#define DMR_PLATFORM_DARWIN
+#define DMR_PLATFORM_UNIX
+
+#elif defined(__linux__)
+#define DMR_PLATFORM_LINUX
+#define DMR_PLATFORM_UNIX
+
+#else
+
+#error Platform not supported
+
+#endif
+
+#ifdef DMR_PLATFORM_WINDOWS
 #include <windows.h>
 
 // From unistd.h on UNIX
@@ -18,22 +32,20 @@ typedef int32_t speed_t;
 //The #define from common.h cannot be used since it breaks other mingw
 //headers if any are included after the #define.
 #define _ftime_s _ftime
-#endif
+#endif // __MINGW32__
 
-#elif defined(__APPLE__) || defined(__MACH__)
+#define dmr_sleep(s)      Sleep(s * 1000L)
+#define dmr_msleep(ms)    Sleep(ms)
+#define dmr_usleep(us)    Sleep(us / 1000L)
 
-#define DMR_PLATFORM_DARWIN
-#define DMR_PLATFORM_UNIX
+#endif // DMR_PLATFORM_WINDOWS
 
-#elif defined(__linux__)
+#ifdef DMR_PLATFORM_UNIX
 
-#define DMR_PLATFORM_LINUX
-#define DMR_PLATFORM_UNIX
+#define dmr_sleep(s)      sleep(s)
+#define dmr_msleep(s)     usleep(s * 1000L)
+#define dmr_usleep(s)     usleep(s)
 
-#else
-
-#error Platform not supported
-
-#endif
+#endif // DMR_PLATFORM_UNIX
 
 #endif // _DMR_PLATFORM_H

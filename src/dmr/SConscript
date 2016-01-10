@@ -11,6 +11,7 @@ localenv.Append(
     ],
     LIBPATH=[
         '#build/libdmrfec',
+        '#build/mbelib',
     ],
 )
 
@@ -26,11 +27,9 @@ if sys.platform == 'darwin':
     # Support Homebrew, http://brew.sh/
     localenv.Append(
         CPPPATH=[
-            '#support/darwin/mbelib/include',
             '/usr/local/include',
         ],
         LIBPATH=[
-            '#support/darwin/mbelib/lib',
             '/usr/local/lib',
         ],
     )
@@ -38,20 +37,8 @@ if sys.platform == 'darwin':
 if sys.platform == 'win32':
     env['libdmr_name'] = 'dmr'
     localenv.Append(
-        CPPDEFINES=[
-            '_CRT_NONSTDC_NO_DEPRECATE',
-        ],
-        CPPPATH=[
-            '#support/windows/mbelib/include',
-        ],
-        LIBPATH=[
-            '#support/windows/mbelib/lib',
-        ],
         LIBS=[
             'ws2_32',
-        ],
-        LINKFLAGS=[
-            '-static-libgcc',
         ],
     )
 

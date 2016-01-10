@@ -25,17 +25,20 @@ const char dmr_homebrew_repeater_config[4]  = "RPTC";
 
 static dmr_proto_status_t homebrew_proto_init(void *homebrewptr)
 {
+    dmr_log_debug("homebrew: init");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return DMR_PROTO_CONF;
     else if (homebrew->auth != DMR_HOMEBREW_AUTH_DONE)
         return DMR_PROTO_NOT_READY;
-    else
-        return DMR_PROTO_OK;
+
+    homebrew->proto.init_done = true;
+    return DMR_PROTO_OK;
 }
 
 static int homebrew_proto_start_thread(void *homebrewptr)
 {
+    dmr_log_debug("homebrew: start thread");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return dmr_thread_error;
@@ -46,10 +49,15 @@ static int homebrew_proto_start_thread(void *homebrewptr)
 
 static bool homebrew_proto_start(void *homebrewptr)
 {
+    dmr_log_debug("homebrew: start");
     int ret;
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return false;
+    if (!homebrew->proto.init_done) {
+        dmr_log_error("homebrew: attempt to start without init");
+        return false;
+    }
 
     if (homebrew->thread != NULL) {
         dmr_log_error("homebrew: can't start, already active");
@@ -58,7 +66,7 @@ static bool homebrew_proto_start(void *homebrewptr)
 
     homebrew->thread = malloc(sizeof(dmr_thread_t));
     if (homebrew->thread == NULL) {
-        fprintf(stderr, "homebrew: can't start, out of memory\n");
+        dmr_error(DMR_ENOMEM);
         return false;
     }
 
@@ -66,7 +74,7 @@ static bool homebrew_proto_start(void *homebrewptr)
     case dmr_thread_success:
         break;
     default:
-        fprintf(stderr, "homebrew: can't create thread\n");
+        dmr_log_error("homebrew: can't create thread");
         return false;
     }
 
@@ -75,13 +83,14 @@ static bool homebrew_proto_start(void *homebrewptr)
 
 static bool homebrew_proto_stop(void *homebrewptr)
 {
+    dmr_log_debug("homebrew: stop");
     int ret;
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return false;
 
     if (homebrew->thread == NULL) {
-        fprintf(stderr, "homebrew: not active\n");
+        dmr_log_error("homebrew: not active");
         return true;
     }
 
@@ -90,7 +99,7 @@ static bool homebrew_proto_stop(void *homebrewptr)
     case dmr_thread_success:
         break;
     default:
-        fprintf(stderr, "homebrew: can't stop thread\n");
+        dmr_log_error("homebrew: can't stop thread");
         return false;
     }
 
@@ -103,6 +112,7 @@ static bool homebrew_proto_stop(void *homebrewptr)
 
 static bool homebrew_proto_active(void *homebrewptr)
 {
+    dmr_log_verbose("homebrew: active");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return false;
@@ -112,6 +122,7 @@ static bool homebrew_proto_active(void *homebrewptr)
 
 static void homebrew_proto_rx(void *homebrewptr, dmr_packet_t *packet)
 {
+    dmr_log_debug("homebrew: proto_rx");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL || packet == NULL)
         return;
@@ -121,6 +132,10 @@ static void homebrew_proto_rx(void *homebrewptr, dmr_packet_t *packet)
 
 dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer)
 {
+    dmr_log_debug("homebrew: new on %s:%d to %s:%d",
+        inet_ntoa(bind), port,
+        inet_ntoa(peer), port);
+
     int optval = 1;
     dmr_homebrew_t *homebrew = malloc(sizeof(dmr_homebrew_t));
     if (homebrew == NULL) {
@@ -163,7 +178,6 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     }
     */
 
-    fprintf(stderr, "homebrew: remote %s\n", inet_ntoa(peer));
     homebrew->remote.sin_family = AF_INET;
     homebrew->remote.sin_addr.s_addr = peer.s_addr;
     homebrew->remote.sin_port = htons(port);
@@ -180,7 +194,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
     sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
-    fprintf(stderr, "homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x\n",
+    dmr_log_info("homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x\n",
         inet_ntoa(homebrew->remote.sin_addr),
         ntohs(homebrew->remote.sin_port),
         homebrew->config->repeater_id[0],
@@ -196,7 +210,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
-            fprintf(stderr, "homebrew: sending repeater id\n");
+            dmr_log_verbose("homebrew: sending repeater id\n");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
                 return ret;
 
@@ -210,8 +224,9 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 }
                 if (len == 22 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
                     memcpy(&homebrew->random, &homebrew->buffer[14], 8);
-                    fprintf(stderr, "homebrew: master accepted our repeater id, random: %.*s\n",
+                    dmr_log_verbose("homebrew: master sent nonce %.*s\n",
                         8, homebrew->random);
+                    dmr_log_debug("homebrew: master accepted our repeater id");
                     homebrew->auth = DMR_HOMEBREW_AUTH_INIT;
                     break;
                 }
@@ -239,7 +254,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[13 + j] = hex[(digest[i] & 0x0f)];
             }
 
-            fprintf(stderr, "homebrew: sending nonce\n");
+            dmr_log_verbose("homebrew: sending nonce\n");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
                 return ret;
 
@@ -252,7 +267,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                     return dmr_error_set("homebrew: master authentication failed");
                 }
                 if (len == 14 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
-                    fprintf(stderr, "homebrew: master accepted nonce, logged in\n");
+                    dmr_log_debug("homebrew: master accepted nonce, logged in\n");
                     homebrew->auth = DMR_HOMEBREW_AUTH_DONE;
                     break;
                 }
@@ -264,7 +279,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             return dmr_error_set("homebrew: master authentication failed");
 
         case DMR_HOMEBREW_AUTH_DONE:
-            fprintf(stderr, "homebrew: logged in, sending our configuration\n");
+            dmr_log_verbose("homebrew: logged in, sending our configuration\n");
             memcpy(&buf, &dmr_homebrew_repeater_config, 4);
             uint16_t pos = 4;
 #define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
@@ -454,8 +469,8 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, uint16_t 
     if (homebrew == NULL)
         return dmr_error(DMR_EINVAL);
 
-    fprintf(stderr, "homebrew: send(%s, %d): ", inet_ntoa(homebrew->remote.sin_addr), len);
-    dump_hex((void *)buf, len);
+    dmr_log_debug("homebrew: %d bytes to %s:%d", len, inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
+    //dump_hex((void *)buf, len);
     if (sendto(homebrew->fd, (const char *)buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
         fprintf(stderr, "homebrew: send to %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
@@ -479,13 +494,14 @@ int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, uint16_t *len)
     uint16_t olen;
     if ((ilen = recvfrom(homebrew->fd, (char *)&homebrew->buffer, 64, 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
         *len = 0;
-        fprintf(stderr, "homebrew: recv from %s:%d failed: %s\n",
+        dmr_log_error("homebrew: recv from %s:%d failed: %s\n",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
             strerror(errno));
         return dmr_error_set("homebrew: recvfrom(): %s", strerror(errno));
     }
-
+    dmr_log_debug("homebrew: recv %d bytes from %s:%d", len,
+        inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
     olen = ilen;
     *len = olen;
     dump_hex(homebrew->buffer, *len);

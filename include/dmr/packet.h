@@ -4,8 +4,9 @@
 #ifndef _DMRLIB_PACKET_H
 #define _DMRLIB_PACKET_H
 
-#include "dmr/bits.h"
-#include "dmr/type.h"
+#include <dmr/config.h>
+#include <dmr/bits.h>
+#include <dmr/type.h>
 
 typedef struct {
     bit_t bits[216];
@@ -35,6 +36,7 @@ typedef struct {
     dmr_payload_t payload;
 } dmr_packet_t;
 
+extern dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len);
 extern char *dmr_packet_get_slot_type_name(dmr_slot_type_t slot_type);
 
 #endif // _DMRLIB_PACKET_H

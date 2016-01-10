@@ -7,7 +7,7 @@
 
 static const char *dmr_log_priority_tags[] = {
     NULL,
-    "VERB ",
+    "DEBUG",
     "DEBUG",
     "INFO ",
     "WARN ",
@@ -17,8 +17,8 @@ static const char *dmr_log_priority_tags[] = {
 };
 static const char *dmr_log_priority_tags_colored[] = {
     NULL,
-    "\x1b[1;33mVERB \x1b[0m",
-    "\x1b[1;33mDEBUG\x1b[0m",
+    "\x1b[1;36mDEBUG\x1b[0m",
+    "\x1b[1;34mDEBUG\x1b[0m",
     "\x1b[1;37mINFO \x1b[0m",
     "\x1b[1;31mWARN \x1b[0m",
     "\x1b[1;31mERROR\x1b[0m",
@@ -34,9 +34,6 @@ static void *log_mem = NULL;
 static void log_stderr(void *mem, dmr_log_priority_t priority, const char *msg)
 {
     DMR_UNUSED(mem);
-    struct timeval tv;
-    struct tm *tm;
-    char buf[21];
     const char *tag;
 
     if (log_color) {
@@ -51,11 +48,22 @@ static void log_stderr(void *mem, dmr_log_priority_t priority, const char *msg)
             tag = dmr_log_priority_tags[DMR_LOG_PRIORITIES];
     }
 
+#if defined(DMR_PLATFORM_WINDOWS)
+    SYSTEMTIME lt;
+    GetLocalTime(&lt);
+    fprintf(stderr, "%s[%s] %04d-%02d-%02d %02d:%02d:%02d %s\n",
+        log_prefix, tag, lt.wYear, lt.wMonth, lt.wDay, lt.wHour, lt.wMinute, lt.wSecond, msg);
+#else
+    struct timeval tv;
+    struct tm *tm;
+    char buf[21];
     memset(buf, 0, 21);
     gettimeofday(&tv, NULL);
     tm = localtime(&tv.tv_sec);
     strftime(buf, 20, DMR_LOG_TIME_FORMAT, tm);
     fprintf(stderr, "%s[%s] %s %s\n", log_prefix, tag, buf, msg);
+#endif
+    fflush(stderr);
 }
 
 static dmr_log_cb_t log_cb = log_stderr;

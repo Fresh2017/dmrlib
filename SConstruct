@@ -17,6 +17,21 @@ env = Environment(
     ],
 )
 
+AddOption(
+    '--with-dmalloc',
+    dest='with_dmalloc',
+    action='store_true',
+    default=False,
+    help='Compile with dmalloc',
+)
+
+if GetOption('with_dmalloc'):
+    env.Append(
+        CPPDEFINES=[
+            'WITH_DMALLOC',
+        ],
+    )
+
 if sys.platform == 'darwin':
     # To support Homebrew, http://brew.sh/
     env.Append(
@@ -31,6 +46,9 @@ if sys.platform == 'darwin':
 if sys.platform == 'win32':
     env.Tool('mingw')
     env.Append(
+        CPPDEFINES=[
+            '_CRT_NONSTDC_NO_DEPRECATE',
+        ],
         LINKFLAGS=[
             '-static-libgcc',
         ],
@@ -65,6 +83,7 @@ dmr = env.SConscript(
 )
 env.Install('dist', dmr)
 env.Depends(dmr, dmrfec)
+env.Depends(dmr, mbelib)
 
 dmrdump = env.SConscript(
     os.path.join('src', 'cmd', 'dmrdump', 'SConscript'),

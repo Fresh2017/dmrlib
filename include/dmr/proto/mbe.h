@@ -17,13 +17,13 @@
 #include <dmr/thread.h>
 
 typedef struct {
+    dmr_proto_t  proto;
     mbe_parms    curr_mp;
     mbe_parms    prev_mp;
     mbe_parms    prev_mp_enhanced;
     uint8_t      quality;
     dmr_thread_t *thread;
     bool         active;
-    dmr_proto_t  proto;
 } dmr_mbe_t;
 
 extern dmr_mbe_t *dmr_mbe_new(uint8_t quality);

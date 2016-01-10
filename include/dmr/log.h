@@ -13,8 +13,14 @@
 extern "C" {
 #endif
 
+#include <dmr/platform.h>
+
 #define DMR_LOG_MESSAGE_MAX 1024
-#define DMR_LOG_TIME_FORMAT "%FT%TZ"
+#if defined(DMR_PLATFORM_WINDOWS)
+#define DMR_LOG_TIME_FORMAT "%Y-%m-%dT%H:%M:%SZ"
+#else
+#define DMR_LOG_TIME_FORMAT "%F %T"
+#endif // DMR_PLATFORM_WINDOWS
 
 typedef enum {
     DMR_LOG_PRIORITY_VERBOSE = 1,

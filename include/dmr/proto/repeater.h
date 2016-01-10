@@ -22,10 +22,15 @@ typedef struct dmr_repeater_s dmr_repeater_t;
  */
 typedef bool (*dmr_repeater_route_t)(dmr_repeater_t *, dmr_proto_t *, dmr_packet_t *);
 
+typedef struct dmr_repeater_slot_s {
+    void        *ptr;
+    dmr_proto_t *proto;
+} dmr_repeater_slot_t;
+
 struct dmr_repeater_s {
-    dmr_repeater_route_t *route;
     dmr_proto_t          proto;
-    dmr_proto_t          *slot[DMR_REPEATER_MAX_SLOTS];
+    dmr_repeater_route_t *route;
+    dmr_repeater_slot_t  slot[DMR_REPEATER_MAX_SLOTS];
     size_t               slots;
 };
 
@@ -41,9 +46,10 @@ extern void dmr_repeater_free(dmr_repeater_t *repeater);
 /**
  * Add a protocol to the repeater.
  * @param repeater Repeater instance pointer.
+ * @param ptr      Pointer to the protocol.
  * @param proto    Protocol instance pointer.
  */
-extern bool dmr_repeater_add(dmr_repeater_t *repeater, dmr_proto_t *proto);
+extern bool dmr_repeater_add(dmr_repeater_t *repeater, void *ptr, dmr_proto_t *proto);
 /**
  * Returns the number of active protocols on the repeater. If an error occurs,
  * -1 will be returned.

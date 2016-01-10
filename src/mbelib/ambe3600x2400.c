@@ -145,18 +145,16 @@ int
 mbe_decodeAmbe2400Parms (char *ambe_d, mbe_parms * cur_mp, mbe_parms * prev_mp)
 {
 
-  int ji, i, j, k, l, L, L9, m, am, ak;
+  int ji, i, j, k, l, L = 0, L9, m, am, ak;
   int intkl[57];
   int b0, b1, b2, b3, b4, b5, b6, b7, b8;
   float f0, Cik[5][18], flokl[57], deltal[57];
   float Sum42, Sum43, Tl[57], Gm[9], Ri[9], sum, c1, c2;
-  int silence;
+  int silence = 0;
   int Ji[5], jl;
   float deltaGamma, BigGamma;
   float unvc, rconst;
   DMR_UNUSED(L9);
-
-  silence = 0;
 
 #ifdef AMBE_DEBUG
   printf ("\n");
@@ -657,6 +655,7 @@ mbe_processAmbe2400Dataf (float *aout_buf, int *errs, int *errs2, char *err_str,
 {
 
   int i, bad;
+  DMR_UNUSED(errs);
 
   for (i = 0; i < *errs2; i++)
     {

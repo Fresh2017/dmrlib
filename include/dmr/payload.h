@@ -4,6 +4,7 @@
 #ifndef _DMR_PAYLOAD_H
 #define _DMR_PAYLOAD_H
 
+#include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/type.h>
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dmr/log.h"
 #include "dmr/proto/homebrew.h"
 
 static const char *dmr_software_id = "dmrlib-20160105";
@@ -38,7 +39,7 @@ dmr_homebrew_config_t *dmr_homebrew_config_new(void)
 
 void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign)
 {
-    fprintf(stderr, "homebrew config: call sign = %s\n", callsign);
+    dmr_log_debug("homebrew config: call sign = %s\n", callsign);
     int len = min(sizeof(config->callsign), strlen(callsign));
     memset(&config->callsign, 0x20, sizeof(config->callsign));
     memcpy(&config->callsign, callsign, len);
@@ -47,7 +48,7 @@ void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *cal
 void dmr_homebrew_config_repeater_id(dmr_homebrew_config_t *config, dmr_id_t repeater_id)
 {
     if (repeater_id != 0) {
-        fprintf(stderr, "homebrew config: repeater id = %u, %u\n", repeater_id, repeater_id >> 16);
+        dmr_log_debug("homebrew config: repeater id = %u, %u\n", repeater_id, repeater_id >> 16);
     }
     config->repeater_id[0] = repeater_id >> 24;
     config->repeater_id[1] = repeater_id >> 16;

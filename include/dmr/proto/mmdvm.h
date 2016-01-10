@@ -22,6 +22,7 @@
 #include <dmr/thread.h>
 #include <dmr/proto.h>
 #include <dmr/thread.h>
+#include <dmr/serial.h>
 
 #define DMR_MMDVM_BAUD_RATE     115200
 
@@ -100,15 +101,16 @@ typedef enum {
 } dmr_mmdvm_response_t;
 
 typedef struct {
-    int     fd;
-    int     error;
-    speed_t baud;
-    char    *port;
-    uint8_t buffer[200];
-    bool    rx;
-    bool    adc_overflow;
-    uint8_t version;
-    char    *firmware;
+    dmr_proto_t  proto;
+    dmr_serial_t fd;
+    int          error;
+    speed_t      baud;
+    char         *port;
+    uint8_t      buffer[200];
+    bool         rx;
+    bool         adc_overflow;
+    uint8_t      version;
+    char         *firmware;
     struct {
         bool    enable_dstar;
         bool    enable_dmr;
@@ -137,14 +139,13 @@ typedef struct {
     dmr_ring_t   *ysf_tx_buffer;
     dmr_thread_t *thread;
     bool         active;
-    dmr_proto_t  proto;
 } dmr_mmdvm_t;
 
 extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes);
-extern bool dmr_mmdvm_sync(dmr_mmdvm_t *modem);
-extern void dmr_mmdvm_poll(dmr_mmdvm_t *modem);
+extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
+extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
 extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *len);
-extern void dmr_mmdvm_free(dmr_mmdvm_t *modem);
-extern void dmr_mmdvm_close(dmr_mmdvm_t *modem);
+extern int dmr_mmdvm_free(dmr_mmdvm_t *modem);
+extern int dmr_mmdvm_close(dmr_mmdvm_t *modem);
 
 #endif // _DMR_PROTO_MMDVM

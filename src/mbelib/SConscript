@@ -1,8 +1,14 @@
+import os
 import sys
 
 Import('env')
 
 localenv = env.Clone()
+
+if sys.platform == 'linux2':
+    localenv.Append(
+        LIBS=['m'],
+    )
 
 if sys.platform == 'win32':
     localenv.Append(

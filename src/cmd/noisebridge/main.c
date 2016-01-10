@@ -11,7 +11,15 @@
 #include <dmr/log.h>
 #include <dmr/proto/homebrew.h>
 #include <dmr/proto/mmdvm.h>
+#include <dmr/proto/repeater.h>
 #include <dmr/payload/voice.h>
+
+const char *software_id = "NoiseBridge";
+#ifdef PACKAGE_ID
+const char *package_id = PACKAGE_ID;
+#else
+const char *package_id = "NoiseBridge-git";
+#endif
 
 typedef enum {
     PEER_NONE,
@@ -20,44 +28,48 @@ typedef enum {
 } peer_t;
 
 typedef struct config_s {
-    const char       *filename;
-    peer_t           upstream, modem;
-    dmr_homebrew_t   *homebrew;
-    char             *homebrew_host_s;
-    struct hostent   *homebrew_host;
-    int              homebrew_port;
-    char             *homebrew_auth;
-    char             *homebrew_call;
-    struct in_addr   homebrew_bind;
-    dmr_id_t         homebrew_id;
-    dmr_color_code_t homebrew_cc;
-    dmr_mmdvm_t      *mmdvm;
-    char             *mmdvm_port;
-    int              mmdvm_rate;
-    char             *audio_device;
+    const char         *filename;
+    peer_t             upstream, modem;
+    dmr_homebrew_t     *homebrew;
+    char               *homebrew_host_s;
+    struct hostent     *homebrew_host;
+    int                homebrew_port;
+    char               *homebrew_auth;
+    char               *homebrew_call;
+    struct in_addr     homebrew_bind;
+    dmr_id_t           homebrew_id;
+    dmr_color_code_t   homebrew_cc;
+    dmr_mmdvm_t        *mmdvm;
+    char               *mmdvm_port;
+    int                mmdvm_rate;
+    char               *audio_device;
+    dmr_log_priority_t log_level;
 } config_t;
 
-char *trim(char *str)
+void rtrim(char *str)
 {
-    char *end;
+    size_t n;
+    n = strlen(str);
+    while (n > 0 && isspace((unsigned char)str[n - 1])) {
+        n--;
+    }
+    str[n] = '\0';
+}
 
-    if (str == NULL)
-        return NULL;
+void ltrim(char *str)
+{
+    size_t n;
+    n = 0;
+    while (str[n] != '\0' && isspace((unsigned char)str[n])) {
+        n++;
+    }
+    memmove(str, str + n, strlen(str) - n + 1);
+}
 
-    // Trim leading space
-    while (isspace(*str)) str++;
-
-    if (*str == 0)  // All spaces?
-        return str;
-
-    // Trim trailing space
-    end = str + strlen(str) - 1;
-    while (end > str && isspace(*end)) end--;
-
-    // Write new null terminator
-    *(end+1) = 0;
-
-    return str;
+void trim(char *str)
+{
+    rtrim(str);
+    ltrim(str);
 }
 
 config_t *configure(const char *filename)
@@ -72,6 +84,7 @@ config_t *configure(const char *filename)
 
     memset(&config, 0, sizeof(config_t));
     config.filename = filename;
+    config.log_level = DMR_LOG_PRIORITY_INFO;
 
     if ((fp = fopen(filename, "r")) == NULL) {
         dmr_log_critical("failed to open %s: %s", filename, strerror(errno));
@@ -80,26 +93,31 @@ config_t *configure(const char *filename)
 
     while ((read = getline(&line, &len, fp)) != -1) {
         lineno++;
-        line = trim(line);
+        trim(line);
+        dmr_log_verbose("noisebridge: %s[%zu]: %s", filename, lineno, line);
 
         if (strlen(line) == 0 || line[0] == '#' || line[0] == ';')
             continue;
 
         k = strtok_r(line, "=", &v);
-        k = trim(k);
-        v = trim(v);
+        trim(k);
+        trim(v);
         if (k == NULL || v == NULL || strlen(v) == 0) {
-            fprintf(stderr, "%s[%zu]: syntax error\n", filename, lineno);
+            dmr_log_critical("noisebridge: %s[%zu]: syntax error\n", filename, lineno);
             valid = false;
             break;
         }
 
-        //printf("%s = %s\n", k, v);
-        if (!strcmp(k, "upstream_type")) {
+        dmr_log_debug("noisebridge: config %s = \"%s\"", k, v);
+        if (!strcmp(k, "log_level")) {
+            config.log_level = atoi(v);
+            dmr_log_verbose("noisebridge: config %s = %d", k, config.log_level);
+
+        } else if (!strcmp(k, "upstream_type")) {
             if (!strcmp(v, "homebrew")) {
                 config.upstream = PEER_HOMEBREW;
             } else {
-                fprintf(stderr, "%s[%zu]: unsupported type %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s\n", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -107,7 +125,7 @@ config_t *configure(const char *filename)
         } else if (!strcmp(k, "homebrew_host")) {
             config.homebrew_host = gethostbyname(v);
             if (config.homebrew_host == NULL) {
-                fprintf(stderr, "%s[%zu]: unresolved name %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unresolved name %s\n", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -132,7 +150,7 @@ config_t *configure(const char *filename)
             if (!strcmp(v, "mmdvm")) {
                 config.modem = PEER_MMDVM;
             } else {
-                fprintf(stderr, "%s[%zu]: unsupported type %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s\n", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -147,7 +165,7 @@ config_t *configure(const char *filename)
             config.audio_device = strdup(v);
 
         } else {
-            fprintf(stderr, "%s[%zu]: syntax error\n", filename, lineno);
+            dmr_log_critical("noisebridge: %s[%zu]: syntax error, invalid key \"%s\"", filename, lineno, k);
             valid = false;
             break;
         }
@@ -188,6 +206,21 @@ bool init_audio(config_t *config)
     return true;
 }
 
+int stream_pos = 0;
+float samples[DMR_DECODED_AMBE_FRAME_SAMPLES] = { 0 };
+
+void stream_audio_cb(void *mem, uint8_t *stream, int len)
+{
+    DMR_UNUSED(mem);
+    int out = 0, cur;
+    while (out < len) {
+        cur = min(DMR_DECODED_AMBE_FRAME_SAMPLES - stream_pos, len);
+        memcpy(stream, &samples[stream_pos], cur);
+        stream_pos = (stream_pos + cur) % DMR_DECODED_AMBE_FRAME_SAMPLES;
+        out += cur;
+    }
+}
+
 SDL_AudioDeviceID boot_audio(const char *device)
 {
     SDL_AudioSpec want, have;
@@ -198,8 +231,10 @@ SDL_AudioDeviceID boot_audio(const char *device)
     want.format = AUDIO_F32;
     want.channels = 1;
     want.samples = DMR_DECODED_AMBE_FRAME_SAMPLES;
+    want.callback = &stream_audio_cb;
 
-    return SDL_OpenAudioDevice(device, 0, &want, &have, 0);
+    dev = SDL_OpenAudioDevice(device, 0, &want, &have, 0);
+    return dev;
 }
 
 bool init_dmr(config_t *config)
@@ -209,62 +244,69 @@ bool init_dmr(config_t *config)
     switch (config->modem) {
     case PEER_MMDVM:
         if (!(valid = (config->mmdvm_port != NULL))) {
-            fprintf(stderr, "%s: mmdvm_port required\n", config->filename);
+            dmr_log_critical("noisebridge: %s: mmdvm_port required\n", config->filename);
             break;
         }
         if (config->mmdvm_rate == 0) {
             config->mmdvm_rate = DMR_MMDVM_BAUD_RATE;
         }
 
-        printf("noisebridge: connecting to MMDVM modem on port %s with %d baud\n",
+        dmr_log_info("noisebridge: connecting to MMDVM modem on port %s with %d baud\n",
             config->mmdvm_port, config->mmdvm_rate);
         config->mmdvm = dmr_mmdvm_open(config->mmdvm_port, config->mmdvm_rate, 1000UL);
+        if (config->mmdvm == NULL) {
+            valid = false;
+            break;
+        }
+        /*
         if (!dmr_mmdvm_sync(config->mmdvm)) {
             valid = false;
-            fprintf(stderr, "%s: mmdvm modem sync failed\n", config->filename);
+            dmr_log_critical("noisebridge: %s: mmdvm modem sync failed\n", config->filename);
             return NULL;
         }
+        */
         break;
 
     default:
         valid = false;
-        fprintf(stderr, "%s: modem_type required\n", config->filename);
+        dmr_log_critical("noisebridge: %s: modem_type required\n", config->filename);
         break;
     }
 
     switch (config->upstream) {
     case PEER_HOMEBREW:
         if (!(valid = (config->homebrew_host != NULL))) {
-            fprintf(stderr, "%s: homebrew_host required\n", config->filename);
+            dmr_log_critical("noisebridge: %s: homebrew_host required\n", config->filename);
             break;
         }
         if (config->homebrew_port == 0) {
             config->homebrew_port = DMR_HOMEBREW_PORT;
         }
         if (!(valid = (config->homebrew_auth != NULL))) {
-            fprintf(stderr, "%s: homebrew_auth required\n", config->filename);
+            dmr_log_critical("noisebridge: %s: homebrew_auth required\n", config->filename);
             break;
         }
         if (!(valid = (config->homebrew_call != NULL))) {
-            fprintf(stderr, "%s: homebrew_call required\n", config->filename);
+            dmr_log_critical("noisebridge: %s: homebrew_call required\n", config->filename);
             break;
         }
         if (!(valid = (config->homebrew_id != 0))) {
-            fprintf(stderr, "%s: homebrew_id required\n", config->filename);
+            dmr_log_critical("noisebridge: %s: homebrew_id required\n", config->filename);
             break;
         }
         if (!(valid = (config->homebrew_cc >= 1 || config->homebrew_cc <= 15))) {
-            fprintf(stderr, "%s: homebrew_cc required (1 >= cc >= 15)\n", config->filename);
+            dmr_log_critical("noisebridge: %s: homebrew_cc required (1 >= cc >= 15)\n", config->filename);
             break;
         }
 
 
         struct in_addr **addr_list;
         struct in_addr server_addr;
+        int i;
         addr_list = (struct in_addr **)config->homebrew_host->h_addr_list;
-        for (int i = 0; addr_list[i] != NULL; i++) {
+        for (i = 0; addr_list[i] != NULL; i++) {
             server_addr.s_addr = (*addr_list[0]).s_addr;
-            printf("noisebridge: %s resolved to %s\n",
+            dmr_log_debug("noisebridge: %s resolved to %s\n",
                 config->homebrew_host->h_name,
                 inet_ntoa(server_addr));
 
@@ -280,47 +322,70 @@ bool init_dmr(config_t *config)
             dmr_homebrew_config_callsign(config->homebrew->config, config->homebrew_call);
             dmr_homebrew_config_repeater_id(config->homebrew->config, config->homebrew_id);
             dmr_homebrew_config_color_code(config->homebrew->config, config->homebrew_cc);
+            dmr_homebrew_config_software_id(config->homebrew->config, software_id);
+            dmr_homebrew_config_package_id(config->homebrew->config, package_id);
+            /*
             if (config->mmdvm != NULL && config->mmdvm->firmware != NULL) {
                 dmr_homebrew_config_software_id(config->homebrew->config, config->mmdvm->firmware);
                 bool zero = false;
-                for (size_t i = 0; i < sizeof(config->homebrew->config->software_id); i++) {
+                for (j = 0; j < sizeof(config->homebrew->config->software_id); j++) {
                     if (zero) {
-                        config->homebrew->config->software_id[i] = 0x20;
-                    } else if (config->homebrew->config->software_id[i] == '(') {
-                        config->homebrew->config->software_id[i] = 0x20;
-                        config->homebrew->config->software_id[i - 1] = 0x20;
+                        config->homebrew->config->software_id[j] = 0x20;
+                    } else if (config->homebrew->config->software_id[j] == '(') {
+                        config->homebrew->config->software_id[j] = 0x20;
+                        config->homebrew->config->software_id[j - 1] = 0x20;
                         zero = true;
-                    } else if (config->homebrew->config->software_id[i] == ' ') {
-                        config->homebrew->config->software_id[i] = '-';
+                    } else if (config->homebrew->config->software_id[j] == ' ') {
+                        config->homebrew->config->software_id[j] = '-';
                     }
                 }
             }
+            */
             dump_hex(&config->homebrew->config, sizeof(dmr_homebrew_config_t));
-            printf("%02x%02x%02x%02x\n",
-                config->homebrew->config->repeater_id[0],
-                config->homebrew->config->repeater_id[1],
-                config->homebrew->config->repeater_id[2],
-                config->homebrew->config->repeater_id[3]);
             if (dmr_homebrew_auth(config->homebrew, config->homebrew_auth))
                 break;
 
             free(config->homebrew);
             config->homebrew = NULL;
         }
-
-        if (config->homebrew != NULL) {
-            dmr_homebrew_loop(config->homebrew);
-        }
-
         break;
 
     default:
         valid = false;
-        fprintf(stderr, "%s: homebrew_type required\n", config->filename);
+        dmr_log_critical("noisebridge: %s: homebrew_type required\n", config->filename);
         break;
     }
 
     return valid;
+}
+
+bool init_repeater(config_t *config)
+{
+    dmr_repeater_t *repeater = dmr_repeater_new();
+    if (repeater == NULL)
+        return false;
+
+    if (config->homebrew != NULL) {
+        dmr_log_info("noisebridge: starting homebrew proto");
+        if (!dmr_proto_init(config->homebrew))
+            return false;
+        if (!dmr_proto_start(config->homebrew))
+            return false;
+        dmr_repeater_add(repeater, config->homebrew, &config->homebrew->proto);
+    }
+    if (config->mmdvm != NULL) {
+        dmr_log_info("noisebridge: starting mmdvm proto");
+        if (!dmr_proto_init(config->mmdvm))
+            return false;
+        if (!dmr_proto_start(config->mmdvm))
+            return false;
+        dmr_repeater_add(repeater, config->mmdvm, &config->mmdvm->proto);
+    }
+
+    if (!dmr_proto_init(repeater))
+        return false;
+
+    return dmr_proto_start(repeater);
 }
 
 int main(int argc, char **argv)
@@ -328,6 +393,8 @@ int main(int argc, char **argv)
     config_t *config;
     SDL_AudioDeviceID dev;
 
+
+    dmr_log_priority_set(DMR_LOG_PRIORITY_VERBOSE);
     if (argc != 2) {
         fprintf(stderr, "%s <config>\n", argv[0]);
         return 1;
@@ -336,6 +403,8 @@ int main(int argc, char **argv)
     config = configure(argv[1]);
     if (config == NULL)
         return 1;
+
+    dmr_log_priority_set(config->log_level);
 
     if (!init_audio(config))
         return 1;
@@ -346,6 +415,9 @@ int main(int argc, char **argv)
     }
 
     if (!init_dmr(config))
+        return 1;
+
+    if (!init_repeater(config))
         return 1;
 
     return 0;

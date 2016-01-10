@@ -1,4 +1,29 @@
+#include <stdlib.h>
+#include <string.h>
+#include "dmr/error.h"
+#include "dmr/log.h"
 #include "dmr/packet.h"
+
+dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
+{
+    dmr_packet_t *packet;
+    if (len != DMR_PAYLOAD_BYTES) {
+        dmr_log_error("dmr: can't decode packet of %d bytes, need %d", len, DMR_PAYLOAD_BYTES);
+        return NULL;
+    }
+
+    packet = malloc(sizeof(dmr_packet_t));
+    if (packet == NULL) {
+        dmr_error(DMR_ENOMEM);
+        return NULL;
+    }
+
+    memcpy(packet->payload.bytes, buf, DMR_PAYLOAD_BYTES);
+    bytes_to_bits(packet->payload.bytes, DMR_PAYLOAD_BYTES,
+                  packet->payload.bits, DMR_PAYLOAD_BITS);
+
+    return packet;
+}
 
 char *dmr_packet_get_slot_type_name(dmr_slot_type_t slot_type)
 {
@@ -35,6 +60,10 @@ char *dmr_packet_get_slot_type_name(dmr_slot_type_t slot_type)
         return "voice burst E";
     case DMR_SLOT_TYPE_VOICE_BURST_F:
         return "voice burst F";
+    case DMR_SLOT_TYPE_SYNC_VOICE:
+        return "sync voice";
+    case DMR_SLOT_TYPE_SYNC_DATA:
+        return "sync data";
     case DMR_SLOT_TYPE_UNKNOWN:
     default:
         return "unknown";

@@ -68,6 +68,7 @@ typedef struct {
 } dmr_homebrew_config_t;
 
 typedef struct {
+    dmr_proto_t           proto;
     int                   fd;
     struct sockaddr_in    server, remote;
     dmr_homebrew_auth_t   auth;
@@ -77,7 +78,6 @@ typedef struct {
     dmr_homebrew_config_t *config;
     bool                  run;
     dmr_thread_t          *thread;
-    dmr_proto_t           proto;
     struct {
         uint8_t  seq;
         uint32_t stream_id;

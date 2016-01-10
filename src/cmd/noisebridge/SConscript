@@ -11,14 +11,15 @@ localenv.Append(
     LIBS=[
         env['libdmrfec_name'],
         env['libdmr_name'],
+        'mbe',
         'SDL2',
     ],
     LIBPATH=[
         '#build/libdmr',
         '#build/libdmrfec',
+        '#build/mbelib',
     ],
 )
-
 
 if sys.platform in ('linux2', 'darwin'):
     name = 'noisebridge'

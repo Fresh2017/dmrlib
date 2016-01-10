@@ -21,6 +21,7 @@
 
 #include "mbelib.h"
 #include "imbe7200x4400_const.h"
+#include "dmr/type.h"
 
 void
 mbe_dumpImbe4400Data (char *imbe_d)
@@ -398,7 +399,7 @@ mbe_decodeImbe4400Parms (char *imbe_d, mbe_parms * cur_mp, mbe_parms * prev_mp)
   printf ("T1: %e\n", Tl[1]);
 #endif
 
-  // determine log2Ml by applying ci,j to previous log2Ml 
+  // determine log2Ml by applying ci,j to previous log2Ml
   if (cur_mp->L <= 15)
     {
       rho = 0.4;
@@ -515,6 +516,7 @@ mbe_processImbe4400Dataf (float *aout_buf, int *errs, int *errs2, char *err_str,
 {
 
   int i, bad;
+  DMR_UNUSED(errs);
 
   for (i = 0; i < *errs2; i++)
     {

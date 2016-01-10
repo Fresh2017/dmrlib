@@ -7,7 +7,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
-
+#include <dmr/config.h>
 #include <dmr/platform.h>
 #include <dmr/type.h>
 #include <dmr/packet.h>
@@ -66,6 +66,7 @@ struct dmr_proto_s {
     const char                *name;
     dmr_proto_type_t          type;
     dmr_proto_init_t          init;
+    bool                      init_done;
     dmr_proto_start_t         start;
     dmr_proto_stop_t          stop;
     dmr_proto_active_t        active;
@@ -79,6 +80,13 @@ struct dmr_proto_s {
     size_t                    rx_cbs;
 };
 
+//#define DMR_PROTO_INIT(p)     (p->proto.init(p))
+//#define DMR_PROTO_START(p)    (p->proto.start(p))
+
+extern bool dmr_proto_init(void *mem);
+extern bool dmr_proto_start(void *mem);
+extern bool dmr_proto_stop(void *mem);
+extern bool dmr_proto_active(void *mem);
 extern void dmr_proto_rx(dmr_proto_t *proto, void *mem, dmr_packet_t *packet);
 extern bool dmr_proto_rx_cb_add(dmr_proto_t *proto, dmr_proto_io_cb_t cb);
 extern bool dmr_proto_rx_cb_del(dmr_proto_t *proto, dmr_proto_io_cb_t cb);

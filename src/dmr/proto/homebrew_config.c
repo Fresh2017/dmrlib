@@ -39,7 +39,7 @@ void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *cal
 {
     dmr_log_debug("homebrew config: call sign = %s\n", callsign);
     int len = min(sizeof(config->callsign), strlen(callsign));
-    memset(&config->callsign, 0x20, sizeof(config->callsign));
+    memset(&config->callsign, 0, sizeof(config->callsign));
     memcpy(&config->callsign, callsign, len);
 }
 
@@ -140,7 +140,7 @@ void dmr_homebrew_config_description(dmr_homebrew_config_t *config, const char *
     if (description == NULL)
         return;
     int len = min(20, strlen(description));
-    memset(&config->description, 0x20, 20);
+    memset(&config->description, 0, 20);
     memcpy(&config->description, description, len);
 }
 
@@ -149,7 +149,7 @@ void dmr_homebrew_config_url(dmr_homebrew_config_t *config, const char *url)
     if (url == NULL)
         return;
     int len = min(124, strlen(url));
-    memset(&config->url, 0x20, 124);
+    memset(&config->url, 0, 124);
     memcpy(&config->url, url, len);
 }
 
@@ -158,7 +158,7 @@ void dmr_homebrew_config_software_id(dmr_homebrew_config_t *config, const char *
     if (software_id == NULL)
         return;
     int len = min(40, strlen(software_id));
-    memset(&config->software_id, 0x20, 40);
+    memset(&config->software_id, 0, 40);
     memcpy(&config->software_id, software_id, len);
 }
 
@@ -167,6 +167,6 @@ void dmr_homebrew_config_package_id(dmr_homebrew_config_t *config, const char *p
     if (package_id == NULL)
         return;
     int len = min(40, strlen(package_id));
-    memset(&config->package_id, 0x20, 40);
+    memset(&config->package_id, 0, 40);
     memcpy(&config->package_id, package_id, len);
 }

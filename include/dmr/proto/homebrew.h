@@ -51,7 +51,7 @@ typedef struct __attribute__((packed)) {
     struct {
         dmr_ts_t slot       : 1;
         uint8_t  call_type  : 1;
-        uint8_t  frame_type : 1;
+        uint8_t  frame_type : 2;
         uint8_t  data_type  : 4;
     } flags;
     uint32_t stream_id;

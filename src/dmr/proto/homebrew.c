@@ -365,6 +365,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 #undef C
             dmr_log_trace("homebrew: sending %d bytes of config", pos);
 #ifdef DMR_DEBUG
+            dump_hex(&buf[4], pos - 4);
             //assert(pos == 302);
 #endif
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, pos)) < 0)
@@ -487,7 +488,7 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
     while (homebrew_proto_active(homebrew)) {
         struct timeval timeout = { 1, 0 };
 
-        if (dmr_time_since(homebrew->last_ping_sent) > 5) {
+        if (dmr_time_since(homebrew->last_ping_sent) > 3) {
             dmr_log_debug("homebrew: pinging master");
             memset(buf, 0, sizeof(buf));
             memcpy(buf, dmr_homebrew_master_ping, 7);
@@ -595,11 +596,20 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     if (packet->repeater_id == 0)
         packet->repeater_id = homebrew->id;
 
-    if (homebrew->tx[ts].src_id     != packet->src_id    ||
-        homebrew->tx[ts].dst_id     != packet->dst_id    ||
-        homebrew->tx[ts].call_type  != packet->call_type ||
-        homebrew->tx[ts].stream_id  == 0                 ||
-        dmr_time_ms_since(homebrew->tx[ts].last_voice_packet_sent) > 120) {
+    bool reset = false;
+#define C(field) do { if (homebrew->tx[ts].field != (*packet).field) { dmr_log_debug("homebrew: stream 0x%08lx expired: " #field " changed", homebrew->tx[ts].stream_id); reset = true; }} while(0)
+    C(src_id);
+    C(dst_id);
+    C(call_type);
+#undef C
+    double delta = dmr_time_ms_since(homebrew->tx[ts].last_voice_packet_sent);
+    if (delta > 200.0) {
+        dmr_log_debug("homebrew: stream 0x%08lx expired: delta %.2f > 200.0",
+            homebrew->tx[ts].stream_id, delta);
+        reset = true;
+    }
+
+    if (reset) {
         homebrew->tx[ts].src_id      = packet->src_id;
         homebrew->tx[ts].dst_id      = packet->dst_id;
         homebrew->tx[ts].call_type   = packet->call_type;
@@ -616,7 +626,7 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
 
     memcpy(buf, dmr_homebrew_data_signature, 4);
     pos = 4;
-    buf[pos++] = homebrew->tx[ts].seq++;
+    buf[pos++] = homebrew->tx[ts].seq++ % 0xffU;
     buf[pos++] = (packet->src_id >> 16);
     buf[pos++] = (packet->src_id >> 8);
     buf[pos++] = (packet->src_id >> 0);
@@ -629,6 +639,7 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     buf[pos++] = (packet->repeater_id >> 24);
     buf[pos] = ((ts)                                   & B00000001) |
                ((packet->call_type << 1)               & B00000010);
+
     switch (packet->slot_type) {
     case DMR_SLOT_TYPE_VOICE_BURST_A:
         buf[pos] |= (0x00 << 2)                        & B00001100;
@@ -647,9 +658,11 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     default:
         buf[pos] |= (0x02 << 2)                        & B00001100;
         buf[pos] |= ((packet->slot_type & 0x0f) << 4)  & B11110000;
+        gettimeofday(&homebrew->tx[ts].last_data_packet_sent, NULL);
         break;
     }
     pos++;
+
     buf[pos++] = (homebrew->tx[ts].stream_id >> 24) & 0xffU;
     buf[pos++] = (homebrew->tx[ts].stream_id >> 16) & 0xffU;
     buf[pos++] = (homebrew->tx[ts].stream_id >>  8) & 0xffU;

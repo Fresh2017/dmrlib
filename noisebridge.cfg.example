@@ -27,6 +27,10 @@ homebrew_host=brandmeister.pd0zry.ampr.org
 #homebrew_call=N0CALL
 #homebrew_id=123456
 homebrew_cc=1
+homebrew_rx_freq=438000000
+homebrew_tx_freq=438000000
+homebrew_latitude=52.3456
+homebrew_longitude=4.5678
 
 # Our "LF" side
 modem_type=mmdvm

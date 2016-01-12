@@ -25,6 +25,7 @@ typedef uint8_t dmr_bit_t;                  // 1 bits per byte
 typedef uint8_t dmr_dibit_t;                // 2 bits per byte
 typedef uint8_t dmr_tribit_t;               // 3 bits per byte
 
+extern char *dmr_byte_to_binary(uint8_t byte);
 extern uint8_t dmr_bits_to_byte(bool bits[8]);
 extern void dmr_bits_to_bytes(bool *bits, size_t bits_length, uint8_t *bytes, size_t bytes_length);
 extern void dmr_byte_to_bits(uint8_t byte, bool bits[8]);

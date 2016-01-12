@@ -19,6 +19,7 @@ dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
+    memset(packet, 0, sizeof(dmr_packet_t));
     memcpy(packet->payload, buf, DMR_PAYLOAD_BYTES);
     return packet;
 }

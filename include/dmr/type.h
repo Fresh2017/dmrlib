@@ -6,9 +6,10 @@
 #include <inttypes.h>
 
 /** FCLO privacy bit */
-#define DMR_CALL_TYPE_PRIVATE           0x00
-#define DMR_CALL_TYPE_GROUP             0x01
-typedef uint8_t dmr_call_type_t;
+typedef enum {
+    DMR_CALL_TYPE_GROUP,
+    DMR_CALL_TYPE_PRIVATE
+} dmr_call_type_t;
 
 #define DMR_DATA_TYPE_UNKNOWN			0x00
 #define DMR_DATA_TYPE_NORMAL_SMS		0x01

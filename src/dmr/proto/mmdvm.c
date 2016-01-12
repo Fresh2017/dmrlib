@@ -380,6 +380,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
 
             packet->slot_type = modem->buffer[3];
             packet->ts = modem->buffer[2] - DMR_MMDVM_DMR_DATA1;
+            packet->call_type = DMR_CALL_TYPE_GROUP;
 
             switch (packet->slot_type) {
             case DMR_SLOT_TYPE_SYNC_VOICE:

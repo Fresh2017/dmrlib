@@ -268,7 +268,11 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
     case DMR_SLOT_TYPE_VOICE_BURST_D:
     case DMR_SLOT_TYPE_VOICE_BURST_E:
     case DMR_SLOT_TYPE_VOICE_BURST_F:
-        //dmr_emb_encode(NULL, packet);
+        dmr_log_trace("repeater: constructing NULL EMB for %s",
+            dmr_slot_type_name(packet->slot_type));
+        dmr_emb_t emb;
+        memset(&emb, 0, sizeof(dmr_emb_t));
+        dmr_emb_encode(&emb, packet);
         break;
     }
 

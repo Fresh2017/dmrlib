@@ -75,34 +75,34 @@ int dmr_sync_pattern_encode(dmr_sync_pattern_t pattern, dmr_packet_t *packet)
     if (packet == NULL)
         return -1;
 
-    uint8_t *sync_bytes, i;
+    uint8_t sync_bytes[6], i;
     switch (pattern) {
     case DMR_SYNC_PATTERN_BS_SOURCED_VOICE:
-        sync_bytes = dmr_payload_sync_pattern_bs_sourced_voice;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_bs_sourced_voice, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_BS_SOURCED_DATA:
-        sync_bytes = dmr_payload_sync_pattern_bs_sourced_data;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_bs_sourced_data, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_VOICE:
-        sync_bytes = dmr_payload_sync_pattern_ms_sourced_voice;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_voice, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_DATA:
-        sync_bytes = dmr_payload_sync_pattern_ms_sourced_data;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_data, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_RC:
-        sync_bytes = dmr_payload_sync_pattern_ms_sourced_rc;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_rc, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_DIRECT_VOICE_TS1:
-        sync_bytes = dmr_payload_sync_pattern_direct_voice_ts1;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts1, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_DIRECT_DATA_TS1:
-        sync_bytes = dmr_payload_sync_pattern_direct_data_ts1;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_data_ts1, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_DIRECT_VOICE_TS2:
-        sync_bytes = dmr_payload_sync_pattern_direct_voice_ts2;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts2, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_DIRECT_DATA_TS2:
-        sync_bytes = dmr_payload_sync_pattern_direct_data_ts2;
+        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_data_ts2, sizeof(sync_bytes));
         break;
     case DMR_SYNC_PATTERN_UNKNOWN:
     default:

@@ -125,6 +125,7 @@ bool init_repeater()
                 config->homebrew_bind,
                 config->homebrew_port,
                 server_addr);
+            config->homebrew->id = config->homebrew_id;
             dmr_homebrew_config_callsign(config->homebrew->config, config->homebrew_call);
             dmr_homebrew_config_repeater_id(config->homebrew->config, config->homebrew_id);
             dmr_homebrew_config_color_code(config->homebrew->config, config->homebrew_cc);

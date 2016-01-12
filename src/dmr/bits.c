@@ -1,8 +1,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 #include "dmr/bits.h"
 #include "dmr/log.h"
+
+char *dmr_byte_to_binary(uint8_t byte)
+{
+    static char bin[9];
+    bin[0] = 0;
+
+    int s;
+    for (s = 128; s > 0; s >>= 1)
+        strcat(bin, ((byte & s) == s) ? "1" : "0");
+
+    return bin;
+}
 
 uint8_t dmr_bits_to_byte(bool bits[8])
 {

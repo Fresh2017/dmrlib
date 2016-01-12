@@ -42,14 +42,30 @@ typedef enum {
     DMR_HOMEBREW_AUTH_FAIL
 } dmr_homebrew_auth_t;
 
+typedef struct __attribute__((packed)) {
+    char     signature[4];
+    uint8_t  sequence;
+    dmr_id_t src_id      : 24;
+    dmr_id_t dst_id      : 24;
+    dmr_id_t repeater_id : 32;
+    struct {
+        dmr_ts_t slot       : 1;
+        uint8_t  call_type  : 1;
+        uint8_t  frame_type : 1;
+        uint8_t  data_type  : 4;
+    } flags;
+    uint32_t stream_id;
+    uint8_t  dmr_data[DMR_PAYLOAD_BYTES];
+} dmr_homebrew_data_fields_t;
+
+typedef union __attribute__((packed)) {
+    dmr_homebrew_data_fields_t fields;
+    uint8_t                    bytes[DMR_PAYLOAD_BYTES + 20];
+} dmr_homebrew_data_t;
+
 typedef struct {
-    char         signature[4];
-    uint8_t      sequence;
-    dmr_packet_t dmr_packet;
-    uint8_t      call_type;
-    uint8_t      frame_type;
-    uint8_t      data_type;
-    uint32_t     stream_id;
+    dmr_homebrew_data_t data;
+    dmr_packet_t        packet;
 } dmr_homebrew_packet_t;
 
 typedef struct {
@@ -79,12 +95,14 @@ typedef struct {
     uint8_t               random[8];
     dmr_homebrew_config_t *config;
     struct {
-        uint8_t  seq;
-        uint32_t stream_id;
-        dmr_id_t src_id;
-        dmr_id_t dst_id;
+        uint8_t         seq;
+        uint32_t        stream_id;
+        dmr_id_t        src_id;
+        dmr_id_t        dst_id;
         dmr_call_type_t call_type;
         dmr_slot_type_t slot_type;
+        struct timeval  last_voice_packet_sent;
+        struct timeval  last_data_packet_sent;
     } tx[2];
     struct timeval last_ping_sent;
 } dmr_homebrew_t;

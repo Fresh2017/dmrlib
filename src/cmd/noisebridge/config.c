@@ -2,6 +2,7 @@
 #include <string.h>
 #include <netdb.h>
 #include "config.h"
+#include "util.h"
 
 const char *software_id = "NoiseBridge";
 #ifdef PACKAGE_ID
@@ -10,35 +11,15 @@ const char *package_id = PACKAGE_ID;
 const char *package_id = "NoiseBridge-git";
 #endif
 
-void rtrim(char *str)
+static config_t config;
+
+config_t *load_config(void)
 {
-    size_t n;
-    n = strlen(str);
-    while (n > 0 && isspace((unsigned char)str[n - 1])) {
-        n--;
-    }
-    str[n] = '\0';
+    return &config;
 }
 
-void ltrim(char *str)
+config_t *init_config(const char *filename)
 {
-    size_t n;
-    n = 0;
-    while (str[n] != '\0' && isspace((unsigned char)str[n])) {
-        n++;
-    }
-    memmove(str, str + n, strlen(str) - n + 1);
-}
-
-void trim(char *str)
-{
-    rtrim(str);
-    ltrim(str);
-}
-
-config_t *configure(const char *filename)
-{
-    static config_t config;
     bool valid = true;
     FILE *fp;
     char *line = NULL, *k, *v;
@@ -59,7 +40,7 @@ config_t *configure(const char *filename)
     while ((read = getline(&line, &len, fp)) != -1) {
         lineno++;
         trim(line);
-        dmr_log_verbose("noisebridge: %s[%zu]: %s", filename, lineno, line);
+        dmr_log_trace("noisebridge: %s[%zu]: %s", filename, lineno, line);
 
         if (strlen(line) == 0 || line[0] == '#' || line[0] == ';')
             continue;
@@ -68,7 +49,7 @@ config_t *configure(const char *filename)
         trim(k);
         trim(v);
         if (k == NULL || v == NULL || strlen(v) == 0) {
-            dmr_log_critical("noisebridge: %s[%zu]: syntax error\n", filename, lineno);
+            dmr_log_critical("noisebridge: %s[%zu]: syntax error", filename, lineno);
             valid = false;
             break;
         }
@@ -76,13 +57,26 @@ config_t *configure(const char *filename)
         dmr_log_debug("noisebridge: config %s = \"%s\"", k, v);
         if (!strcmp(k, "log_level")) {
             config.log_level = atoi(v);
-            dmr_log_verbose("noisebridge: config %s = %d", k, config.log_level);
+            dmr_log_trace("noisebridge: config %s = %d", k, config.log_level);
+            dmr_log_priority_set(config.log_level);
+
+        } else if (!strcmp(k, "repeater_color_code")) {
+            config.repeater_color_code = atoi(v);
+
+        } else if (!strcmp(k, "repeater_route")) {
+            config.repeater_route[config.repeater_routes] = route_rule_parse(v);
+            if (config.repeater_route[config.repeater_routes] == NULL) {
+                dmr_log_critical("noisebridge: %s[%zu]: invalid route rule", filename, lineno);
+                valid = false;
+                break;
+            }
+            config.repeater_routes++;
 
         } else if (!strcmp(k, "upstream_type")) {
             if (!strcmp(v, "homebrew")) {
                 config.upstream = PEER_HOMEBREW;
             } else {
-                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -90,7 +84,7 @@ config_t *configure(const char *filename)
         } else if (!strcmp(k, "homebrew_host")) {
             config.homebrew_host = gethostbyname(v);
             if (config.homebrew_host == NULL) {
-                dmr_log_critical("noisebridge: %s[%zu]: unresolved name %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unresolved name %s", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -119,7 +113,7 @@ config_t *configure(const char *filename)
                 config.modem = PEER_MBE;
 
             } else {
-                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s\n", filename, lineno, v);
+                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s", filename, lineno, v);
                 valid = false;
                 break;
             }
@@ -148,4 +142,14 @@ config_t *configure(const char *filename)
         return NULL;
 
     return &config;
+}
+
+void kill_config(void)
+{
+    if (config.homebrew != NULL) {
+        dmr_homebrew_free(config.homebrew);
+    }
+    if (config.mbe != NULL) {
+        dmr_mbe_free(config.mbe);
+    }
 }

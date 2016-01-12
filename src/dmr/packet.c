@@ -1,8 +1,10 @@
 #include <stdlib.h>
 #include <string.h>
+#include "dmr/bits.h"
 #include "dmr/error.h"
 #include "dmr/log.h"
 #include "dmr/packet.h"
+#include "dmr/fec/golay_20_8.h"
 
 dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
 {
@@ -17,15 +19,23 @@ dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
-
-    memcpy(packet->payload.bytes, buf, DMR_PAYLOAD_BYTES);
-    bytes_to_bits(packet->payload.bytes, DMR_PAYLOAD_BYTES,
-                  packet->payload.bits, DMR_PAYLOAD_BITS);
-
+    memcpy(packet->payload, buf, DMR_PAYLOAD_BYTES);
     return packet;
 }
 
-char *dmr_packet_get_slot_type_name(dmr_slot_type_t slot_type)
+int dmr_payload_bits(dmr_packet_t *packet, void *bits)
+{
+    if (packet == NULL || bits == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    bool data[33 * 8];
+    dmr_bytes_to_bits(packet->payload, 33, data, sizeof(data));
+    memcpy(bits + 0 , &data[0],   98);
+    memcpy(bits + 98, &data[166], 98);
+    return 0;
+}
+
+char *dmr_slot_type_name(dmr_slot_type_t slot_type)
 {
     switch (slot_type) {
     case DMR_SLOT_TYPE_PRIVACY_INDICATOR:
@@ -68,4 +78,46 @@ char *dmr_packet_get_slot_type_name(dmr_slot_type_t slot_type)
     default:
         return "unknown";
     }
+}
+
+int dmr_slot_type_decode(dmr_slot_t *slot, dmr_packet_t *packet)
+{
+    if (slot == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    slot->bytes[0]  = (packet->payload[12] << 2) & B11111100;
+    slot->bytes[0] |= (packet->payload[13] >> 6) & B00000011;
+    slot->bytes[1]  = (packet->payload[13] << 2) & B11000000;
+    slot->bytes[1] |= (packet->payload[19] << 2) & B11110000;
+    slot->bytes[1] |= (packet->payload[20] >> 6) & B00000011;
+    slot->bytes[2]  = (packet->payload[20] << 2) & B11110000;
+
+    return 0;
+}
+
+int dmr_slot_type_encode(dmr_slot_t *slot, dmr_packet_t *packet)
+{
+    if (slot == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
+    if (packet->slot_type > 0x0fU) {
+        dmr_log_error("packet: can't set slot type PDU for slot type %s (0x%02x)",
+            dmr_slot_type_name(packet->slot_type), packet->slot_type);
+        return -1;
+    }
+
+    slot->fields.fec = dmr_golay_20_8_encode(slot->bytes[0]);
+
+    packet->payload[12] |=                         B11000000;
+    packet->payload[12] |= (slot->bytes[0] >> 2) & B00111111;
+    packet->payload[13] |=                         B00001111;
+    packet->payload[13] |= (slot->bytes[0] << 6) & B11000000;
+    packet->payload[13] |= (slot->bytes[1] >> 2) & B00110000;
+
+    packet->payload[19] |=                         B11110000;
+    packet->payload[19] |= (slot->bytes[1] >> 2) & B00001111;
+    packet->payload[20] |=                         B00000011;
+    packet->payload[20] |= (slot->bytes[1] << 6) & B11000000;
+    packet->payload[20] |= (slot->bytes[2] >> 2) & B00111100;
+
+    return 0;
 }

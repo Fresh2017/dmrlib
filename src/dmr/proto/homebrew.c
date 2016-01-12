@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef DMR_DEBUG
+#include <assert.h>
+#endif
 #include "dmr/error.h"
 #include "dmr/log.h"
 #include "dmr/proto.h"
@@ -9,125 +12,149 @@
 #include "dmr/type.h"
 #include "sha256.h"
 
-const char *dmr_homebrew_proto_name = "homebrew";
-const char hex[16] = "0123456789abcdef";
+static const char *dmr_homebrew_proto_name = "homebrew";
+static const char hex[16] = "0123456789abcdef";
 
-const char dmr_homebrew_data_signature[4]   = "DMRD";
-const char dmr_homebrew_master_ack[6]       = "MSTACK";
-const char dmr_homebrew_master_nak[6]       = "MSTNAK";
-const char dmr_homebrew_master_ping[7]      = "MSTPING";
-const char dmr_homebrew_master_closing[5]   = "MSTCL";
-const char dmr_homebrew_repeater_login[4]   = "RPTL";
-const char dmr_homebrew_repeater_key[4]     = "RPTK";
-const char dmr_homebrew_repeater_pong[7]    = "RPTPONG";
-const char dmr_homebrew_repeater_closing[5] = "RPTCL";
-const char dmr_homebrew_repeater_config[4]  = "RPTC";
+static const char dmr_homebrew_data_signature[4]   = "DMRD";
+static const char dmr_homebrew_master_ack[6]       = "MSTACK";
+static const char dmr_homebrew_master_nak[6]       = "MSTNAK";
+static const char dmr_homebrew_master_ping[7]      = "MSTPING";
+static const char dmr_homebrew_master_closing[5]   = "MSTCL";
+static const char dmr_homebrew_repeater_login[4]   = "RPTL";
+static const char dmr_homebrew_repeater_key[4]     = "RPTK";
+static const char dmr_homebrew_repeater_pong[7]    = "RPTPONG";
+static const char dmr_homebrew_repeater_closing[5] = "RPTCL";
+static const char dmr_homebrew_repeater_config[4]  = "RPTC";
+static const char dmr_homebrew_repeater_beacon[7]  = "RPTSBKN";
+static const char dmr_homebrew_repeater_rssi[7]    = "RPTRSSI";
 
-static dmr_proto_status_t homebrew_proto_init(void *homebrewptr)
+static int homebrew_proto_init(void *homebrewptr)
 {
     dmr_log_debug("homebrew: init");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
-        return DMR_PROTO_CONF;
-    else if (homebrew->auth != DMR_HOMEBREW_AUTH_DONE)
-        return DMR_PROTO_NOT_READY;
+        return dmr_error(DMR_EINVAL);
+    else if (homebrew->auth != DMR_HOMEBREW_AUTH_DONE) {
+        dmr_log_error("homebrew: authentication not done, did you call homebrew_auth?");
+        return dmr_error(DMR_EINVAL);
+    }
 
     homebrew->proto.init_done = true;
-    return DMR_PROTO_OK;
+    return 0;
 }
 
 static int homebrew_proto_start_thread(void *homebrewptr)
 {
-    dmr_log_debug("homebrew: start thread");
+    dmr_log_debug("homebrew: start thread %d", dmr_thread_id(NULL) % 1000);
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
-    if (homebrew == NULL)
+    if (homebrew == NULL) {
         return dmr_thread_error;
+    }
 
+    dmr_thread_name_set("homebrew proto");
     dmr_homebrew_loop(homebrew);
+    dmr_thread_exit(dmr_thread_success);
     return dmr_thread_success;
 }
 
-static bool homebrew_proto_start(void *homebrewptr)
+static int homebrew_proto_start(void *homebrewptr)
 {
     dmr_log_debug("homebrew: start");
-    int ret;
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
-        return false;
+        return dmr_error(DMR_EINVAL);
+
     if (!homebrew->proto.init_done) {
         dmr_log_error("homebrew: attempt to start without init");
-        return false;
+        return dmr_error(DMR_EINVAL);
     }
 
-    if (homebrew->thread != NULL) {
+    if (homebrew->proto.thread != NULL) {
         dmr_log_error("homebrew: can't start, already active");
-        return false;
+        return dmr_error(DMR_EINVAL);
     }
 
-    homebrew->thread = malloc(sizeof(dmr_thread_t));
-    if (homebrew->thread == NULL) {
-        dmr_error(DMR_ENOMEM);
-        return false;
+    homebrew->proto.thread = malloc(sizeof(dmr_thread_t));
+    if (homebrew->proto.thread == NULL) {
+        return dmr_error(DMR_ENOMEM);
     }
 
-    switch ((ret = dmr_thread_create(homebrew->thread, homebrew_proto_start_thread, homebrewptr))) {
-    case dmr_thread_success:
-        break;
-    default:
+    if (dmr_thread_create(homebrew->proto.thread, homebrew_proto_start_thread, homebrewptr) != dmr_thread_success) {
         dmr_log_error("homebrew: can't create thread");
-        return false;
+        return dmr_error(DMR_EINVAL);
     }
 
-    return true;
+    return 0;
 }
 
-static bool homebrew_proto_stop(void *homebrewptr)
+static int homebrew_proto_stop(void *homebrewptr)
 {
     dmr_log_debug("homebrew: stop");
-    int ret;
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
-        return false;
+        return dmr_error(DMR_EINVAL);
 
-    if (homebrew->thread == NULL) {
-        dmr_log_error("homebrew: not active");
-        return true;
+    if (homebrew->proto.thread == NULL) {
+        dmr_log_info("homebrew: not active");
+        return 0;
     }
 
-    homebrew->run = false;
-    switch ((ret = dmr_thread_join(*homebrew->thread, NULL))) {
-    case dmr_thread_success:
-        break;
-    default:
-        dmr_log_error("homebrew: can't stop thread");
-        return false;
+    dmr_mutex_lock(homebrew->proto.mutex);
+    homebrew->proto.is_active = false;
+    dmr_mutex_unlock(homebrew->proto.mutex);
+    if (dmr_thread_join(*homebrew->proto.thread, NULL) != dmr_thread_success) {
+        dmr_log_error("homebrew: can't join thread");
+        return dmr_error(DMR_EINVAL);
     }
 
-    free(homebrew->thread);
-    homebrew->thread = NULL;
-
-    dmr_homebrew_close(homebrew);
-    return true;
+    free(homebrew->proto.thread);
+    homebrew->proto.thread = NULL;
+    return 0;
 }
 
 static bool homebrew_proto_active(void *homebrewptr)
 {
-    dmr_log_verbose("homebrew: active");
+    dmr_log_trace("homebrew: active");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL)
         return false;
 
-    return homebrew->thread != NULL && homebrew->run;
+    dmr_mutex_lock(homebrew->proto.mutex);
+    bool active = homebrew->proto.thread != NULL && homebrew->proto.is_active;
+    dmr_mutex_unlock(homebrew->proto.mutex);
+    return active;
+}
+
+static int homebrew_proto_wait(void *homebrewptr)
+{
+    dmr_log_debug("homebrew: wait");
+    dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
+    if (homebrew == NULL)
+        return 0;
+    if (!homebrew_proto_active(homebrew))
+        return 0;
+    return dmr_thread_join(*homebrew->proto.thread, NULL);
 }
 
 static void homebrew_proto_rx(void *homebrewptr, dmr_packet_t *packet)
 {
-    dmr_log_debug("homebrew: proto_rx");
+    dmr_log_debug("homebrew: proto rx");
     dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
     if (homebrew == NULL || packet == NULL)
         return;
 
     dmr_proto_rx(&homebrew->proto, homebrew, packet);
+    dmr_proto_rx_cb_run(&homebrew->proto, packet);
+}
+
+static void homebrew_proto_tx(void *homebrewptr, dmr_packet_t *packet)
+{
+    dmr_log_debug("homebrew: proto tx");
+    dmr_homebrew_t *homebrew = (dmr_homebrew_t *)homebrewptr;
+    if (homebrew == NULL || packet == NULL)
+        return;
+
+    dmr_homebrew_send(homebrew, packet->ts, packet);
 }
 
 dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer)
@@ -147,8 +174,10 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     homebrew->config = dmr_homebrew_config_new();
     if (homebrew->config == NULL) {
         DMR_OOM();
+        free(homebrew);
         return NULL;
     }
+    memset(homebrew->buffer, 0, sizeof(homebrew->buffer));
 
     // Setup protocol
     homebrew->proto.name = dmr_homebrew_proto_name;
@@ -156,13 +185,23 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     homebrew->proto.init = homebrew_proto_init;
     homebrew->proto.start = homebrew_proto_start;
     homebrew->proto.stop = homebrew_proto_stop;
+    homebrew->proto.wait = homebrew_proto_wait;
     homebrew->proto.active = homebrew_proto_active;
     homebrew->proto.rx = homebrew_proto_rx;
+    homebrew->proto.tx = homebrew_proto_tx;
+    if (dmr_proto_mutex_init(&homebrew->proto) != 0) {
+        dmr_log_error("homebrew: failed to init mutex");
+        free(homebrew->config);
+        free(homebrew);
+        return NULL;
+    }
 
     // Setup file descriptor for UDP socket
     homebrew->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (homebrew->fd < 0) {
         dmr_error_set(strerror(errno));
+        free(homebrew->config);
+        free(homebrew);
         return NULL;
     }
     setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
@@ -194,7 +233,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
     sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
-    dmr_log_info("homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x\n",
+    dmr_log_info("homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x",
         inet_ntoa(homebrew->remote.sin_addr),
         ntohs(homebrew->remote.sin_port),
         homebrew->config->repeater_id[0],
@@ -210,12 +249,12 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
                 buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
             }
-            dmr_log_verbose("homebrew: sending repeater id");
+            dmr_log_trace("homebrew: sending repeater id");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
                 return ret;
 
             while (true) {
-                if ((ret = dmr_homebrew_recvraw(homebrew, &len)) < 0)
+                if ((ret = dmr_homebrew_recvraw(homebrew, &len, NULL)) < 0)
                     return ret;
 
                 if (len == 14 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_nak, 6)) {
@@ -224,7 +263,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 }
                 if (len == 22 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
                     memcpy(&homebrew->random, &homebrew->buffer[14], 8);
-                    dmr_log_verbose("homebrew: master sent nonce %.*s",
+                    dmr_log_trace("homebrew: master sent nonce %.*s",
                         8, homebrew->random);
                     dmr_log_debug("homebrew: master accepted our repeater id");
                     homebrew->auth = DMR_HOMEBREW_AUTH_INIT;
@@ -254,12 +293,12 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 buf[13 + j] = hex[(digest[i] & 0x0f)];
             }
 
-            dmr_log_verbose("homebrew: sending nonce");
+            dmr_log_trace("homebrew: sending nonce");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12 + 64)) < 0)
                 return ret;
 
             while (true) {
-                if ((ret = dmr_homebrew_recvraw(homebrew, &len)) < 0)
+                if ((ret = dmr_homebrew_recvraw(homebrew, &len, NULL)) < 0)
                     return ret;
 
                 if (len == 14 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_nak, 6)) {
@@ -268,7 +307,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
                 }
                 if (len == 14 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ack, 6)) {
                     dmr_log_debug("homebrew: master accepted nonce, logged in");
-                    homebrew->auth = DMR_HOMEBREW_AUTH_DONE;
+                    homebrew->auth = DMR_HOMEBREW_AUTH_CONF;
                     break;
                 }
 
@@ -278,8 +317,8 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
         case DMR_HOMEBREW_AUTH_FAIL:
             return dmr_error_set("homebrew: master authentication failed");
 
-        case DMR_HOMEBREW_AUTH_DONE:
-            dmr_log_verbose("homebrew: logged in, sending our configuration");
+        case DMR_HOMEBREW_AUTH_CONF:
+            dmr_log_trace("homebrew: logged in, sending our configuration");
             memcpy(&buf, &dmr_homebrew_repeater_config, 4);
             uint16_t pos = 4;
 #define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
@@ -301,9 +340,18 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             C(homebrew->config->software_id);
             C(homebrew->config->package_id);
 #undef C
-            if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
+            dmr_log_trace("homebrew: sending %d bytes of config", pos);
+#ifdef DMR_DEBUG
+            //assert(pos == 302);
+#endif
+            if ((ret = dmr_homebrew_sendraw(homebrew, buf, pos)) < 0)
                 return ret;
 
+            homebrew->auth = DMR_HOMEBREW_AUTH_DONE;
+            gettimeofday(&homebrew->last_ping_sent, NULL);
+            break;
+
+        case DMR_HOMEBREW_AUTH_DONE:
             break;
         }
     }
@@ -322,8 +370,10 @@ void dmr_homebrew_close(dmr_homebrew_t *homebrew)
     if (homebrew->fd < 0)
         return;
 
-    if (homebrew->run) {
-        homebrew->run = false;
+    dmr_mutex_lock(homebrew->proto.mutex);
+    if (homebrew->proto.is_active) {
+        homebrew->proto.is_active = false;
+    dmr_mutex_unlock(homebrew->proto.mutex);
 #ifdef DMR_PLATFORM_WINDOWS
         Sleep(5000);
 #else
@@ -344,8 +394,10 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
     if (homebrew == NULL)
         return;
 
-    if (homebrew->run) {
-        dmr_homebrew_close(homebrew);
+    dmr_mutex_lock(homebrew->proto.mutex);
+    if (homebrew->proto.is_active) {
+        dmr_mutex_unlock(homebrew->proto.mutex);
+        dmr_homebrew_close(homebrew); // also may lock the mutex
 #ifdef DMR_PLATFORM_WINDOWS
         Sleep(1000);
 #else
@@ -353,6 +405,8 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
 #endif
 
         close(homebrew->fd);
+    } else {
+        dmr_mutex_unlock(homebrew->proto.mutex);
     }
 
     free(homebrew->config);
@@ -361,25 +415,52 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
 
 void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
 {
-    uint8_t buf[53];
-    ssize_t len, pos;
+    uint8_t buf[53], i, j;
+    ssize_t len = 0, pos;
     dmr_packet_t packet, *p;
+    int ret;
 
     if (homebrew == NULL)
         return;
 
-    homebrew->run = true;
-    while (homebrew->run) {
-        if (!dmr_homebrew_recvraw(homebrew, &len))
-            return;
+    dmr_log_debug("homebrew: loop");
+    dmr_mutex_lock(homebrew->proto.mutex);
+    homebrew->proto.is_active = true;
+    dmr_mutex_unlock(homebrew->proto.mutex);
+    while (homebrew_proto_active(homebrew)) {
+        struct timeval timeout = { 1, 0 };
 
-        if (len == 15 && !memcmp(&homebrew->buffer[0], dmr_homebrew_master_ping, 7)) {
-            fprintf(stderr, "homebrew: ping? pong!\n");
+        if (dmr_time_since(homebrew->last_ping_sent) > 5) {
+            dmr_log_debug("homebrew: pinging master");
+            memset(buf, 0, sizeof(buf));
+            memcpy(buf, dmr_homebrew_master_ping, 7);
+            for (i = 0, j = 0; i < 4; i++, j += 2) {
+                buf[j+7] = hex[(homebrew->config->repeater_id[i] >> 4)];
+                buf[j+8] = hex[(homebrew->config->repeater_id[i] & 0xf)];
+            }
+            if ((ret = dmr_homebrew_sendraw(homebrew, buf, 15)) != 0) {
+                dmr_log_error("homebrew: error sending ping: %s", dmr_error_get());
+                break;
+            }
+            gettimeofday(&homebrew->last_ping_sent, NULL);
+        }
+
+        if ((ret = dmr_homebrew_recvraw(homebrew, &len, &timeout)) != 0) {
+            // Only log errors if it's not a timeout
+            if (ret == -1)
+                continue;
+
+            dmr_log_error("homebrew: loop error: %s", dmr_error_get());
+            break;
+        }
+
+        if (len == 15 && !memcmp(homebrew->buffer, dmr_homebrew_master_ping, 7)) {
+            dmr_log_debug("homebrew: ping? pong!");
             memcpy(buf, homebrew->buffer, 15);
             memcpy(buf, dmr_homebrew_repeater_pong, 7);
             if (!dmr_homebrew_sendraw(homebrew, buf, 15))
                 return;
-        } else if (len > 4 && !memcmp(&homebrew->buffer, dmr_homebrew_data_signature, 4)) {
+        } else if (len > 4 && !memcmp(homebrew->buffer, dmr_homebrew_data_signature, 4)) {
             p = &packet;
             memset(p, 0, sizeof(dmr_packet_t));
             pos = 4 + 1;
@@ -394,18 +475,39 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             packet.repeater_id |= (homebrew->buffer[pos++] << 16);
             packet.repeater_id |= (homebrew->buffer[pos++] << 24);
             pos += 1 + 4;
-            memcpy(&packet.payload.bytes[0], &homebrew->buffer[pos], 33);
+            memcpy(packet.payload, &homebrew->buffer[pos], 33);
             homebrew->proto.rx(homebrew, p);
+        } else if (len > 7 && !memcmp(homebrew->buffer, dmr_homebrew_repeater_pong, 7)) {
+            dmr_log_debug("homebrew: master sent pong");
+        } else if (len > 7 && !memcmp(homebrew->buffer, dmr_homebrew_repeater_beacon, 7)) {
+            dmr_log_debug("homebrew: master sent synchronous site beacon (ignored)");
+        } else if (len > 7 && !memcmp(homebrew->buffer, dmr_homebrew_repeater_rssi, 7)) {
+            dmr_log_debug("homebrew: master sent repeater RSSI (ignored)");
+        } else if (len > 6 && !memcmp(homebrew->buffer, dmr_homebrew_master_ack, 6)) {
+            dmr_log_debug("homebrew: master sent ack");
+        } else if (len > 5 && !memcmp(homebrew->buffer, dmr_homebrew_master_closing, 5)) {
+            dmr_log_critical("homebrew: master closing");
+            break;
+        } else {
+            dmr_log_debug("homebrew: master sent unknown data");
         }
     }
+
+    dmr_log_debug("homebrew: loop finished");
 }
 
 int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet)
 {
-    uint8_t buf[53], pos = 0;
+    uint8_t *buf, pos = 0;
 
     if (homebrew == NULL || packet == NULL || ts > DMR_TS2)
         return dmr_error(DMR_EINVAL);
+
+    buf = malloc(DMR_PAYLOAD_BYTES + 20);
+    if (buf == NULL)
+        return dmr_error(DMR_ENOMEM);
+
+    memset(buf, 0, DMR_PAYLOAD_BYTES + 20);
 
     if (packet->repeater_id == 0)
         packet->repeater_id = homebrew->id;
@@ -422,7 +524,7 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
         homebrew->tx[ts].stream_id  += 1;
     }
 
-    memcpy(&buf[0], dmr_homebrew_data_signature, 4);
+    memcpy(buf, dmr_homebrew_data_signature, 4);
     pos += 4;
     buf[pos++] = homebrew->tx[ts].seq++;
     buf[pos++] = (packet->src_id >> 16);
@@ -459,21 +561,26 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     buf[pos++] = (homebrew->tx[ts].stream_id >> 16);
     buf[pos++] = (homebrew->tx[ts].stream_id >> 8);
     buf[pos++] = (homebrew->tx[ts].stream_id >> 0);
-    memcpy(&buf[pos], packet->payload.bytes, DMR_PAYLOAD_BYTES);
+#ifdef DMR_DEBUG
+    assert(pos == 20);
+#endif
+    memcpy(buf + pos, packet->payload, DMR_PAYLOAD_BYTES);
 
-    return dmr_homebrew_sendraw(homebrew, buf, DMR_PAYLOAD_BYTES + 20);
+    int ret = dmr_homebrew_sendraw(homebrew, buf, DMR_PAYLOAD_BYTES + 20);
+    free(buf);
+    return ret;
 }
 
-int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, ssize_t len)
+int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len)
 {
     if (homebrew == NULL)
         return dmr_error(DMR_EINVAL);
 
     dmr_log_debug("homebrew: %d bytes to %s:%d", len, inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
-        dump_hex((void *)buf, len);
+        dump_hex(buf, len);
     if (sendto(homebrew->fd, buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
-        fprintf(stderr, "homebrew: send to %s:%d failed: %s\n",
+        dmr_log_error("homebrew: send to %s:%d failed: %s",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
             strerror(errno));
@@ -483,25 +590,41 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, ssize_t l
     return 0;
 }
 
-int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len)
+int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout)
 {
     struct sockaddr_in peer;
+    memset(&peer, 0, sizeof(struct sockaddr_in));
 #ifdef DMR_PLATFORM_WINDOWS
     int peerlen;
 #else
-    socklen_t peerlen;
-#endif
+    socklen_t peerlen = sizeof(peer);
+    fd_set rfds;
+    int nfds;
+    FD_ZERO(&rfds);
+    FD_SET(homebrew->fd, &rfds);
+select_again:
+    nfds = select(homebrew->fd + 1, &rfds, NULL, NULL, timeout);
+    if (nfds == 0) {
+        dmr_log_debug("homebrew: timeout on recvraw");
+        return -1;
+    } else if (nfds == -1) {
+        dmr_log_debug("homebrew: select: %s", strerror(errno));
+        if (errno == EINTR || errno == EAGAIN) {
+            goto select_again;
+        }
+        return dmr_error(DMR_EINVAL);
+    }
     if ((*len = recvfrom(homebrew->fd, homebrew->buffer, sizeof(homebrew->buffer), 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
-        dmr_log_error("homebrew: recv from %s:%d failed: %s\n",
+        dmr_log_error("homebrew: recv from %s:%d failed: %s",
             inet_ntoa(homebrew->remote.sin_addr),
             ntohs(homebrew->remote.sin_port),
             strerror(errno));
         return dmr_error_set("homebrew: recvfrom(): %s", strerror(errno));
     }
+#endif
     dmr_log_debug("homebrew: recv %d bytes from %s:%d", *len,
         inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
-
-    if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
+    if (*len > 0 && dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
         dump_hex(homebrew->buffer, *len);
 
     return 0;
@@ -565,10 +688,7 @@ dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned 
         packet->dmr_packet.slot_type = DMR_SLOT_TYPE_UNKNOWN;
         break;
     }
-
-    memcpy(&packet->dmr_packet.payload.bytes, &bytes[20], DMR_PAYLOAD_BYTES);
-    bytes_to_bits(&packet->dmr_packet.payload.bytes[0], DMR_PAYLOAD_BYTES,
-                  &packet->dmr_packet.payload.bits[0], DMR_PAYLOAD_BITS);
+    memcpy(&packet->dmr_packet.payload, &bytes[20], DMR_PAYLOAD_BYTES);
 
     return packet;
 }

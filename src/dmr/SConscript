@@ -6,11 +6,9 @@ Import('env')
 localenv = env.Clone()
 localenv.Append(
     LIBS=[
-        env['libdmrfec_name'],
         'mbe',
     ],
     LIBPATH=[
-        '#build/libdmrfec',
         '#build/mbelib',
     ],
 )

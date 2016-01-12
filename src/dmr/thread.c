@@ -54,12 +54,12 @@ extern "C" {
 #endif
 
 
-int dmr_mutexinit(dmr_mutext *mtx, int type)
+int dmr_mutex_init(dmr_mutex_t *mtx, int type)
 {
 #if defined(_DMR_THREAD_WIN32_)
   mtx->mAlreadyLocked = FALSE;
-  mtx->mRecursive = type & dmr_mutexrecursive;
-  mtx->mTimed = type & dmr_mutextimed;
+  mtx->mRecursive = type & dmr_mutex_recursive;
+  mtx->mTimed = type & dmr_mutex_timed;
   if (!mtx->mTimed)
   {
     InitializeCriticalSection(&(mtx->mHandle.cs));
@@ -77,7 +77,7 @@ int dmr_mutexinit(dmr_mutext *mtx, int type)
   int ret;
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
-  if (type & dmr_mutexrecursive)
+  if (type & dmr_mutex_recursive)
   {
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
   }
@@ -87,7 +87,7 @@ int dmr_mutexinit(dmr_mutext *mtx, int type)
 #endif
 }
 
-void dmr_mutexdestroy(dmr_mutext *mtx)
+void dmr_mutex_destroy(dmr_mutex_t *mtx)
 {
 #if defined(_DMR_THREAD_WIN32_)
   if (!mtx->mTimed)
@@ -103,7 +103,7 @@ void dmr_mutexdestroy(dmr_mutext *mtx)
 #endif
 }
 
-int dmr_mutexlock(dmr_mutext *mtx)
+int dmr_mutex_lock(dmr_mutex_t *mtx)
 {
 #if defined(_DMR_THREAD_WIN32_)
   if (!mtx->mTimed)
@@ -133,7 +133,7 @@ int dmr_mutexlock(dmr_mutext *mtx)
 #endif
 }
 
-int dmr_mutextimedlock(dmr_mutext *mtx, const struct timespec *ts)
+int dmr_mutex_timedlock(dmr_mutex_t *mtx, const struct timespec *ts)
 {
 #if defined(_DMR_THREAD_WIN32_)
   struct timespec current_ts;
@@ -228,7 +228,7 @@ int dmr_mutextimedlock(dmr_mutext *mtx, const struct timespec *ts)
 #endif
 }
 
-int dmr_mutextrylock(dmr_mutext *mtx)
+int dmr_mutex_trylock(dmr_mutex_t *mtx)
 {
 #if defined(_DMR_THREAD_WIN32_)
   int ret;
@@ -260,7 +260,7 @@ int dmr_mutextrylock(dmr_mutext *mtx)
 #endif
 }
 
-int dmr_mutexunlock(dmr_mutext *mtx)
+int dmr_mutex_unlock(dmr_mutex_t *mtx)
 {
 #if defined(_DMR_THREAD_WIN32_)
   mtx->mAlreadyLocked = FALSE;
@@ -383,7 +383,7 @@ int dmr_cond_broadcast(dmr_cond_t *cond)
 }
 
 #if defined(_DMR_THREAD_WIN32_)
-static int _dmr_cond_timedwait_win32(dmr_cond_t *cond, dmr_mutext *mtx, DWORD timeout)
+static int _dmr_cond_timedwait_win32(dmr_cond_t *cond, dmr_mutex_t *mtx, DWORD timeout)
 {
   int result, lastWaiter;
 
@@ -394,7 +394,7 @@ static int _dmr_cond_timedwait_win32(dmr_cond_t *cond, dmr_mutext *mtx, DWORD ti
 
   /* Release the mutex while waiting for the condition (will decrease
      the number of waiters when done)... */
-  dmr_mutexunlock(mtx);
+  dmr_mutex_unlock(mtx);
 
   /* Wait for either event to become signaled due to dmr_cond_signal() or
      dmr_cond_broadcast() being called */
@@ -402,13 +402,13 @@ static int _dmr_cond_timedwait_win32(dmr_cond_t *cond, dmr_mutext *mtx, DWORD ti
   if (result == WAIT_TIMEOUT)
   {
     /* The mutex is locked again before the function returns, even if an error occurred */
-    dmr_mutexlock(mtx);
+    dmr_mutex_lock(mtx);
     return dmr_thread_timedout;
   }
   else if (result == (int)WAIT_FAILED)
   {
     /* The mutex is locked again before the function returns, even if an error occurred */
-    dmr_mutexlock(mtx);
+    dmr_mutex_lock(mtx);
     return dmr_thread_error;
   }
 
@@ -425,19 +425,19 @@ static int _dmr_cond_timedwait_win32(dmr_cond_t *cond, dmr_mutext *mtx, DWORD ti
     if (ResetEvent(cond->mEvents[_CONDITION_EVENT_ALL]) == 0)
     {
       /* The mutex is locked again before the function returns, even if an error occurred */
-      dmr_mutexlock(mtx);
+      dmr_mutex_lock(mtx);
       return dmr_thread_error;
     }
   }
 
   /* Re-acquire the mutex */
-  dmr_mutexlock(mtx);
+  dmr_mutex_lock(mtx);
 
   return dmr_thread_success;
 }
 #endif
 
-int dmr_cond_wait(dmr_cond_t *cond, dmr_mutext *mtx)
+int dmr_cond_wait(dmr_cond_t *cond, dmr_mutex_t *mtx)
 {
 #if defined(_DMR_THREAD_WIN32_)
   return _dmr_cond_timedwait_win32(cond, mtx, INFINITE);
@@ -446,7 +446,7 @@ int dmr_cond_wait(dmr_cond_t *cond, dmr_mutext *mtx)
 #endif
 }
 
-int dmr_cond_timedwait(dmr_cond_t *cond, dmr_mutext *mtx, const struct timespec *ts)
+int dmr_cond_timedwait(dmr_cond_t *cond, dmr_mutex_t *mtx, const struct timespec *ts)
 {
 #if defined(_DMR_THREAD_WIN32_)
   struct timespec now;
@@ -629,6 +629,15 @@ dmr_thread_t dmr_thread_current(void)
 #endif
 }
 
+unsigned long dmr_thread_id(dmr_thread_t *thr)
+{
+    if (thr == NULL) {
+        dmr_thread_t current = dmr_thread_current();
+        thr = &current;
+    }
+    return (unsigned long)(thr);
+}
+
 int dmr_thread_detach(dmr_thread_t thr)
 {
 #if defined(_DMR_THREAD_WIN32_)
@@ -737,6 +746,30 @@ void dmr_thread_yield(void)
   Sleep(0);
 #else
   sched_yield();
+#endif
+}
+
+int dmr_thread_name(char *buf, size_t len)
+{
+#if defined(_DMR_THREAD_WIN32_)
+    return 0;
+#else
+    return pthread_getname_np(dmr_thread_current(), buf, len);
+#endif
+}
+
+int dmr_thread_name_set(char *buf)
+{
+#if defined(_DMR_THREAD_WIN32_)
+    return 0;
+#elif defined(_DMR_THREAD_MAC_)
+    return pthread_setname_np(buf);
+#else
+    // On Linux, the name size is restricted to 16 characters including NUL
+    static char thread_name[16];
+    memset(thread_name, 0, sizeof(thread_name));
+    strncpy(thread_name, buf, sizeof(thread_name));
+    return pthread_setname_np(dmr_thread_current(), thread_name);
 #endif
 }
 

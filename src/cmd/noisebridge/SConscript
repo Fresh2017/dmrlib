@@ -6,25 +6,32 @@ Import('env')
 localenv = env.Clone()
 localenv.Append(
     LIBS=[
-        env['libdmrfec_name'],
         env['libdmr_name'],
         'mbe',
         'portaudio',
     ],
     LIBPATH=[
         '#build/libdmr',
-        '#build/libdmrfec',
         '#build/mbelib',
     ],
 )
 
-if sys.platform in ('linux2', 'darwin'):
+if sys.platform == 'linux2':
     name = 'noisebridge'
+    localenv.Append(
+        LIBS=[
+            'pthread',
+        ],
+    )
 
 if sys.platform == 'darwin':
+    name = 'noisebridge'
     localenv.Append(
         CPPPATH=[
             '#support/darwin/portaudio/include',
+        ],
+        LIBS=[
+            'pthread',
         ],
         LIBPATH=[
             '#support/darwin/portaudio/lib',
@@ -36,6 +43,14 @@ if sys.platform == 'darwin':
 
 if sys.platform == 'win32':
     name = 'noisebridge.exe'
+
+'''
+conf = localenv.Configure()
+if not conf.CheckLibWithHeader('portaudio', 'portaudio.h', 'c'):
+    print('portaudio is required, apt-get install portaudio19-dev')
+    Exit(1)
+conf.Finish()
+'''
 
 noisebridge = localenv.Program(name, Glob('*.c'))
 Return('noisebridge')

@@ -6,7 +6,7 @@
 #include "audio.h"
 
 static PaStream *stream;
-static unsigned long stream_pos = 0;
+static unsigned long stream_pos, stream_write_pos = 0;
 static float samples[DMR_DECODED_AMBE_FRAME_SAMPLES] = { 0 };
 static PaStreamParameters output = {
     -1,
@@ -15,6 +15,17 @@ static PaStreamParameters output = {
     0,
     NULL
 };
+
+void stream_audio(float *samples, size_t len)
+{
+    unsigned long out = 0, cur;
+    while (out < len) {
+        cur = min(DMR_DECODED_AMBE_FRAME_SAMPLES - stream_write_pos, len);
+        memcpy(&samples[stream_pos], &samples[out], cur);
+        stream_write_pos = (stream_write_pos + cur) % DMR_DECODED_AMBE_FRAME_SAMPLES;
+        out += cur;
+    }
+}
 
 //void stream_audio_cb(void *mem, uint8_t *stream, int len)
 int stream_audio_cb(const void *input, void *output, unsigned long len, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *mem)
@@ -28,6 +39,7 @@ int stream_audio_cb(const void *input, void *output, unsigned long len, const Pa
     while (out < len) {
         cur = min(DMR_DECODED_AMBE_FRAME_SAMPLES - stream_pos, len);
         memcpy(output, &samples[stream_pos], cur);
+        memset(&samples[stream_pos], 0, cur);
         stream_pos = (stream_pos + cur) % DMR_DECODED_AMBE_FRAME_SAMPLES;
         out += cur;
     }
@@ -44,7 +56,7 @@ void kill_audio(void)
     }
 }
 
-bool boot_audio(config_t *config)
+bool boot_audio(void)
 {
     int err;
 
@@ -56,16 +68,20 @@ bool boot_audio(config_t *config)
     return true;
 }
 
-bool init_audio(config_t *config)
+bool init_audio(void)
 {
     int err, i, n;
     const PaDeviceInfo *dev;
+    config_t *config = load_config();
+
+    dmr_log_info("audio: %s device",
+        config->audio_device == NULL ? "detecting" : "configuring");
 
     if ((err = Pa_Initialize()) != paNoError) {
         dmr_log_critical("audio: boot failed: %s", Pa_GetErrorText(err));
         return false;
     }
-    atexit(kill_audio);
+    //atexit(kill_audio);
 
     n = Pa_GetDeviceCount();
     if (n < 0) {

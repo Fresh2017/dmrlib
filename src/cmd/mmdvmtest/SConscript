@@ -12,13 +12,11 @@ elif sys.platform == 'win32':
 localenv = env.Clone()
 localenv.Append(
     LIBS=[
-        env['libdmrfec_name'],
         env['libdmr_name'],
         'mbe',
     ],
     LIBPATH=[
         '#build/libdmr',
-        '#build/libdmrfec',
         '#build/mbelib',
     ],
 )

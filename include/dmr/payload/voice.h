@@ -6,21 +6,22 @@
 #define _DMR_VOICE_H
 
 #include <dmr/bits.h>
+#include <dmr/packet.h>
 
 #define DMR_DECODED_AMBE_FRAME_SAMPLES 160
 
 typedef struct {
-    bit_t bits[72];
-} dmr_ambe_frame_bits_t;
+    bool bits[72];
+} dmr_voice_frame_t;
 
 typedef union {
     struct {
-        bit_t bits[108 * 2];
+        bool bits[108 * 2];
     } raw;
     struct {
-        dmr_ambe_frame_bits_t frame[3];
+        dmr_voice_frame_t frame[3];
     } frames;
-} dmr_voice_t;
+} dmr_voice_bits_t;
 
 typedef struct {
     float samples[DMR_DECODED_AMBE_FRAME_SAMPLES];

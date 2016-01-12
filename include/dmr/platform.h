@@ -34,6 +34,7 @@ typedef int32_t speed_t;
 #define _ftime_s _ftime
 #endif // __MINGW32__
 
+#include <unistd.h>
 #define dmr_sleep(s)      Sleep(s * 1000L)
 #define dmr_msleep(ms)    Sleep(ms)
 #define dmr_usleep(us)    Sleep(us / 1000L)
@@ -42,6 +43,7 @@ typedef int32_t speed_t;
 
 #ifdef DMR_PLATFORM_UNIX
 
+#include <unistd.h>
 #define dmr_sleep(s)      sleep(s)
 #define dmr_msleep(s)     usleep(s * 1000L)
 #define dmr_usleep(s)     usleep(s)

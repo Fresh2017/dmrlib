@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+/** FCLO privacy bit */
 #define DMR_CALL_TYPE_PRIVATE           0x00
 #define DMR_CALL_TYPE_GROUP             0x01
 typedef uint8_t dmr_call_type_t;
@@ -39,6 +40,7 @@ typedef uint8_t dmr_slot_type_t;
 
 #define DMR_TS1                         0x00
 #define DMR_TS2                         0x01
+#define DMR_TS_INVALID                  (DMR_TS2 + 1)
 typedef uint8_t dmr_ts_t;
 
 typedef uint32_t dmr_id_t;

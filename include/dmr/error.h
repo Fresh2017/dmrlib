@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 
+#include <errno.h>
 #include <stdarg.h>
 
 #include <dmr/log.h>

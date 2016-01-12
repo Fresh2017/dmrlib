@@ -20,6 +20,7 @@
 #include <dmr/packet.h>
 #include <dmr/proto.h>
 #include <dmr/thread.h>
+#include <dmr/time.h>
 
 #define DMR_HOMEBREW_PORT               62030
 #define DMR_HOMEBREW_DMR_DATA_SIZE      53
@@ -36,6 +37,7 @@ typedef uint8_t dmr_homebrew_frame_type_t;
 typedef enum {
     DMR_HOMEBREW_AUTH_NONE,
     DMR_HOMEBREW_AUTH_INIT,
+    DMR_HOMEBREW_AUTH_CONF,
     DMR_HOMEBREW_AUTH_DONE,
     DMR_HOMEBREW_AUTH_FAIL
 } dmr_homebrew_auth_t;
@@ -73,11 +75,9 @@ typedef struct {
     struct sockaddr_in    server, remote;
     dmr_homebrew_auth_t   auth;
     dmr_id_t              id;
-    uint8_t               buffer[64];
+    uint8_t               buffer[512];
     uint8_t               random[8];
     dmr_homebrew_config_t *config;
-    bool                  run;
-    dmr_thread_t          *thread;
     struct {
         uint8_t  seq;
         uint32_t stream_id;
@@ -86,6 +86,7 @@ typedef struct {
         dmr_call_type_t call_type;
         dmr_slot_type_t slot_type;
     } tx[2];
+    struct timeval last_ping_sent;
 } dmr_homebrew_t;
 
 extern dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer);
@@ -94,8 +95,8 @@ extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_loop(dmr_homebrew_t *homebrew);
 extern int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
-extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, const uint8_t *buf, ssize_t len);
-extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len);
+extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len);
+extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout);
 extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
 extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
 

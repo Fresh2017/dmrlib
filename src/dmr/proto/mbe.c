@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "dmr/log.h"
 #include "dmr/platform.h"
 #include "dmr/proto.h"
 #include "dmr/proto/mbe.h"
@@ -49,16 +50,30 @@ static uint8_t mbe_decode_deinterleave_matrix_z[36] = {
     0x0d, 0x02, 0x0c, 0x01, 0x0b, 0x00
 };
 
-static dmr_proto_status_t mbe_proto_init(void *mbeptr)
+static int mbe_proto_init(void *mbeptr)
 {
+    dmr_log_trace("mbe: init %p", mbeptr);
     if (mbeptr == NULL)
-        return DMR_PROTO_CONF;
-    else
-        return DMR_PROTO_OK;
+        return dmr_error(DMR_EINVAL);
+    return 0;
 }
 
-static void mbe_proto_process_voice(void *mbeptr, dmr_voice_t *voice, float *samples)
+static int mbe_proto_start(void *mbeptr)
 {
+    dmr_log_trace("mbe: start %p", mbeptr);
+    dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
+    if (mbe == NULL)
+        return dmr_error(DMR_EINVAL);
+    if (mbe->samples_cb == NULL) {
+        dmr_log_error("mbe: no samples callback");
+        return dmr_error(DMR_EINVAL);
+    }
+    return 0;
+}
+
+static void mbe_proto_process_voice(void *mbeptr, dmr_voice_bits_t *voice, float *samples)
+{
+    dmr_log_trace("mbe: process voice %p", mbeptr);
     dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
 
     if (mbe == NULL || voice == NULL || samples == NULL)
@@ -67,7 +82,45 @@ static void mbe_proto_process_voice(void *mbeptr, dmr_voice_t *voice, float *sam
     dmr_mbe_decode(mbe, voice, samples);
 }
 
-dmr_mbe_t *dmr_mbe_new(uint8_t quality)
+static void mbe_proto_tx(void *mbeptr, dmr_packet_t *packet)
+{
+    dmr_log_trace("mbe: tx %p", mbeptr);
+    dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
+    dmr_voice_bits_t voice_bits;
+
+    if (mbe == NULL || packet == NULL)
+        return;
+
+    dmr_log_debug("mbe: tx %s", dmr_slot_type_name(packet->slot_type));
+    switch (packet->slot_type) {
+    case DMR_SLOT_TYPE_VOICE_BURST_A:
+    case DMR_SLOT_TYPE_VOICE_BURST_B:
+    case DMR_SLOT_TYPE_VOICE_BURST_C:
+    case DMR_SLOT_TYPE_VOICE_BURST_D:
+    case DMR_SLOT_TYPE_VOICE_BURST_E:
+    case DMR_SLOT_TYPE_VOICE_BURST_F:
+        break;
+    default:
+        dmr_log_debug("mbe: ignored unsupported packet");
+        return;
+    }
+
+    if (dmr_payload_bits(packet, &voice_bits) != 0) {
+        dmr_log_error("mbe: unable to extract voice bits: %s", dmr_error_get());
+        return;
+    }
+
+    int i;
+    dmr_decoded_voice_t *frame;
+    for (i = 0; i < 3; i++) {
+        if ((frame = dmr_mbe_decode_frame(mbe, &voice_bits.frames.frame[i])) == NULL) {
+            dmr_log_error("mbe: unable to decode voice frame");
+            return;
+        }
+    }
+}
+
+dmr_mbe_t *dmr_mbe_new(uint8_t quality, dmr_mbe_samples_cb_t samples_cb)
 {
     dmr_mbe_t *mbe = malloc(sizeof(dmr_mbe_t));
     if (mbe == NULL)
@@ -77,9 +130,12 @@ dmr_mbe_t *dmr_mbe_new(uint8_t quality)
     mbe->proto.name = dmr_mbe_proto_name;
     mbe->proto.type = DMR_PROTO_MBE;
     mbe->proto.init = mbe_proto_init;
-    mbe->proto.process_voice = mbe_proto_process_voice;
+    mbe->proto.start = mbe_proto_start;
+    //mbe->proto.process_voice = mbe_proto_process_voice;
+    mbe->proto.tx = mbe_proto_tx;
 
     mbe->quality = quality;
+    mbe->samples_cb = samples_cb;
     mbe_initMbeParms(
         &mbe->curr_mp,
         &mbe->prev_mp,
@@ -89,7 +145,7 @@ dmr_mbe_t *dmr_mbe_new(uint8_t quality)
     return mbe;
 }
 
-dmr_decoded_voice_t *dmr_mbe_decode_frame(dmr_mbe_t *mbe, dmr_ambe_frame_bits_t *frame)
+dmr_decoded_voice_t *dmr_mbe_decode_frame(dmr_mbe_t *mbe, dmr_voice_frame_t *frame)
 {
     static dmr_decoded_voice_t decoded;
     char deinterleaved_bits[4][24];
@@ -108,7 +164,7 @@ dmr_decoded_voice_t *dmr_mbe_decode_frame(dmr_mbe_t *mbe, dmr_ambe_frame_bits_t 
     y = mbe_decode_deinterleave_matrix_y;
     z = mbe_decode_deinterleave_matrix_z;
 
-    for (j = 0; j < sizeof(dmr_ambe_frame_bits_t); j += 2) {
+    for (j = 0; j < sizeof(dmr_voice_frame_t); j += 2) {
         deinterleaved_bits[*w][*x] = frame->bits[j];
         deinterleaved_bits[*y][*z] = frame->bits[j+1];
         w++; x++; y++; z++;
@@ -129,7 +185,7 @@ dmr_decoded_voice_t *dmr_mbe_decode_frame(dmr_mbe_t *mbe, dmr_ambe_frame_bits_t 
     return &decoded;
 }
 
-void dmr_mbe_decode(dmr_mbe_t *mbe, dmr_voice_t *voice, float *samples)
+void dmr_mbe_decode(dmr_mbe_t *mbe, dmr_voice_bits_t *voice, float *samples)
 {
     dmr_decoded_voice_t *decoded;
     int i, j;

@@ -6,7 +6,7 @@
 #define _DMR_PAYLOAD_CSBK_H
 
 #include <dmr/type.h>
-#include <dmrfec/bptc_196_96.h>
+#include <dmr/fec/bptc_196_96.h>
 
 #define DMR_CSBK_OUTBOUND_ACTIVATION                 0b00111000
 #define DMR_CSBK_UNIT_TO_UNIT_VOICE_SERVICE_REQUEST  0b00000100
@@ -42,7 +42,7 @@ typedef struct {
     } data;
 } dmr_csbk_t;
 
-extern dmr_csbk_t *dmr_csbk_decode(dmrfec_bptc_196_96_data_bits_t *data_bits);
+extern int dmr_csbk_decode(dmr_csbk_t *csbk, dmr_packet_t *packet);
 extern char *dmr_csbk_opcode_name(dmr_csbk_opcode_t opcode);
 
 #endif // _DMR_PAYLOAD_CSBK_H

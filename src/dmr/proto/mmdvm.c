@@ -6,6 +6,7 @@
 #include <ctype.h>
 
 #include "dmr/platform.h"
+#include "dmr/time.h"
 
 #if defined(DMR_PLATFORM_WINDOWS)
 #include <windows.h>
@@ -17,6 +18,7 @@
 
 #include "dmr/error.h"
 #include "dmr/log.h"
+#include "dmr/payload/sync.h"
 #include "dmr/proto.h"
 #include "dmr/proto/mmdvm.h"
 #include "dmr/thread.h"
@@ -24,154 +26,121 @@
 
 static const char *dmr_mmdvm_proto_name = "mmdvm";
 
-struct baud_mapping {
-  long    baud;
-  speed_t speed;
-};
-
-static struct baud_mapping baud_lookup_table[] = {
-#if defined(DMR_PLATFORM_WINDOWS)
-    { 1200,   CBR_1200 },
-    { 2400,   CBR_2400 },
-    { 4800,   CBR_4800 },
-    { 9600,   CBR_9600 },
-    { 19200,  CBR_19200 },
-    { 38400,  CBR_38400 },
-    { 57600,  CBR_57600 },
-    { 115200, CBR_115200 },
-#else
-    { 1200,   B1200 },
-    { 2400,   B2400 },
-    { 4800,   B4800 },
-    { 9600,   B9600 },
-    { 19200,  B19200 },
-    { 38400,  B38400 },
-#ifdef B57600
-    { 57600,  B57600 },
-#endif
-#ifdef B115200
-    { 115200, B115200 },
-#endif
-#ifdef B230400
-    { 230400, B230400 },
-#endif
-#endif
-    { 0,      0 }                 /* Terminator. */
-};
-
-static speed_t serial_baud_lookup(long baud)
+static int mmdvm_proto_init(void *modemptr)
 {
-    struct baud_mapping *map = baud_lookup_table;
-
-    while (map->baud) {
-        if (map->baud == baud)
-            return map->speed;
-        map++;
-    }
-
-    /*
-     * If a non-standard BAUD rate is used, issue
-     * a warning (if we are verbose) and return the raw rate
-     */
-     fprintf(stderr, "mmdvm: serial_baud_lookup(): using non-standard baud rate: %ld", baud);
-     return baud;
-}
-
-
-static dmr_proto_status_t mmdvm_proto_init(void *modemptr)
-{
-    dmr_log_verbose("mmdvm: init");
+    dmr_log_trace("mmdvm: init");
     dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
     if (modem == NULL)
-        return DMR_PROTO_CONF;
+        return dmr_error(DMR_EINVAL);
 
-    return dmr_mmdvm_sync(modem) ? DMR_PROTO_OK : DMR_PROTO_NOT_READY;
-}
-
-static int mmdvm_proto_start_thread(void *modemptr)
-{
-    dmr_log_verbose("mmdvm: start thread");
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL) {
-        fprintf(stderr, "mmdvm: start thread called without modem?!\n");
-        return dmr_thread_error;
+    if (modem->flag & DMR_MMDVM_FLAG_SYNC) {
+        if (dmr_mmdvm_sync(modem) != 0) {
+            dmr_log_error("mmdvm: sync failed");
+            return dmr_error(DMR_UNSUPPORTED);
+        }
     }
-
-    while (modem->active) {
-        dmr_mmdvm_poll(modem);
-        dmr_msleep(250);
-    }
-
-    return dmr_thread_success;
-}
-
-static bool mmdvm_proto_start(void *modemptr)
-{
-    dmr_log_verbose("mmdvm: start");
-    int ret;
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    if (modem->thread != NULL) {
-        fprintf(stderr, "mmdvm: can't start, already active\n");
-        return false;
-    }
-
-    modem->thread = malloc(sizeof(dmr_thread_t));
-    if (modem->thread == NULL) {
-        fprintf(stderr, "mmdvm: can't start, out of memory\n");
-        return false;
-    }
-
-    switch ((ret = dmr_thread_create(modem->thread, mmdvm_proto_start_thread, modemptr))) {
-    case dmr_thread_success:
-        break;
-    default:
-        fprintf(stderr, "mmdvm: can't create thread\n");
-        return false;
-    }
-
-    return true;
-}
-
-static bool mmdvm_proto_stop(void *modemptr)
-{
-    dmr_log_verbose("mmdvm: stop");
-    int ret;
-    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
-    if (modem == NULL)
-        return false;
-
-    if (modem->thread == NULL) {
-        fprintf(stderr, "mmdvm: not active\n");
-        return true;
-    }
-
-    modem->active = false;
-    switch ((ret = dmr_thread_join(*modem->thread, NULL))) {
-    case dmr_thread_success:
-        break;
-    default:
-        fprintf(stderr, "mmdvm: can't stop thread\n");
-        return false;
-    }
-
-    free(modem->thread);
-    modem->thread = NULL;
-
-    dmr_mmdvm_close(modem);
-    return true;
+    return 0;
 }
 
 static bool mmdvm_proto_active(void *modemptr)
 {
-    dmr_log_verbose("mmdvm: active?");
+    dmr_log_trace("mmdvm: active");
     dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
     if (modem == NULL)
         return false;
 
-    return modem->thread != NULL && modem->active;
+    dmr_log_trace("mmdvm: mutex lock");
+    dmr_mutex_lock(modem->proto.mutex);
+    bool active = modem->proto.thread != NULL && modem->proto.is_active;
+    dmr_log_trace("mmdvm: mutex unlock");
+    dmr_mutex_unlock(modem->proto.mutex);
+    dmr_log_trace("mmdvm: active = %s", DMR_LOG_BOOL(active));
+    return active;
+}
+
+static int mmdvm_proto_start_thread(void *modemptr)
+{
+    dmr_log_trace("mmdvm: start thread");
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL) {
+        dmr_log_error("mmdvm: start thread called without modem?!\n");
+        return dmr_thread_error;
+    }
+    dmr_thread_name_set("mmdvm proto");
+    while (mmdvm_proto_active(modem)) {
+        switch (dmr_mmdvm_poll(modem)) {
+        case dmr_mmdvm_error:
+            dmr_log_critical("mmdvm: stop on error: %s", strerror(modem->error));
+            dmr_mutex_lock(modem->proto.mutex);
+            modem->proto.is_active = false;
+            dmr_mutex_unlock(modem->proto.mutex);
+            break;
+        case dmr_mmdvm_timeout:
+        default:
+            dmr_msleep(25);
+            break;
+        }
+    }
+    dmr_thread_exit(dmr_thread_success);
+    return dmr_thread_success;
+}
+
+static int mmdvm_proto_start(void *modemptr)
+{
+    dmr_log_trace("mmdvm: start");
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    if (modem->proto.thread != NULL) {
+        dmr_log_error("mmdvm: can't start, already active");
+        return dmr_error(DMR_EINVAL);
+    }
+
+    modem->proto.thread = malloc(sizeof(dmr_thread_t));
+    if (modem->proto.thread == NULL) {
+        dmr_log_critical("mmdvm: can't start, out of memory");
+        return dmr_error(DMR_ENOMEM);
+    }
+
+    dmr_log_trace("mmdvm: mutex lock");
+    dmr_mutex_lock(modem->proto.mutex);
+    modem->proto.is_active = true;
+    dmr_log_trace("mmdvm: mutex unlock");
+    dmr_mutex_unlock(modem->proto.mutex);
+    if (dmr_thread_create(modem->proto.thread, mmdvm_proto_start_thread, modemptr) != dmr_thread_success) {
+        dmr_log_error("mmdvm: can't creat thread");
+        return dmr_error(DMR_EINVAL);
+    }
+
+    return 0;
+}
+
+static int mmdvm_proto_stop(void *modemptr)
+{
+    dmr_log_trace("mmdvm: stop");
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    if (modem->proto.thread == NULL) {
+        dmr_log_error("mmdvm: not active\n");
+        return 0;
+    }
+
+    dmr_mutex_lock(modem->proto.mutex);
+    modem->proto.is_active = false;
+    dmr_mutex_unlock(modem->proto.mutex);
+    if (dmr_thread_join(*modem->proto.thread, NULL) != dmr_thread_success) {
+        dmr_log_error("mmdvm: can't join thread");
+        return dmr_error(DMR_EINVAL);
+    }
+
+    free(modem->proto.thread);
+    modem->proto.thread = NULL;
+
+    dmr_mmdvm_close(modem);
+    return 0;
 }
 
 static char *dmr_mmdvm_command_name(uint8_t command)
@@ -238,7 +207,11 @@ static char *dmr_mmdvm_command_name(uint8_t command)
     }
 }
 
-dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes)
+#ifdef DMR_MMDVM_DUMP_FILE
+FILE *dump;
+#endif
+
+dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes)
 {
     dmr_mmdvm_t *modem = malloc(sizeof(dmr_mmdvm_t));
     if (modem == NULL)
@@ -246,17 +219,27 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes)
 
     memset(modem, 0, sizeof(dmr_mmdvm_t));
 
+#ifdef DMR_MMDVM_DUMP_FILE
+    dump = fopen("mmdvm.dump", "w+");
+#endif
+
     // Setup MMDVM protocol
     modem->proto.name = dmr_mmdvm_proto_name;
     modem->proto.init = mmdvm_proto_init;
     modem->proto.start = mmdvm_proto_start;
     modem->proto.stop = mmdvm_proto_stop;
     modem->proto.active = mmdvm_proto_active;
+    if (dmr_proto_mutex_init(&modem->proto) != 0) {
+        dmr_log_error("modem: failed to init mutex");
+        free(modem);
+        return NULL;
+    }
 
     // Setup MMDVM modem
     modem->version = 0;
     modem->firmware = NULL;
-    modem->baud = serial_baud_lookup(baud);
+    modem->baud = baud;
+    modem->flag = flag;
 #ifdef DMR_PLATFORM_WINDOWS
     char portbuf[64];
     memset(portbuf, 0, 64);
@@ -286,13 +269,15 @@ modem->port = strdup(port);
         return NULL;
     }
 
+/*
 #if defined(DMR_PLATFORM_WINDOWS)
     modem->fd = CreateFile(modem->port, GENERIC_READ|GENERIC_WRITE, 0, NULL,
         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (modem->fd == INVALID_HANDLE_VALUE) {
         modem->error = dmr_serial_error();
         dmr_log_error("mmdvm: open %s failed: %s", modem->port, dmr_serial_error_message());
-        return modem;
+        dmr_mmdvm_free(modem);
+        return NULL;
     }
 
     DCB settings = {0};
@@ -300,7 +285,8 @@ modem->port = strdup(port);
     if (GetCommState(modem->fd, &settings) == 0) {
         modem->error = dmr_serial_error();
         dmr_log_error("mmdvm: error getting %s device state: %s", modem->port, dmr_serial_error_message());
-        return modem;
+        dmr_mmdvm_free(modem);
+        return NULL;
     }
 
     settings.BaudRate = modem->baud;
@@ -310,7 +296,8 @@ modem->port = strdup(port);
     if (SetCommState(modem->fd, &settings) == 0) {
         modem->error = dmr_serial_error();
         dmr_log_error("mmdvm: error setting %s device state: %s", modem->port, dmr_serial_error_message());
-        return modem;
+        dmr_mmdvm_free(modem);
+        return NULL;
     }
 
     COMMTIMEOUTS timeouts = {0};
@@ -322,75 +309,18 @@ modem->port = strdup(port);
     if (SetCommTimeouts(modem->fd, &timeouts) == 0) {
         modem->error = dmr_serial_error();
         dmr_log_error("mmdvm: error setting %s timeouts: %s", modem->port, dmr_serial_error_message());
-        return modem;
+        dmr_mmdvm_free(modem);
+        return NULL;
     }
 
 #else
-    if ((modem->fd = open(modem->port, O_RDWR | O_NOCTTY | O_NONBLOCK)) < 0) {
+*/
+    if ((modem->fd = dmr_serial_open(modem->port, baud, true)) < 0) {
         modem->error = errno;
         dmr_log_error("mmdvm: open %s failed: %s", modem->port, dmr_serial_error_message());
-        return modem;
+        dmr_mmdvm_free(modem);
+        return NULL;
     }
-    if (!isatty(modem->fd)) {
-        fprintf(stderr, "mmdvm open %s failed: not a TTY\n", modem->port);
-        return modem;
-    }
-
-    struct termios settings;
-    memset(&settings, 0, sizeof(struct termios));
-    if ((modem->error = tcgetattr(modem->fd, &settings)) != 0) {
-        fprintf(stderr, "mmdvm tcgetattr failed: %s\n", strerror(modem->error));
-        return modem;
-    }
-    /*
-    settings.c_lflag &= ~(ECHO | ECHOE | ICANON | IEXTEN | ISIG);
-	settings.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON | IXOFF | IXANY);
-	settings.c_cflag &= ~(CSIZE | CSTOPB | PARENB | CRTSCTS);
-	settings.c_cflag |= CS8;
-	settings.c_oflag &= ~(OPOST);
-	settings.c_cc[VMIN] = 1;
-	settings.c_cc[VTIME] = 10;
-    */
-    // 8N1
-    /*
-    settings.c_cflag &= ~PARENB;
-    settings.c_cflag &= ~CSTOPB;
-    settings.c_cflag &= ~CSIZE;
-    settings.c_cflag |= CS8;
-    // no flow control
-    settings.c_cflag &= ~CRTSCTS;
-    //toptions.c_cflag &= ~HUPCL; // disable hang-up-on-close to avoid reset
-    settings.c_cflag |= CREAD | CLOCAL;  // turn on READ & ignore ctrl lines
-    settings.c_iflag &= ~(IXON | IXOFF | IXANY); // turn off s/w flow ctrl
-    settings.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // make raw
-    settings.c_oflag &= ~OPOST; // make raw
-    settings.c_cc[VMIN] = 1;
-    settings.c_cc[VTIME] = 2;
-    */
-    // set new port settings for non-canonical input processing  //must be NOCTTY
-    settings.c_lflag    &= ~(ECHO | ECHOE | ICANON | IEXTEN | ISIG);
-    settings.c_iflag    &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON | IXOFF | IXANY);
-    settings.c_cflag    &= ~(CSIZE | CSTOPB | PARENB | CRTSCTS);
-    settings.c_cflag    |= CS8;
-    settings.c_oflag    &= ~(OPOST);
-    settings.c_cc[VMIN]  = 0;
-    settings.c_cc[VTIME] = 10;
-    cfsetispeed(&settings, modem->baud);
-    cfsetospeed(&settings, modem->baud);
-    if ((modem->error = tcsetattr(modem->fd, TCSANOW, &settings)) != 0) {
-        fprintf(stderr, "mmdvm tcsetattr failed: %s\n", strerror(modem->error));
-        return modem;
-    }
-    dmr_msleep(250);
-    if ((modem->error = tcflush(modem->fd, TCOFLUSH)) != 0) {
-        fprintf(stderr, "mmdvm tcflush failed: %s\n", strerror(modem->error));
-        return modem;
-    }
-    if ((modem->error = tcflush(modem->fd, TCIFLUSH)) != 0) {
-        fprintf(stderr, "mmdvm tcflush failed: %s\n", strerror(modem->error));
-        return modem;
-    }
-#endif
 
     return modem;
 }
@@ -402,15 +332,19 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
 
     uint8_t len, length, data;
     uint16_t val[4];
-    dmr_mmdvm_response_t res = dmr_mmdvm_get_response(modem, &len);
+    struct timeval timeout = { 1, 0 };
+    dmr_mmdvm_response_t res = dmr_mmdvm_get_response(modem, &len, &timeout, 1);
 
     switch (res) {
     case dmr_mmdvm_timeout:
-        break; // Nothing to do here
+        return 0; // Nothing to do here
 
     case dmr_mmdvm_error:
-        fprintf(stderr, "mmdvm read error\n");
-        break;
+        if (len == 0)
+            return 0; // Nothing to do here
+
+        dmr_log_debug("mmdvm: error reading response");
+        return 1;
 
     case dmr_mmdvm_ok:
         length = modem->buffer[1];
@@ -419,7 +353,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
         case DMR_MMDVM_DMR_DATA2:
             dmr_log_debug("mmdvm: DMR data on TS%d, slot type %s (%d)",
                 modem->buffer[2] - DMR_MMDVM_DMR_DATA1,
-                dmr_packet_get_slot_type_name(modem->buffer[3]),
+                dmr_slot_type_name(modem->buffer[3]),
                 modem->buffer[3]);
             dump_hex(modem->buffer, len);
 
@@ -428,12 +362,51 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 dmr_log_error("mmdvm: unable to decode DMR packet");
                 return -1;
             }
+
+            packet->slot_type = modem->buffer[3];
             packet->ts = modem->buffer[2] - DMR_MMDVM_DMR_DATA1;
-            if (mmdvm_proto_active(modem)) {
-                dmr_log_debug("mmdvm: proto active, relaying packet");
-                dmr_proto_rx(&modem->proto, modem, packet);
+
+            switch (packet->slot_type) {
+            case DMR_SLOT_TYPE_SYNC_VOICE:
+                // If this is a new voice stream or it has been too long since
+                // we've last seen a voice frame, prepend a voice LC header.
+                if (modem->last_dmr_slot_type != packet->slot_type ||
+                    dmr_time_ms_since(modem->last_dmr_voice_packet_received) > 125) {
+                    dmr_log_debug("mmdvm: prepending voice LC");
+                    dmr_packet_t *voice_lc = malloc(sizeof(dmr_packet_t));
+                    if (voice_lc == NULL) {
+                        dmr_error(DMR_ENOMEM);
+                        return -1;
+                    }
+                    memset(voice_lc, 0, sizeof(dmr_packet_t));
+                    voice_lc->slot_type = DMR_SLOT_TYPE_VOICE_LC;
+
+                    // Reset frame counter (so we start with frame A)
+                    modem->last_dmr_voice_frame = 0;
+
+                    dmr_proto_rx(&modem->proto, modem, voice_lc);
+                    dmr_proto_rx_cb_run(&modem->proto, voice_lc);
+                    free(voice_lc);
+                }
+
+                // Number it as a valid voice burst frame
+                packet->slot_type = DMR_SLOT_TYPE_VOICE_BURST_A + modem->last_dmr_voice_frame;
+                switch (packet->slot_type) {
+                case DMR_SLOT_TYPE_VOICE_BURST_A:
+                    dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet);
+                    break;
+                }
+
+                // Track progress
+                modem->last_dmr_voice_frame = (modem->last_dmr_voice_frame + 1) % 6;
+                modem->last_dmr_slot_type = packet->slot_type;
+                gettimeofday(&modem->last_dmr_voice_packet_received, NULL);
+                break;
             }
-            free(packet);
+
+            dmr_log_trace("mmdvm: rx %s", dmr_slot_type_name(packet->slot_type));
+            dmr_proto_rx(&modem->proto, modem, packet);
+            dmr_proto_rx_cb_run(&modem->proto, packet);
             break;
 
         case DMR_MMDVM_DMR_LOST1:
@@ -484,25 +457,25 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
         case DMR_MMDVM_DEBUG5:
             switch (modem->buffer[2]) {
             case DMR_MMDVM_DEBUG1:
-                fprintf(stderr, "mmdvm: debug1 %.*s\n",
+                dmr_log_error("mmdvm: debug1 %.*s\n",
                     length - 3, &modem->buffer[3]);
                 break;
             case DMR_MMDVM_DEBUG2:
                 val[0] = modem->buffer[length - 2] << 8 | modem->buffer[length - 1];
-                fprintf(stderr, "mmdvm: debug2 %.*s %d\n",
+                dmr_log_error("mmdvm: debug2 %.*s %d\n",
                     length - 5, &modem->buffer[3], val[0]);
                 break;
             case DMR_MMDVM_DEBUG3:
                 val[0] = modem->buffer[length - 4] << 8 | modem->buffer[length - 3];
                 val[1] = modem->buffer[length - 2] << 8 | modem->buffer[length - 1];
-                fprintf(stderr, "mmdvm: debug3 %.*s %d %d\n",
+                dmr_log_error("mmdvm: debug3 %.*s %d %d\n",
                     length - 7, &modem->buffer[3], val[0], val[1]);
                 break;
             case DMR_MMDVM_DEBUG4:
                 val[0] = modem->buffer[length - 6] << 8 | modem->buffer[length - 5];
                 val[1] = modem->buffer[length - 4] << 8 | modem->buffer[length - 3];
                 val[2] = modem->buffer[length - 2] << 8 | modem->buffer[length - 1];
-                fprintf(stderr, "mmdvm: debug4 %.*s %d %d %d\n",
+                dmr_log_error("mmdvm: debug4 %.*s %d %d %d\n",
                     length - 9, &modem->buffer[3], val[0], val[1], val[2]);
                 break;
             case DMR_MMDVM_DEBUG5:
@@ -510,7 +483,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 val[1] = modem->buffer[length - 6] << 8 | modem->buffer[length - 5];
                 val[2] = modem->buffer[length - 4] << 8 | modem->buffer[length - 3];
                 val[3] = modem->buffer[length - 2] << 8 | modem->buffer[length - 1];
-                fprintf(stderr, "mmdvm: debug5 %.*s %d %d %d %d\n",
+                dmr_log_error("mmdvm: debug5 %.*s %d %d %d %d\n",
                     length - 11, &modem->buffer[3], val[0], val[1], val[2], val[3]);
                 break;
             }
@@ -527,8 +500,10 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             dump_hex(&modem->buffer[3], length - 2);
             break;
         }
-    }
 
+        modem->last_dmr_slot_type = modem->buffer[3];
+        gettimeofday(&modem->last_packet_received, NULL);
+    }
     return 0;
 }
 
@@ -539,19 +514,24 @@ int dmr_mmdvm_sync(dmr_mmdvm_t *modem)
     if (modem == NULL)
         return dmr_error(DMR_EINVAL);
 
-    dmr_log_debug("mmdvm: sync modem on %s rate %u", modem->port, modem->baud);
-    dmr_msleep(DMR_MMDVM_DELAY_MS);
+    dmr_log_debug("mmdvm: sync modem on %s", modem->port);
     for (i = 0; i < 6; i++) {
         uint8_t buf[3] = {DMR_MMDVM_FRAME_START, 3, DMR_MMDVM_GET_VERSION};
-
-        dmr_log_debug("mmdvm write: DMR_MMDVM_FRAME_START, 3, DMR_MMDVM_GET_VERSION");
-        if (dmr_serial_write(modem->fd, &buf, 3) != 3) {
+        if (dmr_serial_write(modem->fd, &buf[0], 3) != 3) {
             modem->error = errno;
             return dmr_error(DMR_EWRITE);
         }
+        dmr_msleep(DMR_MMDVM_DELAY_MS);
 
         uint8_t len;
-        dmr_mmdvm_response_t res = dmr_mmdvm_get_response(modem, &len);
+        struct timeval timeout = { 1, 0 };
+        dmr_mmdvm_response_t res = dmr_mmdvm_get_response(modem, &len, &timeout, 16);
+        if (res == dmr_mmdvm_timeout)
+            goto mmdvm_sync_retry;
+        if (len < 2) {
+            dmr_log_error("mmdvm: response too short: received %d bytes", len);
+            goto mmdvm_sync_retry;
+        }
         dmr_log_debug("mmdvm: %d bytes of response", len);
         dump_hex(modem->buffer, len);
         if (res == dmr_mmdvm_ok && modem->buffer[2] == DMR_MMDVM_GET_VERSION) {
@@ -565,26 +545,19 @@ int dmr_mmdvm_sync(dmr_mmdvm_t *modem)
             return 0;
         }
 
+mmdvm_sync_retry:
         dmr_sleep(1);
     }
 
     dmr_log_error("mmdvm: sync error: unable to read firmware version");
-    return -1;
+    return dmr_error(DMR_EINVAL);
 }
 
-dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length)
+dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries)
 {
     int ret = 0;
-    uint8_t offset = 0;
-    uint8_t *p = &modem->buffer[0];
-#ifdef DMR_PLATFORM_WINDOWS
-    OVERLAPPED ov;
-    DWORD dwEventMask;
-#else
-    struct timeval timeout;
-    fd_set rfds;
-    int nfds;
-#endif
+    uint8_t offset = 0, retry = 0;
+    uint8_t *p = modem->buffer;
 
     if (modem == NULL)
         return dmr_mmdvm_error;
@@ -593,50 +566,42 @@ dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length)
     memset(modem->buffer, 0, sizeof(modem->buffer));
     *length = 0;
 
-#ifndef DMR_PLATFORM_WINDOWS
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 250000;
-#endif
     while (true) {
-#ifdef DMR_PLATFORM_WINDOWS
-        memset(&ov, 0, sizeof(ov));
-        ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-        assert(ov.hEvent);
-        BOOL abRet = WaitCommEvent(modem->fd, &dwEventMask, &ov);
-        if (!abRet) {
-            DWORD dwRet = GetLastError();
-            if (dwRet != ERROR_IO_PENDING) {
-                dmr_log_error("mmdvm: read failed: %s", dmr_serial_error_message());
+        if (offset == 0) {
+            // Nothing received yet, scan for a DMR_MMDVM_FRAME_START
+            dmr_log_trace("mmdvm: looking for DMR_MMDVM_FRAME_START %d/%d", retry, retries);
+            if (retry >= retries) {
+                dmr_log_debug("mmdvm: maximum retries %d reached", retry);
                 return dmr_mmdvm_error;
             }
-        }
-
-#else
-select_again:
-        FD_ZERO(&rfds);
-        FD_SET(modem->fd, &rfds);
-        nfds = select(modem->fd + 1, &rfds, NULL, NULL, NULL);
-        if (nfds == 0) {
-            fprintf(stderr, "mmdvm: read failed: modem not responding\n");
-            return dmr_mmdvm_timeout;
-        } else if (nfds == -1) {
-            if (errno == EINTR || errno == EAGAIN) {
-                fprintf(stderr, "mmdvm: read failed: modem not responding, retrying\n");
-                goto select_again;
+            ret = dmr_serial_read(modem->fd, p, 1, timeout);
+            dmr_log_trace("mmdvm: read %d/1 bytes", ret);
+            if (ret > 0) {
+                if (p[0] == DMR_MMDVM_FRAME_START) {
+                    dmr_log_trace("mmdvm: got DMR_MMDVM_FRAME_START");
+                    p++;
+                    offset++;
+                } else {
+                    dmr_log_trace("mmdvm: expected DMR_MMDVM_FRAME_START, got 0x%02x", modem->buffer[0]);
+                }
             }
-            modem->error = errno;
-            fprintf(stderr, "mmdvm: read failed: select(): %s\n", strerror(modem->error));
-            return dmr_mmdvm_error;
-        }
-#endif // DMR_PLATFORM_WINDOWS
-
-        // If we have no length, read frame start and length only
-        if (*length == 0) {
-            ret = dmr_serial_read(modem->fd, p, 2);
-            dmr_log_debug("mmdvm: read %d/2 bytes", ret);
+            retry++;
+            continue;
+        } else if (offset == 1) {
+            // Read packet size
+            ret = dmr_serial_read(modem->fd, p, 1, timeout);
+            dmr_log_trace("mmdvm: read %d/1 bytes", ret);
+            if (ret > 0) {
+                dmr_log_trace("mmdvm: got packet size %d", modem->buffer[1]);
+                *length = modem->buffer[1];
+                if (*length > 200) {
+                    dmr_log_error("mmdvm: packet size %d too large", *length);
+                    return dmr_mmdvm_error;
+                }
+            }
         } else {
-            ret = dmr_serial_read(modem->fd, p, *length - offset);
-            dmr_log_debug("mmdvm: read %d/%d bytes, length = %d", ret, *length - offset, *length);
+            ret = dmr_serial_read(modem->fd, p, *length - offset, timeout);
+            dmr_log_trace("mmdvm: read %d/%d bytes, length = %d", ret, *length - offset, *length);
         }
         if (ret <= 0) {
             modem->error = errno;
@@ -646,24 +611,14 @@ select_again:
 
         offset += ret;
         p += ret;
-
-        if (*length == 0 && offset >= 2) {
-            fprintf(stderr, "mmdvm read: 0x%02x\n", modem->buffer[0]);
-            if (modem->buffer[0] != DMR_MMDVM_FRAME_START) {
-                fprintf(stderr, "mmdvm read failed: expected FRAME_START, got 0x%02x\n", modem->buffer[0]);
-                return dmr_mmdvm_timeout;
-            }
-            if (modem->buffer[1] > 200) {
-                fprintf(stderr, "mmdvm read failed: length overflow\n");
-                return dmr_mmdvm_error;
-            }
-            *length = modem->buffer[1];
-        }
-
-        if (*length > 0 && offset == *length)
+        if (*length > 0 && offset >= *length)
             break;
     }
 
+#ifdef DMR_MMDVM_DUMP_FILE
+    fwrite(modem->buffer, *length, 1, dump);
+    fflush(dump);
+#endif
     return dmr_mmdvm_ok;
 }
 

@@ -1,12 +1,31 @@
 # Logging
 #log_level=0
 
+# Our repeater
+repeater_color_code=1
+# Route rules: <name>:{<policy>,<proto>,<proto>,<ts>,<src_id>,<dst_id>}
+# policy = reject,permit
+# proto  = homebrew,mmdvm,mbe,repeater
+# ts     = 0: do not modify
+#          1: time slot 1
+#          2: time slot 2
+# src_id = 0: do not modify
+#          n: rewrite src_id
+# dst_id = 0: do not modify
+#          n: rewrite dst_id
+#
+#                                policy  proto  proto  ts  src_id   dst_id
+repeater_route=from_mmdvm_block:{reject, mmdvm, mmdvm,  0, 0,       0      }
+repeater_route=from_mmdvm_modem:{permit, mmdvm, *    ,  1, 2042214, 9990   }
+repeater_route=dest_mmdvm_modem:{permit, *,     mmdvm,  0, 0,       0      }
+
 # Our upstream peer
 upstream_type=homebrew
 homebrew_host=brandmeister.pd0zry.ampr.org
-homebrew_auth=secret
-homebrew_call=N0CALL
-homebrew_id=123456
+# Change these:
+#homebrew_auth=secret
+#homebrew_call=N0CALL
+#homebrew_id=123456
 homebrew_cc=1
 
 # Our "LF" side
@@ -14,6 +33,7 @@ modem_type=mmdvm
 mmdvm_rate=115200
 # Linux:
 mmdvm_port=/dev/ttyACM0
+#mmdvm_port=/dev/ttyUSB0
 # OS X:
 #mmdvm_port=/dev/cu.usbmodem1421
 # OS X (Chinese knock-off CH340 chip)

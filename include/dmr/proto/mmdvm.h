@@ -15,6 +15,7 @@
 #else
 #include <termios.h>
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 
 #include <dmr/buffer/ring.h>
@@ -94,6 +95,13 @@ typedef enum {
 } dmr_mmdvm_response_type_t;
 */
 
+/* Sync before connecting running a GET_VERSION command. */
+#define DMR_MMDVM_FLAG_SYNC             (1U << 1)
+/* Fixup voice frames replacing EMB and headers. */
+#define DMR_MMDVM_FLAG_FIXUP_VOICE      (1U << 2)
+/* Fixup voice frames adding a LC before the voice stream. */
+#define DMR_MMDVM_FLAG_FIXUP_VOICE_LC   (1U << 3)
+
 typedef enum {
     dmr_mmdvm_ok,
     dmr_mmdvm_timeout,
@@ -103,8 +111,9 @@ typedef enum {
 typedef struct {
     dmr_proto_t  proto;
     dmr_serial_t fd;
+    uint16_t     flag;
     int          error;
-    speed_t      baud;
+    long         baud;
     char         *port;
     uint8_t      buffer[200];
     bool         rx;
@@ -137,14 +146,19 @@ typedef struct {
     dmr_ring_t   *dmr_ts2_tx_buffer;
     dmr_ring_t   *ysf_rx_buffer;
     dmr_ring_t   *ysf_tx_buffer;
-    dmr_thread_t *thread;
-    bool         active;
+
+    // Book keeping
+    struct timeval  last_packet_received;
+    dmr_slot_type_t last_dmr_slot_type;
+    struct timeval  last_dmr_data_packet_received;
+    struct timeval  last_dmr_voice_packet_received;
+    uint8_t         last_dmr_voice_frame;
 } dmr_mmdvm_t;
 
-extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, size_t buffer_sizes);
+extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes);
 extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
-extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *len);
+extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries);
 extern int dmr_mmdvm_free(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_close(dmr_mmdvm_t *modem);
 

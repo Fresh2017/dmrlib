@@ -29,10 +29,17 @@ freely, subject to the following restrictions:
 extern "C" {
 #endif
 
+#ifndef _REENTRANT
+#error You need to compile with _REENTRANT defined since this uses threads
+#endif
+
 /* Which platform are we on? */
 #if !defined(_DMR_THREAD_PLATFORM_DEFINED_)
   #if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__)
     #define _DMR_THREAD_WIN32_
+  #elif defined(__APPLE__) || defined(__MACH__)
+    #define _DMR_THREAD_MAC_
+    #define _DMR_THREAD_POSIX_
   #else
     #define _DMR_THREAD_POSIX_
   #endif
@@ -45,6 +52,9 @@ extern "C" {
   #if !defined(_GNU_SOURCE)
     #define _GNU_SOURCE
   #endif
+  #if !defined(_DARWIN_C_SOURCE)
+    #define _DARWIN_C_SOURCE
+  #endif
   #if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
     #undef _POSIX_C_SOURCE
     #define _POSIX_C_SOURCE 199309L
@@ -53,14 +63,19 @@ extern "C" {
     #undef _XOPEN_SOURCE
     #define _XOPEN_SOURCE 500
   #endif
+  #if !defined(__USE_GNU)
+    // To unlock pthread_{get,set}name_np
+    #define __USE_GNU
+  #endif
 #endif
 
 /* Generic includes */
 #include <time.h>
 
 /* Platform specific includes */
-#if defined(_DMR_THREAD_POSIX_)
+#if defined(_DMR_THREAD_POSIX_) || defined(_DMR_THREAD_MAC_)
   #include <pthread.h>
+  #include <string.h>
 #elif defined(_DMR_THREAD_WIN32_)
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
@@ -151,9 +166,9 @@ int _dmr_thread_timespec_get(struct timespec *ts, int base);
 #define dmr_thread_nomem    4 /**< The requested operation failed because it was unable to allocate memory */
 
 /* Mutex types */
-#define dmr_mutexplain     0
-#define dmr_mutextimed     1
-#define dmr_mutexrecursive 2
+#define dmr_mutex_plain     0
+#define dmr_mutex_timed     1
+#define dmr_mutex_recursive 2
 
 /* Mutex */
 #if defined(_DMR_THREAD_WIN32_)
@@ -165,27 +180,27 @@ typedef struct {
   int mAlreadyLocked;         /* TRUE if the mutex is already locked */
   int mRecursive;             /* TRUE if the mutex is recursive */
   int mTimed;                 /* TRUE if the mutex is timed */
-} dmr_mutext;
+} dmr_mutex_t;
 #else
-typedef pthread_mutex_t dmr_mutext;
+typedef pthread_mutex_t dmr_mutex_t;
 #endif
 
 /** Create a mutex object.
 * @param mtx A mutex object.
 * @param type Bit-mask that must have one of the following six values:
-*   @li @c dmr_mutexplain for a simple non-recursive mutex
-*   @li @c dmr_mutextimed for a non-recursive mutex that supports timeout
-*   @li @c dmr_mutexplain | @c dmr_mutexrecursive (same as @c dmr_mutexplain, but recursive)
-*   @li @c dmr_mutextimed | @c dmr_mutexrecursive (same as @c dmr_mutextimed, but recursive)
+*   @li @c dmr_mutex_plain for a simple non-recursive mutex
+*   @li @c dmr_mutex_timed for a non-recursive mutex that supports timeout
+*   @li @c dmr_mutex_plain | @c dmr_mutex_recursive (same as @c dmr_mutex_plain, but recursive)
+*   @li @c dmr_mutex_timed | @c dmr_mutex_recursive (same as @c dmr_mutex_timed, but recursive)
 * @return @ref dmr_thread_success on success, or @ref dmr_thread_error if the request could
 * not be honored.
 */
-int dmr_mutexinit(dmr_mutext *mtx, int type);
+int dmr_mutex_init(dmr_mutex_t *mtx, int type);
 
 /** Release any resources used by the given mutex.
 * @param mtx A mutex object.
 */
-void dmr_mutexdestroy(dmr_mutext *mtx);
+void dmr_mutex_destroy(dmr_mutex_t *mtx);
 
 /** Lock the given mutex.
 * Blocks until the given mutex can be locked. If the mutex is non-recursive, and
@@ -195,11 +210,11 @@ void dmr_mutexdestroy(dmr_mutext *mtx);
 * @return @ref dmr_thread_success on success, or @ref dmr_thread_error if the request could
 * not be honored.
 */
-int dmr_mutexlock(dmr_mutext *mtx);
+int dmr_mutex_lock(dmr_mutex_t *mtx);
 
 /** NOT YET IMPLEMENTED.
 */
-int dmr_mutextimedlock(dmr_mutext *mtx, const struct timespec *ts);
+int dmr_mutex_timedlock(dmr_mutex_t *mtx, const struct timespec *ts);
 
 /** Try to lock the given mutex.
 * The specified mutex shall support either test and return or timeout. If the
@@ -209,14 +224,14 @@ int dmr_mutextimedlock(dmr_mutext *mtx, const struct timespec *ts);
 * requested is already in use, or @ref dmr_thread_error if the request could not be
 * honored.
 */
-int dmr_mutextrylock(dmr_mutext *mtx);
+int dmr_mutex_trylock(dmr_mutex_t *mtx);
 
 /** Unlock the given mutex.
 * @param mtx A mutex object.
 * @return @ref dmr_thread_success on success, or @ref dmr_thread_error if the request could
 * not be honored.
 */
-int dmr_mutexunlock(dmr_mutext *mtx);
+int dmr_mutex_unlock(dmr_mutex_t *mtx);
 
 /* Condition variable */
 #if defined(_DMR_THREAD_WIN32_)
@@ -271,7 +286,7 @@ int dmr_cond_broadcast(dmr_cond_t *cond);
 * @return @ref dmr_thread_success on success, or @ref dmr_thread_error if the request could
 * not be honored.
 */
-int dmr_cond_wait(dmr_cond_t *cond, dmr_mutext *mtx);
+int dmr_cond_wait(dmr_cond_t *cond, dmr_mutex_t *mtx);
 
 /** Wait for a condition variable to become signaled.
 * The function atomically unlocks the given mutex and endeavors to block until
@@ -285,7 +300,7 @@ int dmr_cond_wait(dmr_cond_t *cond, dmr_mutext *mtx);
 * specified in the call was reached without acquiring the requested resource, or
 * @ref dmr_thread_error if the request could not be honored.
 */
-int dmr_cond_timedwait(dmr_cond_t *cond, dmr_mutext *mtx, const struct timespec *ts);
+int dmr_cond_timedwait(dmr_cond_t *cond, dmr_mutex_t *mtx, const struct timespec *ts);
 
 /* Thread */
 #if defined(_DMR_THREAD_WIN32_)
@@ -319,9 +334,14 @@ typedef int (*dmr_thread_start_t)(void *arg);
 int dmr_thread_create(dmr_thread_t *thr, dmr_thread_start_t func, void *arg);
 
 /** Identify the calling thread.
-* @return The identifier of the calling thread.
-*/
+ * @return The identifier of the calling thread.
+ */
 dmr_thread_t dmr_thread_current(void);
+
+/** Get the current thread identifier.
+ * @return The identifier.
+ */
+unsigned long dmr_thread_id(dmr_thread_t *thr);
 
 /** Dispose of any resources allocated to the thread when that thread exits.
  * @return dmr_thread_success, or dmr_thread_error on error
@@ -369,6 +389,12 @@ int dmr_thread_sleep(const struct timespec *duration, struct timespec *remaining
 * continue to run.
 */
 void dmr_thread_yield(void);
+
+/** Get the current thread name. */
+int dmr_thread_name(char *buf, size_t len);
+
+/** Set the current thread name. */
+int dmr_thread_name_set(char *buf);
 
 /* Thread local storage */
 #if defined(_DMR_THREAD_WIN32_)

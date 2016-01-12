@@ -9,6 +9,8 @@
 #include <dmr/proto/repeater.h>
 #include <dmr/payload/voice.h>
 
+#include "route.h"
+
 extern const char *software_id, *package_id;
 
 typedef enum {
@@ -21,6 +23,9 @@ typedef enum {
 typedef struct config_s {
     const char         *filename;
     peer_t             upstream, modem;
+    route_rule_t       *repeater_route[ROUTE_RULE_MAX];
+    size_t             repeater_routes;
+    dmr_color_code_t   repeater_color_code;
     dmr_homebrew_t     *homebrew;
     char               *homebrew_host_s;
     struct hostent     *homebrew_host;
@@ -39,6 +44,8 @@ typedef struct config_s {
     dmr_log_priority_t log_level;
 } config_t;
 
-config_t *configure(const char *filename);
+config_t *load_config(void);
+config_t *init_config(const char *filename);
+void kill_config();
 
 #endif // _NOISEBRIDGE_CONFIG_H

@@ -1,38 +1,39 @@
 #include <string.h>
-
+#ifdef DMR_DEBUG
+#include <assert.h>
+#endif
+#include "dmr/error.h"
 #include "dmr/payload.h"
-#include "dmrfec/quadres_16_7.h"
+#include "dmr/fec/qr_16_7.h"
 
-dmr_emb_bits_t *dmr_emb_from_payload_sync_bits(dmr_payload_sync_bits_t *sync_bits)
+
+int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet)
 {
-    static dmr_emb_bits_t emb_bits;
+    if (emb == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
 
-    if (sync_bits == NULL)
-        return NULL;
-
-    memcpy(emb_bits.bits, sync_bits->bits, sizeof(dmr_emb_bits_t) / 2);
-    memcpy(emb_bits.bits + 8, sync_bits->bits + sizeof(dmr_emb_bits_t) / 2 + sizeof(dmr_emb_signalling_lc_fragment_bits_t), sizeof(dmr_emb_bits_t) / 2);
-
-    return &emb_bits;
+#ifdef DMR_DEBUG
+    assert(sizeof(dmr_emb_t) == 2);
+#endif
+    memset(emb, 0, sizeof(dmr_emb_t));
+    emb->bytes[0]  = (packet->payload[13] << 4) & 0xf0U;
+    emb->bytes[0] |= (packet->payload[14] >> 4) & 0x0fU;
+    emb->bytes[1]  = (packet->payload[18] << 4) & 0xf0U;
+    emb->bytes[1] |= (packet->payload[19] >> 4) & 0x0fU;
+    //dmr_fec_qr_16_7_decode(emb->bytes);
+    return 0;
 }
 
-dmr_emb_t *dmr_emb_decode(dmr_emb_bits_t *emb_bits)
+int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
 {
-    static dmr_emb_t emb;
+    if (emb == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
 
-    if (emb_bits == NULL)
-        return NULL;
-
-    if (!dmrfec_quadres_16_7_check((dmrfec_quadres_16_7_codeword_t *)emb_bits->bits))
-        return NULL;
-
-    // Privacy Indicator must be 0
-    if (emb_bits->bits[4] != 0)
-        return NULL;
-
-    emb.color_code = emb_bits->bits[0] << 3 | emb_bits->bits[1] << 2 | emb_bits->bits[2] << 1 | emb_bits->bits[3];
-    emb.lcss = emb_bits->bits[5] << 1 | emb_bits->bits[6];
-    return &emb;
+    dmr_fec_qr_16_7_encode(emb->bytes);
+    packet->payload[13] = (packet->payload[13] & 0xf0U) | (emb->bytes[0] >> 4);
+    packet->payload[14] = (packet->payload[14] & 0x0fU) | (emb->bytes[0] << 4);
+    packet->payload[18] = (packet->payload[18] & 0xf0U) | (emb->bytes[1] >> 4);
+    packet->payload[19] = (packet->payload[19] & 0x0fU) | (emb->bytes[1] << 4);
 }
 
 char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss)

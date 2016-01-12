@@ -3,7 +3,9 @@
 
 #include "config.h"
 
-bool boot_audio(config_t *config);
-bool init_audio(config_t *config);
+void stream_audio(float *samples, size_t len);
+void kill_audio(void);
+bool boot_audio(void);
+bool init_audio(void);
 
 #endif // _NOISEBRIDGE_AUDIO_H

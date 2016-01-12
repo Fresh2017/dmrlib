@@ -6,6 +6,7 @@ env = Environment(
     SUPPORTDIR='#support',
     CPPDEFINES=[
         '_GNU_SOURCE',
+        '_REENTRANT',
     ],
     CPPPATH=[
         os.path.join('#include'),
@@ -34,6 +35,9 @@ AddOption(
 
 if GetOption('with_debug'):
     env.Append(
+        CPPDEFINES=[
+            'DMR_DEBUG',
+        ],
         CCFLAGS=[
             '-g',
         ],
@@ -80,19 +84,6 @@ if sys.platform == 'win32':
 
 Export('env')
 
-shared = env.SConscript(
-    os.path.join('src', 'shared', 'SConscript'),
-    variant_dir='build/shared',
-    duplicate=0,
-)
-
-dmrfec = env.SConscript(
-    os.path.join('src', 'dmrfec', 'SConscript'),
-    variant_dir='build/libdmrfec',
-    duplicate=0,
-)
-env.Install('dist', dmrfec)
-
 mbelib = env.SConscript(
     os.path.join('src', 'mbelib', 'SConscript'),
     variant_dir='build/mbelib',
@@ -106,9 +97,9 @@ dmr = env.SConscript(
     duplicate=0,
 )
 env.Install('dist', dmr)
-env.Depends(dmr, dmrfec)
 env.Depends(dmr, mbelib)
 
+'''
 dmrdump = env.SConscript(
     os.path.join('src', 'cmd', 'dmrdump', 'SConscript'),
     variant_dir='build/cmd/dmrdump',
@@ -117,6 +108,14 @@ dmrdump = env.SConscript(
 env.Install('dist', dmrdump)
 env.Depends(dmrdump, dmr)
 
+mmdvmplay = env.SConscript(
+    os.path.join('src', 'cmd', 'mmdvmplay', 'SConscript'),
+    variant_dir='build/cmd/mmdvmplay',
+    duplicate=0,
+)
+env.Install('dist', mmdvmplay)
+env.Depends(mmdvmplay, dmr)
+
 mmdvmtest = env.SConscript(
     os.path.join('src', 'cmd', 'mmdvmtest', 'SConscript'),
     variant_dir='build/cmd/mmdvmtest',
@@ -124,6 +123,7 @@ mmdvmtest = env.SConscript(
 )
 env.Install('dist', mmdvmtest)
 env.Depends(mmdvmtest, dmr)
+'''
 
 if sys.platform in ('darwin', 'linux2'):
     noisebridge = env.SConscript(

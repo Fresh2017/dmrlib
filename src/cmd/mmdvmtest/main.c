@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     long rate = DMR_MMDVM_BAUD_RATE;
     int ret = 0;
 
-    dmr_log_priority_set(DMR_LOG_PRIORITY_VERBOSE);
+    dmr_log_priority_set(DMR_LOG_PRIORITY_TRACE);
     if (argc != 2 && argc != 3) {
         fprintf(stderr, "%s <port> [<rate>]\n", argv[0]);
         list_serial_ports();
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     }
 
     dmr_log_info("mmdvm: on %s rate %ld", argv[1], rate);
-    if ((modem = dmr_mmdvm_open(argv[1], rate, 1000UL)) == NULL) {
+    if ((modem = dmr_mmdvm_open(argv[1], rate, 0, 1000UL)) == NULL) {
         return 1;
     }
     if (modem->error != 0) {

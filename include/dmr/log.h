@@ -22,8 +22,10 @@ extern "C" {
 #define DMR_LOG_TIME_FORMAT "%F %T"
 #endif // DMR_PLATFORM_WINDOWS
 
+#define DMR_LOG_BOOL(x) (x ? "true" : "false")
+
 typedef enum {
-    DMR_LOG_PRIORITY_VERBOSE = 1,
+    DMR_LOG_PRIORITY_TRACE = 1,
     DMR_LOG_PRIORITY_DEBUG,
     DMR_LOG_PRIORITY_INFO,
     DMR_LOG_PRIORITY_WARN,
@@ -40,7 +42,7 @@ extern void dmr_log_priority_reset(void);
 extern const char *dmr_log_prefix(void);
 extern void dmr_log_prefix_set(const char *prefix);
 extern void dmr_log(const char *fmt, ...);
-extern void dmr_log_verbose(const char *fmt, ...);
+extern void dmr_log_trace(const char *fmt, ...);
 extern void dmr_log_debug(const char *fmt, ...);
 extern void dmr_log_info(const char *fmt, ...);
 extern void dmr_log_warn(const char *fmt, ...);

@@ -1,7 +1,8 @@
 #include "dmr/payload/csbk.h"
-#include "dmrfec/bptc_196_96.h"
+#include "dmr/fec/bptc_196_96.h"
 
-dmr_csbk_t *dmr_csbk_decode(dmrfec_bptc_196_96_data_bits_t *data_bits)
+/*
+dmr_csbk_t *dmr_csbk_decode(dmr_fec_bptc_196_96_data_bits_t *data_bits)
 {
     static dmr_csbk_t csbk;
     uint8_t bytes[12];
@@ -9,7 +10,7 @@ dmr_csbk_t *dmr_csbk_decode(dmrfec_bptc_196_96_data_bits_t *data_bits)
     if (data_bits == NULL)
         return NULL;
 
-    bits_to_bytes(data_bits->bits, sizeof(dmrfec_bptc_196_96_data_bits_t), bytes, 12);
+    bits_to_bytes(data_bits->bits, sizeof(dmr_fec_bptc_196_96_data_bits_t), bytes, 12);
 
     // Protect flag is set.
     if (bytes[0] & 0b01000000)
@@ -68,3 +69,4 @@ char *dmr_csbk_opcode_name(dmr_csbk_opcode_t opcode)
         return "unknown";
     }
 }
+*/

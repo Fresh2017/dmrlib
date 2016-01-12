@@ -80,7 +80,7 @@ void usage(const char *program)
 
 void dump_dmr_packet(dmr_packet_t *packet)
 {
-    dmr_payload_info_bits_t *info_bits;
+    dmr_payload_info_bits_t info_bits, deinfo_bits;
     dmr_payload_sync_pattern_t sync_pattern;
     dmr_payload_sync_bits_t *sync_bits;
     dmrfec_bptc_196_96_data_bits_t *data_bits;
@@ -91,12 +91,13 @@ void dump_dmr_packet(dmr_packet_t *packet)
         packet->src_id, packet->dst_id,
         packet->repeater_id,
         dmr_packet_get_slot_type_name(packet->slot_type));
+    dump_hex(packet->payload.bytes, DMR_PAYLOAD_BYTES);
 
     switch (packet->slot_type) {
     case DMR_SLOT_TYPE_CSBK:
-        info_bits = dmr_payload_get_info_bits(&packet->payload);
-        info_bits = dmr_info_bits_deinterleave(info_bits);
-        data_bits = dmrfec_bptc_196_96_extractdata(info_bits->bits);
+        dmr_payload_get_info_bits(&packet->payload, &info_bits);
+        dmr_info_bits_deinterleave(&info_bits, &deinfo_bits);
+        data_bits = dmrfec_bptc_196_96_decode(deinfo_bits.bits);
         if (data_bits == NULL) {
             fprintf(stderr, "csbk: BPTC(196, 96) extract failed\n");
             break;
@@ -235,7 +236,7 @@ int main(int argc, char **argv)
         if (caplen < ip_headerlen)
             continue;
 
-        if (ip_hdr->ip_v != 4 || ip_hdr->ip_p != 23) {
+        if (ip_hdr->ip_v != 4 || (ip_hdr->ip_p != 17 && ip_hdr->ip_p != 23)) {
             fprintf(stderr, "skipping packet IP version %d, protocol %d\n", ip_hdr->ip_v, ip_hdr->ip_p);
             continue;
         }

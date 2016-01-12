@@ -5,10 +5,11 @@
 #include "dmr/log.h"
 #include "dmr/bits.h"
 #include "dmr/type.h"
+#include "dmr/thread.h"
 
 static const char *dmr_log_priority_names[] = {
     "NULL",
-    "verbose",
+    "trace",
     "debug",
     "info",
     "warn",
@@ -17,7 +18,7 @@ static const char *dmr_log_priority_names[] = {
 };
 static const char *dmr_log_priority_tags[] = {
     NULL,
-    "DEBUG",
+    "TRACE",
     "DEBUG",
     "INFO ",
     "WARN ",
@@ -27,7 +28,7 @@ static const char *dmr_log_priority_tags[] = {
 };
 static const char *dmr_log_priority_tags_colored[] = {
     NULL,
-    "\x1b[1;36mDEBUG\x1b[0m",
+    "\x1b[1;36mTRACE\x1b[0m",
     "\x1b[1;34mDEBUG\x1b[0m",
     "\x1b[1;37mINFO \x1b[0m",
     "\x1b[1;31mWARN \x1b[0m",
@@ -61,17 +62,21 @@ static void log_stderr(void *mem, dmr_log_priority_t priority, const char *msg)
 #if defined(DMR_PLATFORM_WINDOWS)
     SYSTEMTIME lt;
     GetLocalTime(&lt);
-    fprintf(stderr, "%s[%s] %04d-%02d-%02d %02d:%02d:%02d %s\n",
-        log_prefix, tag, lt.wYear, lt.wMonth, lt.wDay, lt.wHour, lt.wMinute, lt.wSecond, msg);
+    fprintf(stderr, "%s[%08lx][%s] %04d-%02d-%02d %02d:%02d:%02d %s\n",
+        log_prefix, dmr_thread_id(NULL), tag,
+        lt.wYear, lt.wMonth, lt.wDay, lt.wHour, lt.wMinute, lt.wSecond, msg);
 #else
     struct timeval tv;
     struct tm *tm;
-    char buf[21];
-    memset(buf, 0, 21);
+    static char tbuf[21], nbuf[17];
+    memset(tbuf, 0, sizeof(tbuf));
+    memset(nbuf, 0, sizeof(nbuf));
     gettimeofday(&tv, NULL);
     tm = localtime(&tv.tv_sec);
-    strftime(buf, 20, DMR_LOG_TIME_FORMAT, tm);
-    fprintf(stderr, "%s[%s] %s %s\n", log_prefix, tag, buf, msg);
+    strftime(tbuf, 20, DMR_LOG_TIME_FORMAT, tm);
+    dmr_thread_name(nbuf, sizeof(nbuf));
+    fprintf(stderr, "%s[%-16s][%s] %s %s\n",
+        log_prefix, nbuf, tag, tbuf, msg);
 #endif
     fflush(stderr);
 }
@@ -95,7 +100,7 @@ dmr_log_priority_t dmr_log_priority(void)
 
 void dmr_log_priority_set(dmr_log_priority_t priority)
 {
-    log_priority = min(DMR_LOG_PRIORITY_VERBOSE, max(priority, DMR_LOG_PRIORITIES - 1));
+    log_priority = min(DMR_LOG_PRIORITY_TRACE, max(priority, DMR_LOG_PRIORITIES - 1));
     dmr_log_info("log: priority set to %s", dmr_log_priority_names[log_priority]);
 }
 
@@ -122,11 +127,11 @@ void dmr_log(const char *fmt, ...)
     va_end(ap);
 }
 
-void dmr_log_verbose(const char *fmt, ...)
+void dmr_log_trace(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    dmr_log_messagev(DMR_LOG_PRIORITY_VERBOSE, fmt, ap);
+    dmr_log_messagev(DMR_LOG_PRIORITY_TRACE, fmt, ap);
     va_end(ap);
 }
 

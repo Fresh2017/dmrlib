@@ -8,7 +8,6 @@
 #include "util.h"
 
 static const char *route_rule_syntax = "name:{proto,proto,ts,dmr_id,dmr_id}";
-static const char *route_proto_empty = "";
 
 void route_rule_free(route_rule_t *rule)
 {

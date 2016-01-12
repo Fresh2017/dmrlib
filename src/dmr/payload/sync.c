@@ -12,17 +12,6 @@ static uint8_t dmr_payload_sync_pattern_direct_voice_ts1[6] = { 0x5d, 0x57, 0x7f
 static uint8_t dmr_payload_sync_pattern_direct_data_ts1[6]  = { 0xf7, 0xfd, 0xd5, 0xdd, 0xfd, 0x55 };
 static uint8_t dmr_payload_sync_pattern_direct_voice_ts2[6] = { 0x7d, 0xff, 0xd5, 0xf5, 0x5d, 0x5f };
 static uint8_t dmr_payload_sync_pattern_direct_data_ts2[6]  = { 0xd7, 0x55, 0x7f, 0x5f, 0xf7, 0xf5 };
-static const uint8_t dmr_payload_sync_patterns[9][6] = {
-    { 0x75, 0x5f, 0xd7, 0xdf, 0x75, 0xf7 },
-    { 0xdf, 0xf5, 0x7d, 0x75, 0xdf, 0x5d },
-    { 0x7f, 0x7d, 0x5d, 0xd5, 0x7d, 0xfd },
-    { 0xd5, 0xd7, 0xf7, 0x7f, 0xd7, 0x57 },
-    { 0x77, 0xd5, 0x5f, 0x7d, 0xfd, 0x77 },
-    { 0x5d, 0x57, 0x7f, 0x77, 0x57, 0xff },
-    { 0xf7, 0xfd, 0xd5, 0xdd, 0xfd, 0x55 },
-    { 0x7d, 0xff, 0xd5, 0xf5, 0x5d, 0x5f },
-    { 0xd7, 0x55, 0x7f, 0x5f, 0xf7, 0xf5 }
-};
 
 dmr_sync_pattern_t dmr_sync_pattern_decode(dmr_packet_t *packet)
 {
@@ -31,13 +20,7 @@ dmr_sync_pattern_t dmr_sync_pattern_decode(dmr_packet_t *packet)
         sync_bytes[i]  = (packet->payload[17 + i] & 0x0f) << 4;
         sync_bytes[i] |= (packet->payload[18 + i] & 0xf0) >> 4;
     }
-    /*
-    for (i = 0; i < 9; i++) {
-        if (!memcmp(dmr_payload_sync_patterns[i], sync_bytes, 6))
-            return i;
-    }
-    return DMR_SYNC_PATTERN_UNKNOWN;
-    */
+
     if (!memcmp(sync_bytes, dmr_payload_sync_pattern_bs_sourced_voice, sizeof(sync_bytes)))
         return DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
     else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_bs_sourced_data, sizeof(sync_bytes)))

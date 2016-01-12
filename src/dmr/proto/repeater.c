@@ -23,7 +23,7 @@ static int repeater_proto_init(void *repeaterptr)
             repeater->slots);
         return dmr_error(DMR_EINVAL);
     }
-    if (repeater->color_code < 0 || repeater->color_code > 15) {
+    if (repeater->color_code < 1 || repeater->color_code > 15) {
         dmr_log_error("repeater: can't start, invalid color code %d",
             repeater->color_code);
         return dmr_error(DMR_EINVAL);
@@ -258,11 +258,13 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
     case DMR_SLOT_TYPE_VOICE_LC:
         dmr_log_trace("repeater: constructing Full Link Control");
         dmr_lc_t lc = {
-            .flco                 = DMR_LC_GROUP_VOICE_CHANNEL_USER,
-            .fid                  = 0,
-            .service_options.byte = 0,
-            .dst_id               = packet->dst_id,
-            .src_id               = packet->src_id
+            .flco            = DMR_LC_GROUP_VOICE_CHANNEL_USER,
+            .fid             = 0,
+            .service_options = {
+                .byte        = 0,
+            },
+            .dst_id          = packet->dst_id,
+            .src_id          = packet->src_id
         };
         if (dmr_lc_full_encode(&lc, packet) != 0) {
             dmr_log_error("repeater: can't fix headers, full LC failed");
@@ -285,9 +287,11 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
         dmr_log_trace("repeater: constructing slot type PDU for %s",
             dmr_slot_type_name(packet->slot_type));
         dmr_slot_t pdu = {
-            .fields.color_code = repeater->color_code,
-            .fields.data_type  = packet->slot_type,
-            .fields.fec        = 0
+            .fields = {
+                .color_code = repeater->color_code,
+                .data_type  = packet->slot_type,
+                .fec        = 0
+            }
         };
         dmr_slot_type_encode(&pdu, packet);
     }

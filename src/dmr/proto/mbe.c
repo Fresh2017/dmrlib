@@ -71,17 +71,6 @@ static int mbe_proto_start(void *mbeptr)
     return 0;
 }
 
-static void mbe_proto_process_voice(void *mbeptr, dmr_voice_bits_t *voice, float *samples)
-{
-    dmr_log_trace("mbe: process voice %p", mbeptr);
-    dmr_mbe_t *mbe = (dmr_mbe_t *)mbeptr;
-
-    if (mbe == NULL || voice == NULL || samples == NULL)
-        return;
-
-    dmr_mbe_decode(mbe, voice, samples);
-}
-
 static void mbe_proto_tx(void *mbeptr, dmr_packet_t *packet)
 {
     dmr_log_trace("mbe: tx %p", mbeptr);

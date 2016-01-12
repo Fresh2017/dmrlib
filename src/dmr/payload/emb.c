@@ -34,6 +34,7 @@ int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
     packet->payload[14] = (packet->payload[14] & 0x0fU) | (emb->bytes[0] << 4);
     packet->payload[18] = (packet->payload[18] & 0xf0U) | (emb->bytes[1] >> 4);
     packet->payload[19] = (packet->payload[19] & 0x0fU) | (emb->bytes[1] << 4);
+    return 0;
 }
 
 char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss)

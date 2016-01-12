@@ -103,7 +103,11 @@ extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, un
 extern dmr_homebrew_config_t *dmr_homebrew_config_new(void);
 extern void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign);
 extern void dmr_homebrew_config_repeater_id(dmr_homebrew_config_t *config, dmr_id_t repeater_id);
+extern void dmr_homebrew_config_rx_freq(dmr_homebrew_config_t *config, uint32_t hz);
+extern void dmr_homebrew_config_tx_freq(dmr_homebrew_config_t *config, uint32_t hz);
 extern void dmr_homebrew_config_tx_power(dmr_homebrew_config_t *config, uint8_t tx_power);
+extern void dmr_homebrew_config_latitude(dmr_homebrew_config_t *config, float latitude);
+extern void dmr_homebrew_config_longitude(dmr_homebrew_config_t *config, float longitude);
 extern void dmr_homebrew_config_color_code(dmr_homebrew_config_t *config, dmr_color_code_t color_code);
 extern void dmr_homebrew_config_height(dmr_homebrew_config_t *config, int height);
 extern void dmr_homebrew_config_location(dmr_homebrew_config_t *config, const char *location);

@@ -105,6 +105,18 @@ config_t *init_config(const char *filename)
         } else if (!strcmp(k, "homebrew_cc")) {
             config.homebrew_cc = (dmr_id_t)atoi(v);
 
+        } else if (!strcmp(k, "homebrew_tx_freq")) {
+            config.homebrew_tx_freq = strtol(v, NULL, 10);
+
+        } else if (!strcmp(k, "homebrew_rx_freq")) {
+            config.homebrew_rx_freq = strtol(v, NULL, 10);
+
+        } else if (!strcmp(k, "homebrew_latitude")) {
+            config.homebrew_latitude = strtod(v, NULL);
+
+        } else if (!strcmp(k, "homebrew_longitude")) {
+            config.homebrew_longitude = strtod(v, NULL);
+
         } else if (!strcmp(k, "modem_type")) {
             if (!strcmp(v, "mmdvm")) {
                 config.modem = PEER_MMDVM;

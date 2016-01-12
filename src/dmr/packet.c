@@ -82,6 +82,7 @@ char *dmr_slot_type_name(dmr_slot_type_t slot_type)
 
 int dmr_slot_type_decode(dmr_slot_t *slot, dmr_packet_t *packet)
 {
+    dmr_log_trace("packet: slot type decode");
     if (slot == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
@@ -92,11 +93,16 @@ int dmr_slot_type_decode(dmr_slot_t *slot, dmr_packet_t *packet)
     slot->bytes[1] |= (packet->payload[20] >> 6) & B00000011;
     slot->bytes[2]  = (packet->payload[20] << 2) & B11110000;
 
+    packet->slot_type = slot->fields.data_type;
+    dmr_log_debug("packet: slot type decoded as %s (%d)",
+        dmr_slot_type_name(packet->slot_type), packet->slot_type);
+
     return 0;
 }
 
 int dmr_slot_type_encode(dmr_slot_t *slot, dmr_packet_t *packet)
 {
+    dmr_log_trace("packet: slot type encode");
     if (slot == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
     if (packet->slot_type > 0x0fU) {

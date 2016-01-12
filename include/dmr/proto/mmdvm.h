@@ -63,10 +63,11 @@
 #define DMR_MMDVM_DELAY_MS      200UL
 #define DMR_MMDVM_DELAY_US      (DMR_MMDVM_DELAY_MS*1000UL)
 
-#define DMR_MMDVM_MODE_IDLE     0b00
-#define DMR_MMDVM_MODE_DSTAR    0b01
-#define DMR_MMDVM_MODE_DMR      0b10
-#define DMR_MMDVM_MODE_YSF      0b11
+#define DMR_MMDVM_MODE_IDLE     B00000000
+#define DMR_MMDVM_MODE_DSTAR    B00000001
+#define DMR_MMDVM_MODE_DMR      B00000010
+#define DMR_MMDVM_MODE_YSF      B00000011
+#define DMR_MMDVM_MODE_INVALID  B11111111
 
 #define DMR_MMDVM_TAG_HEADER    0b00
 #define DMR_MMDVM_TAG_DATA      0b01
@@ -120,6 +121,7 @@ typedef struct {
     bool         adc_overflow;
     uint8_t      version;
     char         *firmware;
+    uint8_t      last_mode;
     struct {
         bool    enable_dstar;
         bool    enable_dmr;

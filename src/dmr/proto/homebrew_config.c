@@ -7,8 +7,6 @@
 
 static const char *dmr_software_id = "dmrlib-20160105";
 static const char *dmr_package_id = "git:dmrlib-20160105";
-static const char *dmr_latitude = "+00.0000";
-static const char *dmr_longitude = "+000.0000";
 static const char *dmr_location = "Unknown";
 static const char *dmr_description = "dmrlib by PD0MZ";
 static const char *dmr_url = "https://github.com/pd0mz";
@@ -20,12 +18,12 @@ dmr_homebrew_config_t *dmr_homebrew_config_new(void)
         return NULL;
 
     memset(config, 0, sizeof(dmr_homebrew_config_t));
-    memset(config->rx_freq, '0', sizeof(config->rx_freq));
-    memset(config->tx_freq, '0', sizeof(config->tx_freq));
-    memcpy(config->latitude, dmr_latitude, 8);
-    memcpy(config->longitude, dmr_longitude, 9);
     dmr_homebrew_config_repeater_id(config, 0);
     dmr_homebrew_config_tx_power(config, 0);
+    dmr_homebrew_config_rx_freq(config, 0);
+    dmr_homebrew_config_tx_freq(config, 0);
+    dmr_homebrew_config_latitude(config, 0.0);
+    dmr_homebrew_config_longitude(config, 0.0);
     dmr_homebrew_config_color_code(config, 1);
     dmr_homebrew_config_height(config, 0);
     dmr_homebrew_config_location(config, dmr_location);
@@ -54,6 +52,42 @@ void dmr_homebrew_config_repeater_id(dmr_homebrew_config_t *config, dmr_id_t rep
     config->repeater_id[1] = repeater_id >> 16;
     config->repeater_id[2] = repeater_id >> 8;
     config->repeater_id[3] = repeater_id;
+}
+
+void dmr_homebrew_config_rx_freq(dmr_homebrew_config_t *config, uint32_t hz)
+{
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%09d", hz);
+    memcpy(config->rx_freq, buf, 9);
+}
+
+void dmr_homebrew_config_tx_freq(dmr_homebrew_config_t *config, uint32_t hz)
+{
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%09d", hz);
+    memcpy(config->tx_freq, buf, 9);
+}
+
+void dmr_homebrew_config_latitude(dmr_homebrew_config_t *config, float latitude)
+{
+    char buf[9], sign = '+';
+    if (latitude < 0) {
+        latitude *= -1.0;
+        sign = '-';
+    }
+    snprintf(buf, sizeof(buf), "%c%07.04f", sign, latitude);
+    memcpy(config->latitude, buf, 8);
+}
+
+void dmr_homebrew_config_longitude(dmr_homebrew_config_t *config, float longitude)
+{
+    char buf[10], sign = '+';
+    if (longitude < 0) {
+        longitude *= -1.0;
+        sign = '-';
+    }
+    snprintf(buf, sizeof(buf), "%c%08.04f", sign, longitude);
+    memcpy(config->longitude, buf, 9);
 }
 
 void dmr_homebrew_config_tx_power(dmr_homebrew_config_t *config, uint8_t tx_power)
@@ -94,6 +128,8 @@ void dmr_homebrew_config_height(dmr_homebrew_config_t *config, int height)
 
 void dmr_homebrew_config_location(dmr_homebrew_config_t *config, const char *location)
 {
+    if (location == NULL)
+        return;
     int len = min(sizeof(config->location), strlen(location));
     memset(&config->location, 0x20, sizeof(config->location));
     memcpy(&config->location, location, len);
@@ -101,6 +137,8 @@ void dmr_homebrew_config_location(dmr_homebrew_config_t *config, const char *loc
 
 void dmr_homebrew_config_description(dmr_homebrew_config_t *config, const char *description)
 {
+    if (description == NULL)
+        return;
     int len = min(20, strlen(description));
     memset(&config->description, 0x20, 20);
     memcpy(&config->description, description, len);
@@ -108,6 +146,8 @@ void dmr_homebrew_config_description(dmr_homebrew_config_t *config, const char *
 
 void dmr_homebrew_config_url(dmr_homebrew_config_t *config, const char *url)
 {
+    if (url == NULL)
+        return;
     int len = min(124, strlen(url));
     memset(&config->url, 0x20, 124);
     memcpy(&config->url, url, len);
@@ -115,6 +155,8 @@ void dmr_homebrew_config_url(dmr_homebrew_config_t *config, const char *url)
 
 void dmr_homebrew_config_software_id(dmr_homebrew_config_t *config, const char *software_id)
 {
+    if (software_id == NULL)
+        return;
     int len = min(40, strlen(software_id));
     memset(&config->software_id, 0x20, 40);
     memcpy(&config->software_id, software_id, len);
@@ -122,6 +164,8 @@ void dmr_homebrew_config_software_id(dmr_homebrew_config_t *config, const char *
 
 void dmr_homebrew_config_package_id(dmr_homebrew_config_t *config, const char *package_id)
 {
+    if (package_id == NULL)
+        return;
     int len = min(40, strlen(package_id));
     memset(&config->package_id, 0x20, 40);
     memcpy(&config->package_id, package_id, len);

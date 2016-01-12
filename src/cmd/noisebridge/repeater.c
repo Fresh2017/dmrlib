@@ -128,6 +128,10 @@ bool init_repeater()
             dmr_homebrew_config_callsign(config->homebrew->config, config->homebrew_call);
             dmr_homebrew_config_repeater_id(config->homebrew->config, config->homebrew_id);
             dmr_homebrew_config_color_code(config->homebrew->config, config->homebrew_cc);
+            dmr_homebrew_config_tx_freq(config->homebrew->config, config->homebrew_tx_freq);
+            dmr_homebrew_config_rx_freq(config->homebrew->config, config->homebrew_rx_freq);
+            dmr_homebrew_config_latitude(config->homebrew->config, config->homebrew_latitude);
+            dmr_homebrew_config_longitude(config->homebrew->config, config->homebrew_longitude);
             dmr_homebrew_config_software_id(config->homebrew->config, software_id);
             dmr_homebrew_config_package_id(config->homebrew->config, package_id);
             valid = (dmr_homebrew_auth(config->homebrew, config->homebrew_auth) == 0);
@@ -212,6 +216,7 @@ bool loop_repeater(void)
     repeater = dmr_repeater_new(route_rule_packet);
     if (repeater == NULL)
         return false;
+    repeater->color_code = config->repeater_color_code;
 
     if (loop_repeater_start_protos() != 0)
         goto bail_loop_repeater;

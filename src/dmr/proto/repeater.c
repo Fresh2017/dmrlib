@@ -153,6 +153,10 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
     size_t i = 0;
     for (; i < repeater->slots; i++) {
         dmr_repeater_slot_t *slot = &repeater->slot[i];
+        if (slot->proto == proto) {
+            dmr_log_trace("repeater: skipped same-proto %s", slot->proto->name);
+            continue;
+        }
         dmr_log_debug("repeater: call route callback %p for %s->%s",
             repeater->route, proto->name, slot->proto->name);
 
@@ -236,23 +240,10 @@ int dmr_repeater_add(dmr_repeater_t *repeater, void *userdata, dmr_proto_t *prot
 
 int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 {
+    dmr_log_trace("repeater: fixed headers in %s packet",
+        dmr_slot_type_name(packet->slot_type));
     if (repeater == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
-
-    if (packet->slot_type == DMR_SLOT_TYPE_VOICE_BURST_A ||
-        packet->slot_type == DMR_SLOT_TYPE_VOICE_LC) {
-        // Make sure it has the right sync pattern
-        dmr_log_trace("repeater: checking sync pattern");
-        dmr_sync_pattern_t patt = dmr_sync_pattern_decode(packet),
-                           want = DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
-        if (patt != want) {
-            dmr_log_debug("repeater: fixing sync pattern, want \"bs sourced voice\", got \"%s\"",
-                dmr_sync_pattern_name(patt));
-            dmr_sync_pattern_encode(want, packet);
-        }
-        dmr_log_trace("repeater: now we have \"%s\"",
-            dmr_sync_pattern_name(dmr_sync_pattern_decode(packet)));
-    }
 
     switch (packet->slot_type) {
     case DMR_SLOT_TYPE_VOICE_LC:
@@ -272,6 +263,13 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
         }
         break;
 
+    case DMR_SLOT_TYPE_VOICE_BURST_B:
+    case DMR_SLOT_TYPE_VOICE_BURST_C:
+    case DMR_SLOT_TYPE_VOICE_BURST_D:
+    case DMR_SLOT_TYPE_VOICE_BURST_E:
+    case DMR_SLOT_TYPE_VOICE_BURST_F:
+        //dmr_emb_encode(NULL, packet);
+        break;
     }
 
     if (packet->slot_type == DMR_SLOT_TYPE_PRIVACY_INDICATOR        ||
@@ -294,6 +292,21 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             }
         };
         dmr_slot_type_encode(&pdu, packet);
+    }
+
+    if (packet->slot_type == DMR_SLOT_TYPE_VOICE_BURST_A ||
+        packet->slot_type == DMR_SLOT_TYPE_VOICE_LC) {
+        // Make sure it has the right sync pattern
+        dmr_log_trace("repeater: checking sync pattern");
+        dmr_sync_pattern_t patt = dmr_sync_pattern_decode(packet),
+                           want = DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
+        if (patt != want) {
+            dmr_log_debug("repeater: fixing sync pattern, want \"bs sourced voice\", got \"%s\"",
+                dmr_sync_pattern_name(patt));
+            dmr_sync_pattern_encode(want, packet);
+        }
+        dmr_log_trace("repeater: now we have \"%s\"",
+            dmr_sync_pattern_name(dmr_sync_pattern_decode(packet)));
     }
 
     return 0;

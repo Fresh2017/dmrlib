@@ -35,6 +35,12 @@ typedef struct config_s {
     struct in_addr     homebrew_bind;
     dmr_id_t           homebrew_id;
     dmr_color_code_t   homebrew_cc;
+    uint32_t           homebrew_rx_freq;
+    uint32_t           homebrew_tx_freq;
+    float              homebrew_latitude;
+    float              homebrew_longitude;
+    char               *homebrew_location;
+    char               *homebrew_description;
     dmr_mmdvm_t        *mmdvm;
     char               *mmdvm_port;
     int                mmdvm_rate;

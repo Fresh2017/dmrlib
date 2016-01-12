@@ -143,6 +143,65 @@ static int mmdvm_proto_stop(void *modemptr)
     return 0;
 }
 
+static void mmdvm_proto_tx(void *modemptr, dmr_packet_t *packet)
+{
+    dmr_log_trace("mmdvm: tx");
+    dmr_mmdvm_t *modem = (dmr_mmdvm_t *)modemptr;
+    if (modem == NULL || packet == NULL)
+        return;
+
+    uint8_t buf[37];
+    switch (packet->slot_type) {
+    case DMR_SLOT_TYPE_VOICE_BURST_A:
+    case DMR_SLOT_TYPE_VOICE_BURST_B:
+    case DMR_SLOT_TYPE_VOICE_BURST_C:
+    case DMR_SLOT_TYPE_VOICE_BURST_D:
+    case DMR_SLOT_TYPE_VOICE_BURST_E:
+    case DMR_SLOT_TYPE_VOICE_BURST_F:
+        dmr_log_trace("mmdvm: sending voice frames to modem");
+        if (modem->last_mode != DMR_MMDVM_MODE_DMR) {
+            dmr_log_trace("mmdvm: putting modem in DMR mode");
+            buf[0] = DMR_MMDVM_FRAME_START;
+            buf[1] = 3;
+            buf[2] = 0x1c; /* DMR transmit start */
+            if (dmr_serial_write(modem->fd, buf, 3) != 3) {
+                dmr_log_error("mmdvm: failed to send DMR start to modem");
+                return;
+            }
+            modem->last_mode = DMR_MMDVM_MODE_DMR;
+        }
+        buf[0] = DMR_MMDVM_FRAME_START;
+        buf[1] = 37;
+        buf[2] = 0x1a;
+        buf[3] = (packet->ts & 0x01) << 7;
+        memcpy(&buf[4], packet->payload, 33);
+        if (dmr_serial_write(modem->fd, buf, sizeof(buf)) != sizeof(buf)) {
+            dmr_log_error("mmdvm: failed to send %lu bytes of DMR data to modem",
+                sizeof(buf));
+        }
+        break;
+
+    case DMR_SLOT_TYPE_TERMINATOR_WITH_LC:
+        if (modem->last_mode != DMR_MMDVM_MODE_DMR) {
+            dmr_log_debug("mmdvm: received voice terminator, but not in DMR mode (ignored)");
+            return;
+        }
+        dmr_log_trace("mmdvm: sending voice terminator to modem");
+        buf[0] = DMR_MMDVM_FRAME_START;
+        buf[1] = 4;
+        buf[2] = DMR_MMDVM_DMR_LOST1;
+        buf[3] = (packet->ts & 0x01) << 7;
+        if (dmr_serial_write(modem->fd, buf, 4) != 4) {
+            dmr_log_error("mmdvm: failed to send DMR EOT");
+        }
+        modem->last_mode = DMR_MMDVM_MODE_INVALID;
+        break;
+
+    default: // ignored
+        break;
+    }
+}
+
 static char *dmr_mmdvm_command_name(uint8_t command)
 {
     switch (command) {
@@ -229,6 +288,7 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_
     modem->proto.start = mmdvm_proto_start;
     modem->proto.stop = mmdvm_proto_stop;
     modem->proto.active = mmdvm_proto_active;
+    modem->proto.tx = mmdvm_proto_tx;
     if (dmr_proto_mutex_init(&modem->proto) != 0) {
         dmr_log_error("modem: failed to init mutex");
         free(modem);
@@ -240,6 +300,7 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_
     modem->firmware = NULL;
     modem->baud = baud;
     modem->flag = flag;
+    modem->last_mode = DMR_MMDVM_MODE_INVALID;
 #ifdef DMR_PLATFORM_WINDOWS
     char portbuf[64];
     memset(portbuf, 0, 64);
@@ -269,52 +330,6 @@ modem->port = strdup(port);
         return NULL;
     }
 
-/*
-#if defined(DMR_PLATFORM_WINDOWS)
-    modem->fd = CreateFile(modem->port, GENERIC_READ|GENERIC_WRITE, 0, NULL,
-        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (modem->fd == INVALID_HANDLE_VALUE) {
-        modem->error = dmr_serial_error();
-        dmr_log_error("mmdvm: open %s failed: %s", modem->port, dmr_serial_error_message());
-        dmr_mmdvm_free(modem);
-        return NULL;
-    }
-
-    DCB settings = {0};
-    settings.DCBlength = sizeof(settings);
-    if (GetCommState(modem->fd, &settings) == 0) {
-        modem->error = dmr_serial_error();
-        dmr_log_error("mmdvm: error getting %s device state: %s", modem->port, dmr_serial_error_message());
-        dmr_mmdvm_free(modem);
-        return NULL;
-    }
-
-    settings.BaudRate = modem->baud;
-    settings.ByteSize = 8;
-    settings.StopBits = ONESTOPBIT;
-    settings.Parity = NOPARITY;
-    if (SetCommState(modem->fd, &settings) == 0) {
-        modem->error = dmr_serial_error();
-        dmr_log_error("mmdvm: error setting %s device state: %s", modem->port, dmr_serial_error_message());
-        dmr_mmdvm_free(modem);
-        return NULL;
-    }
-
-    COMMTIMEOUTS timeouts = {0};
-    timeouts.ReadIntervalTimeout = 50;
-    timeouts.ReadTotalTimeoutConstant = 50;
-    timeouts.ReadTotalTimeoutMultiplier = 10;
-    timeouts.WriteTotalTimeoutConstant = 50;
-    timeouts.WriteTotalTimeoutMultiplier = 10;
-    if (SetCommTimeouts(modem->fd, &timeouts) == 0) {
-        modem->error = dmr_serial_error();
-        dmr_log_error("mmdvm: error setting %s timeouts: %s", modem->port, dmr_serial_error_message());
-        dmr_mmdvm_free(modem);
-        return NULL;
-    }
-
-#else
-*/
     if ((modem->fd = dmr_serial_open(modem->port, baud, true)) < 0) {
         modem->error = errno;
         dmr_log_error("mmdvm: open %s failed: %s", modem->port, dmr_serial_error_message());
@@ -370,6 +385,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             case DMR_SLOT_TYPE_SYNC_VOICE:
                 // If this is a new voice stream or it has been too long since
                 // we've last seen a voice frame, prepend a voice LC header.
+                /*
                 if (modem->last_dmr_slot_type != packet->slot_type ||
                     dmr_time_ms_since(modem->last_dmr_voice_packet_received) > 125) {
                     dmr_log_debug("mmdvm: prepending voice LC");
@@ -384,10 +400,11 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                     // Reset frame counter (so we start with frame A)
                     modem->last_dmr_voice_frame = 0;
 
-                    dmr_proto_rx(&modem->proto, modem, voice_lc);
+                    //dmr_proto_rx(&modem->proto, modem, voice_lc);
                     dmr_proto_rx_cb_run(&modem->proto, voice_lc);
                     free(voice_lc);
                 }
+                */
 
                 // Number it as a valid voice burst frame
                 packet->slot_type = DMR_SLOT_TYPE_VOICE_BURST_A + modem->last_dmr_voice_frame;
@@ -405,7 +422,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             }
 
             dmr_log_trace("mmdvm: rx %s", dmr_slot_type_name(packet->slot_type));
-            dmr_proto_rx(&modem->proto, modem, packet);
+            //dmr_proto_rx(&modem->proto, modem, packet);
             dmr_proto_rx_cb_run(&modem->proto, packet);
             break;
 

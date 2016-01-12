@@ -68,21 +68,22 @@ typedef struct {
     dmr_packet_t        packet;
 } dmr_homebrew_packet_t;
 
-typedef struct {
-    char    callsign[8];
-    uint8_t repeater_id[4];
-    uint8_t rx_freq[9];
-    uint8_t tx_freq[9];
-    uint8_t tx_power[2];
-    uint8_t color_code[2];
-    uint8_t latitude[8];
-    uint8_t longitude[9];
-    uint8_t height[3];
-    char    location[20];
-    char    description[20];
-    char    url[124];
-    char    software_id[40];
-    char    package_id[40];
+typedef struct __attribute__((packed)) {
+    uint8_t signature[4];
+    char    callsign[8];        // %-8.8s
+    char    repeater_id[8];
+    uint8_t rx_freq[9];         // %09u
+    uint8_t tx_freq[9];         // %09u
+    uint8_t tx_power[2];        // %02u
+    uint8_t color_code[2];      // %02u
+    uint8_t latitude[8];        // %-08f
+    uint8_t longitude[9];       // %-09f
+    uint8_t height[3];          // %03d
+    char    location[20];       // %-20.20s
+    char    description[20];    // %-20.20s
+    char    url[124];           // %-124.124s
+    char    software_id[40];    // %-40.40s
+    char    package_id[40];     // %-40.40s
 } dmr_homebrew_config_t;
 
 typedef struct {

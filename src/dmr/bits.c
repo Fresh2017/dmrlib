@@ -64,7 +64,7 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
     for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
         /* print offset */
         if (i % HEXDUMP_COLS == 0) {
-            printf("0x%06zx: ", i);
+            printf("0x%06zx  ", i);
         }
 
         /* print hex data */
@@ -76,6 +76,7 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
 
         /* print ASCII dump */
         if (i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
+            putchar('|');
             for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
                 if (j >= len - 1) { /* end of block, not really printing */
                     putchar(' ');
@@ -85,6 +86,7 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
                     putchar('.');
                 }
             }
+            putchar('|');
             putchar('\n');
         }
     }

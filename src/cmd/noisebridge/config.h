@@ -37,6 +37,8 @@ typedef struct config_s {
     dmr_color_code_t   homebrew_cc;
     uint32_t           homebrew_rx_freq;
     uint32_t           homebrew_tx_freq;
+    int                homebrew_tx_power;
+    int                homebrew_height;
     float              homebrew_latitude;
     float              homebrew_longitude;
     char               *homebrew_location;

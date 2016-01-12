@@ -8,7 +8,7 @@ const char *software_id = "NoiseBridge";
 #ifdef PACKAGE_ID
 const char *package_id = PACKAGE_ID;
 #else
-const char *package_id = "NoiseBridge-git";
+const char *package_id = "git:NoiseBridge";
 #endif
 
 static config_t config;
@@ -110,6 +110,12 @@ config_t *init_config(const char *filename)
 
         } else if (!strcmp(k, "homebrew_rx_freq")) {
             config.homebrew_rx_freq = strtol(v, NULL, 10);
+
+        } else if (!strcmp(k, "homebrew_tx_power")) {
+            config.homebrew_tx_power = atoi(v);
+
+        } else if (!strcmp(k, "homebrew_height")) {
+            config.homebrew_height = atoi(v);
 
         } else if (!strcmp(k, "homebrew_latitude")) {
             config.homebrew_latitude = strtod(v, NULL);

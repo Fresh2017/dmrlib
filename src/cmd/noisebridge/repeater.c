@@ -129,8 +129,10 @@ bool init_repeater()
             dmr_homebrew_config_callsign(config->homebrew->config, config->homebrew_call);
             dmr_homebrew_config_repeater_id(config->homebrew->config, config->homebrew_id);
             dmr_homebrew_config_color_code(config->homebrew->config, config->homebrew_cc);
-            dmr_homebrew_config_tx_freq(config->homebrew->config, config->homebrew_tx_freq);
             dmr_homebrew_config_rx_freq(config->homebrew->config, config->homebrew_rx_freq);
+            dmr_homebrew_config_tx_freq(config->homebrew->config, config->homebrew_tx_freq);
+            dmr_homebrew_config_tx_power(config->homebrew->config, config->homebrew_tx_power);
+            dmr_homebrew_config_height(config->homebrew->config, config->homebrew_height);
             dmr_homebrew_config_latitude(config->homebrew->config, config->homebrew_latitude);
             dmr_homebrew_config_longitude(config->homebrew->config, config->homebrew_longitude);
             dmr_homebrew_config_software_id(config->homebrew->config, software_id);

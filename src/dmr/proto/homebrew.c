@@ -342,7 +342,13 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 
         case DMR_HOMEBREW_AUTH_CONF:
             dmr_log_trace("homebrew: logged in, sending our configuration");
-            memcpy(&buf, &dmr_homebrew_repeater_config, 4);
+            //memcpy(&buf, &dmr_homebrew_repeater_config, 4);
+            memcpy(homebrew->config->signature, dmr_homebrew_repeater_config, 4);
+#ifdef DMR_DEBUG
+            assert(sizeof(dmr_homebrew_config_t) == 306);
+#endif
+            memcpy(buf, homebrew->config, sizeof(dmr_homebrew_config_t));
+            /*
             uint16_t pos = 4;
 #define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
             C(homebrew->config->callsign);
@@ -368,7 +374,8 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             dump_hex(&buf[4], pos - 4);
             //assert(pos == 302);
 #endif
-            if ((ret = dmr_homebrew_sendraw(homebrew, buf, pos)) < 0)
+            */
+            if ((ret = dmr_homebrew_sendraw(homebrew, buf, sizeof(dmr_homebrew_config_t))) < 0)
                 return ret;
 
             homebrew->auth = DMR_HOMEBREW_AUTH_DONE;

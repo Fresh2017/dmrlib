@@ -8,12 +8,24 @@ The following software is required to compile dmrlib:
   * [Python 2.7](http://www.python.org/)
   * [SConstruct](http://scons.org/)
   * A suitable compiler, such as [clang](http://clang.llvm.org) or gcc
-  * [libpcap](http://www.tcpdump.org)
   * [git](https://git-scm.com)
+  * [talloc](https://talloc.samba.org/)
+
+If you enable the mbelib proto (`--enable-mbe-proto`):
+
+  * [PortAudio](http://portaudio.com/)
+
+If you enable the dmrdump utility (`--enable-dmrdump`):
+
+  * [libpcap](http://www.tcpdump.org)
 
 To compile dmrlib, you just run scons:
 
-    scons
+    $ scons
+
+To compile dmrlib for debugging:
+
+    $ scons --with-debug
 
 This should result with libdmr built in the *build* directory.
 
@@ -21,7 +33,15 @@ This should result with libdmr built in the *build* directory.
 
 On Debian (compatible) systems, you need the following packages:
 
-    ~$ sudo apt-get install gcc scons libpcap-dev git
+    ~$ sudo apt-get install gcc scons git libtalloc-dev
+
+For the *mbe proto*:
+
+    ~$ sudo apt-get install libpcap-dev
+
+For the *dmrdump* utility:
+
+    ~$ sudo apt-get install portaudio-dev
 
 Now clone the repository and build the software:
 
@@ -35,7 +55,15 @@ Now clone the repository and build the software:
 
 Using [Homebrew](http://brew.sh), you need the following packages:
 
-    ~$ brew install scons pcap
+    ~$ brew install scons talloc
+
+For the *mbe proto*:
+
+    ~$ brew install portaudio
+
+For the *dmrdump* utility:
+
+    ~$ brew install pcap
 
 See [compiling on Linux](#compiling-on-linux) on how to build dmrlib.
 

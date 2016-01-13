@@ -94,7 +94,7 @@ typedef struct {
     dmr_id_t              id;
     uint8_t               buffer[512];
     uint8_t               random[8];
-    dmr_homebrew_config_t *config;
+    dmr_homebrew_config_t config;
     struct {
         uint8_t         seq;
         uint32_t        stream_id;
@@ -119,7 +119,7 @@ extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct t
 extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
 extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
 
-extern dmr_homebrew_config_t *dmr_homebrew_config_new(void);
+extern void dmr_homebrew_config_init(dmr_homebrew_config_t *config);
 extern void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign);
 extern void dmr_homebrew_config_repeater_id(dmr_homebrew_config_t *config, dmr_id_t repeater_id);
 extern void dmr_homebrew_config_rx_freq(dmr_homebrew_config_t *config, uint32_t hz);

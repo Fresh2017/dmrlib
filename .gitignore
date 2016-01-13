@@ -22,6 +22,9 @@
 # Scons
 .sconf_temp/
 .sconsign.dblite
+
+# Generated files
 build/
 dist/
+include/dmr/config.h
 config.log

@@ -1,9 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <portaudio.h>
+#include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/payload/voice.h>
 #include "audio.h"
+
+#if defined(DMR_ENABLE_PROTO_MBE)
 
 static PaStream *stream;
 static unsigned long stream_pos, stream_write_pos = 0;
@@ -120,3 +123,27 @@ bool init_audio(void)
 
     return true;
 }
+
+#else // DMR_ENABLE_PROTO_MBE
+
+bool init_audio(void)
+{
+    return true;
+}
+
+bool boot_audio(void)
+{
+    return true;
+}
+
+void kill_audio(void)
+{
+}
+
+void stream_audio(float *samples, size_t len)
+{
+    DMR_UNUSED(samples);
+    DMR_UNUSED(len);
+}
+
+#endif // DMR_ENABLE_PROTO_MBE

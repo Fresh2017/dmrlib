@@ -7,14 +7,22 @@ localenv = env.Clone()
 localenv.Append(
     LIBS=[
         env['libdmr_name'],
-        'mbe',
-        'portaudio',
     ],
     LIBPATH=[
         '#build/libdmr',
-        '#build/mbelib',
     ],
 )
+
+if env['ENABLE_PROTO_MBE']:
+    localenv.Append(
+        LIBS=[
+            'mbe',
+            'portaudio',
+        ],
+        LIBPATH=[
+            '#build/mbelib',
+        ],
+    )
 
 if sys.platform == 'linux2':
     name = 'noisebridge'

@@ -1,0 +1,18 @@
+#ifndef _DMR_CONFIG_H
+#define _DMR_CONFIG_H
+
+#if %(ENABLE_PROTO_MBE)d
+#define DMR_ENABLE_PROTO_MBE
+#endif
+
+#if %(WITH_DEBUG)d
+#define DMR_DEBUG
+#include <assert.h>
+#endif
+
+#if %(WITH_DMALLOC)d
+#include <string.h>
+#include <dmalloc.h>
+#endif
+
+#endif // _DMR_CONFIG_H

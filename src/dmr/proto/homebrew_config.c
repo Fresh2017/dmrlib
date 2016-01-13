@@ -18,13 +18,13 @@ static const char *dmr_url = "https://github.com/pd0mz";
     dmr_log_debug("homebrew: config " #arg " = " #fmt, arg); \
 } while (0)
 
-dmr_homebrew_config_t *dmr_homebrew_config_new(void)
+void dmr_homebrew_config_init(dmr_homebrew_config_t *config)
 {
-    dmr_homebrew_config_t *config = malloc(sizeof(dmr_homebrew_config_t));
-    if (config == NULL)
-        return NULL;
-
+    // Wipe struct
     memset(config, 0, sizeof(dmr_homebrew_config_t));
+
+    // Defaults
+    memcpy(config->signature, "RPTC", 4);
     dmr_homebrew_config_repeater_id(config, 0);
     dmr_homebrew_config_tx_power(config, 0);
     dmr_homebrew_config_rx_freq(config, 0);
@@ -38,8 +38,6 @@ dmr_homebrew_config_t *dmr_homebrew_config_new(void)
     dmr_homebrew_config_url(config, dmr_url);
     dmr_homebrew_config_software_id(config, dmr_software_id);
     dmr_homebrew_config_package_id(config, dmr_package_id);
-
-    return config;
 }
 
 void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign)
@@ -70,12 +68,12 @@ void dmr_homebrew_config_tx_freq(dmr_homebrew_config_t *config, uint32_t tx_freq
 
 void dmr_homebrew_config_latitude(dmr_homebrew_config_t *config, float latitude)
 {
-    CONFIG_VAR(config->latitude, "%-08f", latitude);
+    CONFIG_VAR(config->latitude, "%08f", latitude);
 }
 
 void dmr_homebrew_config_longitude(dmr_homebrew_config_t *config, float longitude)
 {
-    CONFIG_VAR(config->longitude, "%-09f", longitude);
+    CONFIG_VAR(config->longitude, "%09f", longitude);
 }
 
 void dmr_homebrew_config_tx_power(dmr_homebrew_config_t *config, uint8_t tx_power)

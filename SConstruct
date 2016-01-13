@@ -1,6 +1,15 @@
 import os
 import sys
 
+def generate_config_h(target, source, env):
+    print(env.Dictionary())
+    for dst, src in zip(target, source):
+        config_h = open(str(dst), 'w')
+        config_t = open(str(src), 'r')
+        config_h.write(config_t.read() % env.Dictionary())
+        config_t.close()
+        config_h.close()
+
 env = Environment(
     BUILDDIR='#build',
     SUPPORTDIR='#support',
@@ -19,6 +28,18 @@ env = Environment(
 )
 
 AddOption(
+    '--enable-all',
+    action='store_true',
+    default=False,
+    help='Enable all optional features',
+)
+AddOption(
+    '--enable-proto-mbe',
+    action='store_true',
+    default=False,
+    help='Enable the mbe proto',
+)
+AddOption(
     '--with-debug',
     dest='with_debug',
     action='store_true',
@@ -33,11 +54,15 @@ AddOption(
     help='Compile with dmalloc',
 )
 
+env.Append(
+    ENABLE_ALL=int(GetOption('enable_all')),
+    ENABLE_PROTO_MBE=int(GetOption('enable_all') or GetOption('enable_proto_mbe')),
+    WITH_DEBUG=int(GetOption('with_debug')),
+    WITH_DMALLOC=int(GetOption('with_dmalloc')),
+)
+
 if GetOption('with_debug'):
     env.Append(
-        CPPDEFINES=[
-            'DMR_DEBUG',
-        ],
         CCFLAGS=[
             '-g',
         ],
@@ -61,6 +86,7 @@ if GetOption('with_dmalloc'):
     )
 
 if sys.platform == 'darwin':
+    env.ParseConfig('pkg-config --cflags --libs talloc')
     # To support Homebrew, http://brew.sh/
     env.Append(
         CPPPATH=[
@@ -70,6 +96,9 @@ if sys.platform == 'darwin':
             '/usr/local/lib',
         ],
     )
+
+if sys.platform == 'linux2':
+    env.ParseConfig('pkg-config --cflags --libs talloc')
 
 if sys.platform == 'win32':
     env.Tool('mingw')
@@ -84,12 +113,18 @@ if sys.platform == 'win32':
 
 Export('env')
 
-mbelib = env.SConscript(
-    os.path.join('src', 'mbelib', 'SConscript'),
-    variant_dir='build/mbelib',
-    duplicate=0,
-)
-env.Install('dist', mbelib)
+env.AlwaysBuild(env.Command(
+    'include/dmr/config.h',
+    'include/dmr/config.h.in',
+    generate_config_h))
+
+if GetOption('enable_all') or GetOption('enable_proto_mbe'):
+    mbelib = env.SConscript(
+        os.path.join('src', 'mbelib', 'SConscript'),
+        variant_dir='build/mbelib',
+        duplicate=0,
+    )
+    env.Install('dist', mbelib)
 
 dmr = env.SConscript(
     os.path.join('src', 'dmr', 'SConscript'),
@@ -97,7 +132,9 @@ dmr = env.SConscript(
     duplicate=0,
 )
 env.Install('dist', dmr)
-env.Depends(dmr, mbelib)
+
+if GetOption('enable_all') or GetOption('enable_proto_mbe'):
+    env.Depends(dmr, mbelib)
 
 '''
 dmrdump = env.SConscript(

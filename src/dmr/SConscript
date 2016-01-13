@@ -4,14 +4,6 @@ import sys
 Import('env')
 
 localenv = env.Clone()
-localenv.Append(
-    LIBS=[
-        'mbe',
-    ],
-    LIBPATH=[
-        '#build/mbelib',
-    ],
-)
 
 if sys.platform in ('linux2', 'darwin'):
     env['libdmr_name'] = 'dmr'
@@ -42,8 +34,26 @@ if sys.platform == 'win32':
 
 src = [
     Glob('*.c'),
-    Glob('*/*.c'),
+    Glob('buffer/*.c'),
+    Glob('fec/*.c'),
+    Glob('packet/*.c'),
+    Glob('payload/*.c'),
 ]
+
+for proto in ('homebrew', 'mmdvm', 'repeater'):
+    src.append(Glob('proto/{0}*.c'.format(proto)))
+
+if env['ENABLE_PROTO_MBE']:
+    localenv.Append(
+        LIBS=[
+            'mbe',
+        ],
+        LIBPATH=[
+            '#build/mbelib',
+        ],
+    )
+    src.append(Glob('proto/mbe*.c'))
+
 dmr = localenv.SharedLibrary(env['libdmr_name'], src)
 #env.StaticLibrary(name, src)
 Return('dmr')

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#include <dmr/config.h>
 #include <dmr/error.h>
 #include <dmr/proto.h>
 
@@ -39,12 +40,17 @@ bool init_repeater()
 
     switch (config->modem) {
     case PEER_MBE:
+#if !defined(DMR_ENABLE_PROTO_MBE)
+        dmr_log_critical("noisebridge: libdmr not compiled with MBE support");
+        valid = false;
+#else
         dmr_log_info("noisebridge: MBE decoder with quality %d", config->mbe_quality);
         config->mbe = dmr_mbe_new(config->mbe_quality, stream_audio);
         if (config->mbe == NULL) {
             valid = false;
             break;
         }
+#endif
         break;
 
     case PEER_MMDVM:
@@ -92,19 +98,10 @@ bool init_repeater()
             dmr_log_critical("noisebridge: %s: homebrew_auth required", config->filename);
             break;
         }
-        if (!(valid = (config->homebrew_call != NULL))) {
-            dmr_log_critical("noisebridge: %s: homebrew_call required", config->filename);
-            break;
-        }
         if (!(valid = (config->homebrew_id != 0))) {
             dmr_log_critical("noisebridge: %s: homebrew_id required", config->filename);
             break;
         }
-        if (!(valid = (config->homebrew_cc >= 1 || config->homebrew_cc <= 15))) {
-            dmr_log_critical("noisebridge: %s: homebrew_cc required (1 >= cc >= 15)", config->filename);
-            break;
-        }
-
 
         struct in_addr **addr_list;
         struct in_addr server_addr;
@@ -116,27 +113,11 @@ bool init_repeater()
                 config->homebrew_host->h_name,
                 inet_ntoa(server_addr));
 
-            /*
-            printf("noisebridge: connecting to HomeBrew repeater at %s:%d on %s\n",
-                inet_ntoa(server_addr), config->homebrew_port,
-                inet_ntoa(config->homebrew_bind));
-            */
             config->homebrew = dmr_homebrew_new(
                 config->homebrew_bind,
                 config->homebrew_port,
                 server_addr);
             config->homebrew->id = config->homebrew_id;
-            dmr_homebrew_config_callsign(config->homebrew->config, config->homebrew_call);
-            dmr_homebrew_config_repeater_id(config->homebrew->config, config->homebrew_id);
-            dmr_homebrew_config_color_code(config->homebrew->config, config->homebrew_cc);
-            dmr_homebrew_config_rx_freq(config->homebrew->config, config->homebrew_rx_freq);
-            dmr_homebrew_config_tx_freq(config->homebrew->config, config->homebrew_tx_freq);
-            dmr_homebrew_config_tx_power(config->homebrew->config, config->homebrew_tx_power);
-            dmr_homebrew_config_height(config->homebrew->config, config->homebrew_height);
-            dmr_homebrew_config_latitude(config->homebrew->config, config->homebrew_latitude);
-            dmr_homebrew_config_longitude(config->homebrew->config, config->homebrew_longitude);
-            dmr_homebrew_config_software_id(config->homebrew->config, software_id);
-            dmr_homebrew_config_package_id(config->homebrew->config, package_id);
             valid = (dmr_homebrew_auth(config->homebrew, config->homebrew_auth) == 0);
             if (valid)
                 break;

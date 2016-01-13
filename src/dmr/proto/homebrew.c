@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <talloc.h>
 #ifdef DMR_DEBUG
 #include <assert.h>
 #endif
@@ -25,7 +26,6 @@ static const char dmr_homebrew_repeater_login[4]   = "RPTL";
 static const char dmr_homebrew_repeater_key[4]     = "RPTK";
 static const char dmr_homebrew_repeater_pong[7]    = "RPTPONG";
 static const char dmr_homebrew_repeater_closing[5] = "RPTCL";
-static const char dmr_homebrew_repeater_config[4]  = "RPTC";
 static const char dmr_homebrew_repeater_beacon[7]  = "RPTSBKN";
 static const char dmr_homebrew_repeater_rssi[7]    = "RPTRSSI";
 
@@ -181,20 +181,13 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
 #endif
 
     int optval = 1;
-    dmr_homebrew_t *homebrew = malloc(sizeof(dmr_homebrew_t));
+    dmr_homebrew_t *homebrew = talloc_zero(NULL, dmr_homebrew_t);
     if (homebrew == NULL) {
         DMR_OOM();
         return NULL;
     }
 
-    memset(homebrew, 0, sizeof(dmr_homebrew_t));
-    homebrew->config = dmr_homebrew_config_new();
-    if (homebrew->config == NULL) {
-        DMR_OOM();
-        free(homebrew);
-        return NULL;
-    }
-    memset(homebrew->buffer, 0, sizeof(homebrew->buffer));
+    dmr_homebrew_config_init(&homebrew->config);
 
     uint8_t i;
     for (i = 0; i < 2; i++) {
@@ -214,8 +207,7 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     homebrew->proto.tx = homebrew_proto_tx;
     if (dmr_proto_mutex_init(&homebrew->proto) != 0) {
         dmr_log_error("homebrew: failed to init mutex");
-        free(homebrew->config);
-        free(homebrew);
+        talloc_free(homebrew);
         return NULL;
     }
 
@@ -223,22 +215,16 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     homebrew->fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (homebrew->fd < 0) {
         dmr_error_set(strerror(errno));
-        free(homebrew->config);
-        free(homebrew);
+        talloc_free(homebrew);
         return NULL;
     }
+
     setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
+
     homebrew->server.sin_family = AF_INET;
     homebrew->server.sin_addr.s_addr = bind.s_addr;
     homebrew->server.sin_port = htons(port);
     memset(homebrew->server.sin_zero, 0, sizeof(homebrew->server.sin_zero));
-    /*
-    if (bind(homebrew.fd, (struct sockaddr *)&homebrew.server, sizeof(homebrew.server)) < 0) {
-        fprintf(stderr, "homebrew: bind %s:%d failed: %s\n",
-            inet_ntoa(homebrew.server.sin_addr), port, strerror(errno));
-        return NULL;
-    }
-    */
 
     homebrew->remote.sin_family = AF_INET;
     homebrew->remote.sin_addr.s_addr = peer.s_addr;
@@ -256,22 +242,16 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
     sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
-    dmr_log_info("homebrew: connecting to repeater at %s:%d as %02x%02x%02x%02x",
+    dmr_log_info("homebrew: connecting to repeater at %s:%d as %s",
         inet_ntoa(homebrew->remote.sin_addr),
         ntohs(homebrew->remote.sin_port),
-        homebrew->config->repeater_id[0],
-        homebrew->config->repeater_id[1],
-        homebrew->config->repeater_id[2],
-        homebrew->config->repeater_id[3]);
+        homebrew->config.repeater_id);
 
     while (homebrew->auth != DMR_HOMEBREW_AUTH_DONE) {
         switch (homebrew->auth) {
         case DMR_HOMEBREW_AUTH_NONE:
             memcpy(buf, dmr_homebrew_repeater_login, 4);
-            for (i = 0, j = 0; i < 4; i++, j += 2) {
-                buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
-                buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
-            }
+            memcpy(buf + 4, homebrew->config.repeater_id, 8);
             dmr_log_trace("homebrew: sending repeater id");
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 12)) < 0)
                 return ret;
@@ -299,18 +279,15 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
             break;
 
         case DMR_HOMEBREW_AUTH_INIT:
-            memcpy(&buf, &homebrew->random, 8);
-            memcpy(&buf[8], &secret, strlen(secret));
+            memcpy(buf, homebrew->random, 8);
+            memcpy(buf + 8, secret, strlen(secret));
             sha256_init(&sha256ctx);
             sha256_update(&sha256ctx, (const uint8_t *)homebrew->random, 8);
             sha256_update(&sha256ctx, (const uint8_t *)secret, strlen(secret));
             sha256_final(&sha256ctx, &digest[0]);
 
-            memcpy(&buf, &dmr_homebrew_repeater_key, 4);
-            for (i = 0, j = 0; i < 4; i++, j += 2) {
-                buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
-                buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
-            }
+            memcpy(buf, dmr_homebrew_repeater_key, 4);
+            memcpy(buf + 4, homebrew->config.repeater_id, 8);
             for (i = 0, j = 0; i < SHA256_DIGEST_LENGTH; i++, j += 2) {
                 buf[12 + j] = hex[(digest[i] >> 4)];
                 buf[13 + j] = hex[(digest[i] & 0x0f)];
@@ -342,39 +319,10 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 
         case DMR_HOMEBREW_AUTH_CONF:
             dmr_log_trace("homebrew: logged in, sending our configuration");
-            //memcpy(&buf, &dmr_homebrew_repeater_config, 4);
-            memcpy(homebrew->config->signature, dmr_homebrew_repeater_config, 4);
 #ifdef DMR_DEBUG
             assert(sizeof(dmr_homebrew_config_t) == 306);
 #endif
-            memcpy(buf, homebrew->config, sizeof(dmr_homebrew_config_t));
-            /*
-            uint16_t pos = 4;
-#define C(attr) do { memcpy(buf + pos, attr, sizeof(attr)); pos += sizeof(attr); } while(0)
-            C(homebrew->config->callsign);
-            for (i = 0; i < 4; i++) {
-                buf[pos++] = hex[(homebrew->config->repeater_id[i] >> 4)];
-                buf[pos++] = hex[(homebrew->config->repeater_id[i] & 0xf)];
-            }
-            C(homebrew->config->rx_freq);
-            C(homebrew->config->tx_freq);
-            C(homebrew->config->tx_power);
-            C(homebrew->config->color_code);
-            C(homebrew->config->latitude);
-            C(homebrew->config->longitude);
-            C(homebrew->config->height);
-            C(homebrew->config->location);
-            C(homebrew->config->description);
-            C(homebrew->config->url);
-            C(homebrew->config->software_id);
-            C(homebrew->config->package_id);
-#undef C
-            dmr_log_trace("homebrew: sending %d bytes of config", pos);
-#ifdef DMR_DEBUG
-            dump_hex(&buf[4], pos - 4);
-            //assert(pos == 302);
-#endif
-            */
+            memcpy(buf, &homebrew->config, sizeof(dmr_homebrew_config_t));
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, sizeof(dmr_homebrew_config_t))) < 0)
                 return ret;
 
@@ -393,7 +341,6 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 void dmr_homebrew_close(dmr_homebrew_t *homebrew)
 {
     uint8_t buf[12];
-    int i, j;
 
     if (homebrew == NULL)
         return;
@@ -413,10 +360,7 @@ void dmr_homebrew_close(dmr_homebrew_t *homebrew)
     }
 
     memcpy(buf, dmr_homebrew_repeater_closing, 4);
-    for (i = 0, j = 0; i < 4; i++, j += 2) {
-        buf[j+4] = hex[(homebrew->config->repeater_id[i] >> 4)];
-        buf[j+5] = hex[(homebrew->config->repeater_id[i] & 0xf)];
-    }
+    memcpy(buf + 4, homebrew->config.repeater_id, 8);
     dmr_homebrew_sendraw(homebrew, buf, 12);
 }
 
@@ -440,8 +384,7 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
         dmr_mutex_unlock(homebrew->proto.mutex);
     }
 
-    free(homebrew->config);
-    free(homebrew);
+    talloc_free(homebrew);
 }
 
 void dmr_homebrew_dump_data(uint8_t *buf, dmr_packet_t *packet)
@@ -481,7 +424,7 @@ void dmr_homebrew_dump_data(uint8_t *buf, dmr_packet_t *packet)
 
 void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
 {
-    uint8_t buf[53], i, j;
+    uint8_t buf[53];
     ssize_t len = 0, pos;
     int ret;
 
@@ -499,10 +442,7 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             dmr_log_debug("homebrew: pinging master");
             memset(buf, 0, sizeof(buf));
             memcpy(buf, dmr_homebrew_master_ping, 7);
-            for (i = 0, j = 0; i < 4; i++, j += 2) {
-                buf[j+7] = hex[(homebrew->config->repeater_id[i] >> 4)];
-                buf[j+8] = hex[(homebrew->config->repeater_id[i] & 0xf)];
-            }
+            memcpy(buf + 7, homebrew->config.repeater_id, 8);
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, 15)) != 0) {
                 dmr_log_error("homebrew: error sending ping: %s", dmr_error_get());
                 break;

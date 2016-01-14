@@ -5,6 +5,6 @@
 #include <inttypes.h>
 
 uint32_t dmr_time_since(struct timeval tv);
-double dmr_time_ms_since(struct timeval tv);
+uint32_t dmr_time_ms_since(struct timeval tv);
 
 #endif // _DMR_TIME_H

@@ -5,6 +5,12 @@
 #include <dmr/config.h>
 #include "config.h"
 #include "util.h"
+#if defined(HAVE_DL)
+#include <dlfcn.h>
+#endif
+#if defined(HAVE_GETAUXVAL)
+#include <sys/auxv.h>
+#endif
 
 const char *software_id = "NoiseBridge";
 #ifdef PACKAGE_ID
@@ -14,6 +20,51 @@ const char *package_id = "git:NoiseBridge";
 #endif
 
 static config_t *config = NULL;
+
+const char *progname(void)
+{
+    const char *name = NULL;
+#if defined(HAVE_GETAUXVAL)
+    if ((name = (const char *)getauxval(AT_EXECFN)) != NULL)
+        return name;
+#endif
+    return NULL;
+}
+
+plugin_t *load_plugin(char *filename, int argv, char **argc)
+{
+#if defined(HAVE_DL)
+    plugin_t *plugin = talloc_zero(NULL, plugin_t);
+    if (plugin == NULL) {
+        dmr_error(DMR_ENOMEM);
+        return NULL;
+    }
+
+    plugin->handle = dlopen(filename, RTLD_LAZY);
+    char *error = NULL;
+    if (plugin->handle == NULL) {
+        dmr_log_error("noisebridge: can't open %s: %s", filename, dlerror());
+        talloc_free(plugin);
+        return NULL;
+    }
+
+    dlerror(); /* Clear any existing error */
+
+    plugin->filename = talloc_strdup(plugin, filename);
+    plugin->module = (module_t *)dlsym(plugin->handle, "module");
+    if ((error = dlerror()) != NULL) {
+        dmr_log_error("noisebridge: can't find entry point in %s", filename);
+        talloc_free(plugin);
+        return NULL;
+    }
+
+    dmr_log_info("noisebridge: loaded \"%s\" from %s", plugin->module->name, filename);
+    return plugin;
+#else
+    dmr_log_error("noisebridge: module loading not supported");
+    return NULL;
+#endif
+}
 
 config_t *load_config(void)
 {
@@ -32,10 +83,9 @@ config_t *init_config(const char *filename)
     if (config == NULL) {
         config = talloc_zero(NULL, config_t);
         if (config == NULL) {
-            dmr_log_critical("out of memory");
+            dmr_log_critical("noisebridge: out of memory");
             return NULL;
         }
-        config->homebrew = talloc_zero(config, dmr_homebrew_t);
     }
 
     config->filename = filename;
@@ -69,6 +119,23 @@ config_t *init_config(const char *filename)
             config->log_level = atoi(v);
             dmr_log_trace("noisebridge: config %s = %d", k, config->log_level);
             dmr_log_priority_set(config->log_level);
+
+        } else if (!strcmp(k, "load")) {
+            if (config->plugins >= NOISEBRIDGE_MAX_PLUGINS) {
+                dmr_log_critical("noisebridge: %s[%zu]: max number of plugins reached", filename, lineno);
+                valid = false;
+                break;
+            }
+            char *args;
+            v = strtok_r(v, ",", &args);
+            trim(v);
+            trim(args);
+            plugin_t *plugin = load_plugin(v, strlen(args) > 0 ? 1 : 0, NULL);
+            if (plugin == NULL) {
+                dmr_log_critical("noisebridge: %s[%zu]: load failed", filename, lineno);
+                valid = false;
+                break;
+            }
 
         } else if (!strcmp(k, "repeater_color_code")) {
             config->repeater_color_code = atoi(v);
@@ -106,64 +173,33 @@ config_t *init_config(const char *filename)
         } else if (!strcmp(k, "homebrew_auth")) {
             config->homebrew_auth = talloc_strdup(config, v);
 
-        /*
-
-        } else if (!strcmp(k, "homebrew_call")) {
-            config->homebrew_call = strdup(v);
-
         } else if (!strcmp(k, "homebrew_id")) {
             config->homebrew_id = (dmr_id_t)atoi(v);
-
-        } else if (!strcmp(k, "homebrew_cc")) {
-            config->homebrew_cc = (dmr_id_t)atoi(v);
-
-        } else if (!strcmp(k, "homebrew_tx_freq")) {
-            config->homebrew_tx_freq = strtol(v, NULL, 10);
-
-        } else if (!strcmp(k, "homebrew_rx_freq")) {
-            config->homebrew_rx_freq = strtol(v, NULL, 10);
-
-        } else if (!strcmp(k, "homebrew_tx_power")) {
-            config->homebrew_tx_power = atoi(v);
-
-        } else if (!strcmp(k, "homebrew_height")) {
-            config->homebrew_height = atoi(v);
-
-        } else if (!strcmp(k, "homebrew_latitude")) {
-            config->homebrew_latitude = strtod(v, NULL);
-
-        } else if (!strcmp(k, "homebrew_longitude")) {
-            config->homebrew_longitude = strtod(v, NULL);
-
-        */
-
-        } else if (!strcmp(k, "homebrew_id")) {
-            config->homebrew_id = (dmr_id_t)atoi(v);
-            dmr_homebrew_config_repeater_id(config->homebrew_config, config->homebrew_id);
+            dmr_homebrew_config_repeater_id(&config->homebrew_config, config->homebrew_id);
 
         } else if (!strcmp(k, "homebrew_call")) {
-            dmr_homebrew_config_callsign(config->homebrew_config, v);
+            dmr_homebrew_config_callsign(&config->homebrew_config, v);
 
         } else if (!strcmp(k, "homebrew_cc")) {
-            dmr_homebrew_config_color_code(config->homebrew_config, (dmr_id_t)atoi(v));
+            dmr_homebrew_config_color_code(&config->homebrew_config, (dmr_id_t)atoi(v));
 
         } else if (!strcmp(k, "homebrew_rx_freq")) {
-            dmr_homebrew_config_rx_freq(config->homebrew_config, strtol(v, NULL, 10));
+            dmr_homebrew_config_rx_freq(&config->homebrew_config, strtol(v, NULL, 10));
 
         } else if (!strcmp(k, "homebrew_tx_freq")) {
-            dmr_homebrew_config_tx_freq(config->homebrew_config, strtol(v, NULL, 10));
+            dmr_homebrew_config_tx_freq(&config->homebrew_config, strtol(v, NULL, 10));
 
         } else if (!strcmp(k, "homebrew_tx_power")) {
-            dmr_homebrew_config_tx_power(config->homebrew_config, atoi(v));
+            dmr_homebrew_config_tx_power(&config->homebrew_config, atoi(v));
 
         } else if (!strcmp(k, "homebrew_height")) {
-            dmr_homebrew_config_height(config->homebrew_config, atoi(v));
+            dmr_homebrew_config_height(&config->homebrew_config, atoi(v));
 
         } else if (!strcmp(k, "homebrew_latitude")) {
-            dmr_homebrew_config_latitude(config->homebrew_config, strtod(v, NULL));
+            dmr_homebrew_config_latitude(&config->homebrew_config, strtod(v, NULL));
 
         } else if (!strcmp(k, "homebrew_longitude")) {
-            dmr_homebrew_config_longitude(config->homebrew_config, strtod(v, NULL));
+            dmr_homebrew_config_longitude(&config->homebrew_config, strtod(v, NULL));
 
         } else if (!strcmp(k, "modem_type")) {
             if (!strcmp(v, "mmdvm")) {
@@ -171,6 +207,7 @@ config_t *init_config(const char *filename)
 
             } else if (!strcmp(v, "mbe")) {
                 config->modem = PEER_MBE;
+                config->audio_needed = true;
 
             } else {
                 dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s", filename, lineno, v);

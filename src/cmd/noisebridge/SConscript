@@ -1,6 +1,8 @@
 import os
 import sys
 
+from scons_checks import CheckCompileSource
+
 Import('env')
 
 localenv = env.Clone()
@@ -13,6 +15,21 @@ localenv.Append(
     ],
 )
 
+testcode = {
+    'getauxval': '''
+#include <stdlib.h>
+#include <sys/auxv.h>
+
+int main(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    getauxval(AT_EXECFN);
+    return 0;
+}
+''',
+}
+
 if env['ENABLE_PROTO_MBE']:
     localenv.Append(
         LIBS=[
@@ -24,12 +41,18 @@ if env['ENABLE_PROTO_MBE']:
         ],
     )
 
+required_libs_with_header = ()
+
 if sys.platform == 'linux2':
     name = 'noisebridge'
     localenv.Append(
         LIBS=[
             'pthread',
         ],
+    )
+
+    required_libs_with_header += (
+        (1, 'dl', 'dlfcn.h', 'c'),
     )
 
 if sys.platform == 'darwin':
@@ -51,6 +74,33 @@ if sys.platform == 'darwin':
 
 if sys.platform == 'win32':
     name = 'noisebridge.exe'
+
+if not env.GetOption('clean'):
+    conf = Configure(localenv, custom_tests={
+        'CheckCompileSource': CheckCompileSource,
+    })
+
+    features = []
+    for feature, source in testcode.items():
+        if conf.CheckCompileSource(feature, source):
+            features.append(feature)
+    for required, lib, header, compiler in required_libs_with_header:
+        if conf.CheckLibWithHeader(lib, header, compiler):
+            conf.env._Have(lib, 1)
+        elif required:
+            print(lib + ' is required')
+            Exit(1)
+        else:
+            conf.env._Have(lib, 0)
+        features.append(feature)
+
+    localenv = conf.Finish()
+    localenv.Append(
+        CPPDEFINES=[
+            'HAVE_' + feature.upper() for feature in features
+        ]
+    )
+
 
 '''
 conf = localenv.Configure()

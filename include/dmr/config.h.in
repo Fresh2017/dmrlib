@@ -1,18 +1,22 @@
 #ifndef _DMR_CONFIG_H
 #define _DMR_CONFIG_H
 
-#if %(ENABLE_PROTO_MBE)d
-#define DMR_ENABLE_PROTO_MBE
-#endif
-
-#if %(WITH_DEBUG)d
+#if @WITH_DEBUG@
 #define DMR_DEBUG
 #include <assert.h>
 #endif
 
-#if %(WITH_DMALLOC)d
+#if @HAVE_PTHREAD@
+#define DMR_HAVE_PTHREAD
+#endif
+
+#if @WITH_DMALLOC@
 #include <string.h>
 #include <dmalloc.h>
+#endif
+
+#if @ENABLE_PROTO_MBE@
+#define DMR_ENABLE_PROTO_MBE
 #endif
 
 #endif // _DMR_CONFIG_H

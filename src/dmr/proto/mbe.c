@@ -80,14 +80,10 @@ static void mbe_proto_tx(void *mbeptr, dmr_packet_t *packet)
     if (mbe == NULL || packet == NULL)
         return;
 
-    dmr_log_debug("mbe: tx %s", dmr_slot_type_name(packet->slot_type));
-    switch (packet->slot_type) {
-    case DMR_SLOT_TYPE_VOICE_BURST_A:
-    case DMR_SLOT_TYPE_VOICE_BURST_B:
-    case DMR_SLOT_TYPE_VOICE_BURST_C:
-    case DMR_SLOT_TYPE_VOICE_BURST_D:
-    case DMR_SLOT_TYPE_VOICE_BURST_E:
-    case DMR_SLOT_TYPE_VOICE_BURST_F:
+    dmr_log_debug("mbe: tx %s", dmr_data_type_name(packet->data_type));
+    switch (packet->data_type) {
+    case DMR_DATA_TYPE_VOICE:
+    case DMR_DATA_TYPE_VOICE_SYNC:
         break;
     default:
         dmr_log_debug("mbe: ignored unsupported packet");

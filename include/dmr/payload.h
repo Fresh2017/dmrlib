@@ -30,9 +30,4 @@ typedef struct {
 	uint8_t bytes[sizeof(dmr_payload_voice_bits_t)/8];
 } dmr_payload_voice_bytes_t;
 
-#include <dmr/payload/csbk.h>
-#include <dmr/payload/voice.h>
-#include <dmr/payload/emb.h>
-#include <dmr/payload/lc.h>
-
 #endif // _DMR_PAYLOAD_H

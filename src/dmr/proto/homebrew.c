@@ -147,7 +147,7 @@ static void homebrew_proto_rx(void *homebrewptr, dmr_packet_t *packet)
         return;
 
     dmr_log_debug("homebrew: received %s packet",
-        dmr_slot_type_name(packet->slot_type));
+        dmr_data_type_name(packet->data_type));
 
     dmr_proto_rx_cb_run(&homebrew->proto, packet);
 }
@@ -168,17 +168,6 @@ dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr p
     dmr_log_debug("homebrew: new on %s:%d to %s:%d",
         inet_ntoa(bind), port,
         inet_ntoa(peer), port);
-
-#ifdef DMR_DEBUG
-    dmr_homebrew_data_fields_t test;
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t           size = %lu", sizeof(test));
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t.signature size = %lu", sizeof(test.signature));
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t.sequence  size = %lu", sizeof(test.sequence));
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t.dmr_data  size = %lu", sizeof(test.dmr_data));
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t.flags     size = %lu", sizeof(test.flags));
-    dmr_log_trace("homebrew: dmr_homebrew_data_fields_t.stream_id size = %lu", sizeof(test.stream_id));
-    assert(sizeof(dmr_homebrew_data_fields_t) == (DMR_PAYLOAD_BYTES + 20));
-#endif
 
     int optval = 1;
     dmr_homebrew_t *homebrew = talloc_zero(NULL, dmr_homebrew_t);
@@ -387,45 +376,35 @@ void dmr_homebrew_free(dmr_homebrew_t *homebrew)
     talloc_free(homebrew);
 }
 
-void dmr_homebrew_dump_data(uint8_t *buf, dmr_packet_t *packet)
+static void dmr_homebrew_dump_data(dmr_packet_t *packet)
 {
-    /*
-    uint8_t    ts  = (buf[5])      & 0x01U,
-        call_type  = (buf[5] >> 1) & 0x01U,
-        frame_type = (buf[5] >> 2) & 0x03U,
-        data_type  = (buf[5] >> 4) & 0x07U;
-    uint16_t stream_id = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
-    */
-    if (buf == NULL || packet == NULL)
+    if (packet == NULL)
         return;
 
-    dmr_homebrew_data_fields_t *data = (dmr_homebrew_data_fields_t *)buf;
-    dmr_log_debug("homebrew: frame [%lu->%lu] via %lu, seq 0x%02x, slot %d, call type %d, frame type %d, data type %d, stream id 0x%08lx:",
+    dmr_log_debug("homebrew: frame [%lu->%lu] via %lu, seq 0x%02x, slot %d, call type %d, data type %s (%d), stream id 0x%08lx:",
         packet->src_id,
         packet->dst_id,
         packet->repeater_id,
-        data->sequence,
-        data->flags.slot,
-        data->flags.call_type,
-        data->flags.frame_type,
-        data->flags.data_type,
-        data->stream_id);
-    dmr_log_debug("homebrew:  signature: %.s", 4, buf);
-    dmr_log_debug("homebrew:   sequence: 0x%02x", buf[4]);
-    dmr_log_debug("homebrew:             0b%s",      dmr_byte_to_binary(buf[16]));
-    dmr_log_debug("homebrew:       flco: 0b%s",      dmr_byte_to_binary(buf[16] & 0x0fU));
-    dmr_log_debug("homebrew:         ts: 0b%s (%d)", dmr_byte_to_binary(buf[16] & B00000001), data->flags.slot);
-    dmr_log_debug("homebrew:  call type: 0b%s (%d)", dmr_byte_to_binary(buf[16] & B00000010), data->flags.call_type);
-    dmr_log_debug("homebrew: frame type: 0b%s (%d)", dmr_byte_to_binary(buf[16] & B00001100), data->flags.frame_type);
-    dmr_log_debug("homebrew:  data type: 0b%s (%d)", dmr_byte_to_binary(buf[16] & B11110000), data->flags.data_type);
-    dmr_log_debug("homebrew:  stream id: 0x%08lx", data->stream_id);
-    dump_hex(buf, DMR_PAYLOAD_BYTES + 20);
+        packet->meta.sequence,
+        packet->ts,
+        packet->flco,
+        dmr_data_type_name_short(packet->data_type),
+        packet->data_type,
+        packet->meta.stream_id);
+
+    dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
+}
+
+static uint32_t dmr_homebrew_generate_stream_id(void)
+{
+    // Not going to check how much RAND_MAX is, just grab 4 bytes and pack them
+    return DMR_UINT32_BE(rand(), rand(), rand(), rand());
 }
 
 void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
 {
     uint8_t buf[53];
-    ssize_t len = 0, pos;
+    ssize_t len = 0;
     int ret;
 
     if (homebrew == NULL)
@@ -465,44 +444,17 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             memcpy(buf, dmr_homebrew_repeater_pong, 7);
             if (!dmr_homebrew_sendraw(homebrew, buf, 15))
                 return;
-        } else if (len > 4 && !memcmp(homebrew->buffer, dmr_homebrew_data_signature, 4)) {
+        } else if (len == 53 && !memcmp(homebrew->buffer, dmr_homebrew_data_signature, 4)) {
             dmr_log_debug("homebrew: got data packet");
-            dmr_packet_t *packet = malloc(sizeof(dmr_packet_t));
+            dmr_packet_t *packet = dmr_homebrew_parse_packet(homebrew->buffer, len);
             if (packet == NULL) {
                 dmr_error(DMR_ENOMEM);
                 return;
             }
-            memset(packet, 0, sizeof(dmr_packet_t));
-            pos = 4 + 1; /* 'D', 'M', 'R', 'D', seqno */
-            packet->src_id |= (homebrew->buffer[pos++] << 16);
-            packet->src_id |= (homebrew->buffer[pos++] << 8);
-            packet->src_id |= (homebrew->buffer[pos++] << 0);
-            packet->dst_id |= (homebrew->buffer[pos++] << 16);
-            packet->dst_id |= (homebrew->buffer[pos++] << 8);
-            packet->dst_id |= (homebrew->buffer[pos++] << 0);
-            packet->repeater_id |= (homebrew->buffer[pos++] << 0);
-            packet->repeater_id |= (homebrew->buffer[pos++] << 8);
-            packet->repeater_id |= (homebrew->buffer[pos++] << 16);
-            packet->repeater_id |= (homebrew->buffer[pos++] << 24);
-            uint8_t data_type = homebrew->buffer[pos++];
-            switch ((data_type >> 2) & B00000011) {
-            case B00000000: /* voice */
-                packet->slot_type = DMR_SLOT_TYPE_VOICE_BURST_A + (data_type >> 4);
-                break;
-            case B00000001: /* voice sync */
-                packet->slot_type = DMR_SLOT_TYPE_VOICE_BURST_A;
-                break;
-            case B00000010: /* data sync */
-            default:
-                packet->slot_type = (data_type >> 4) & B00001111;
-                break;
-            }
-            pos += 4; /* stream id */
-            memcpy(packet->payload, &homebrew->buffer[pos], DMR_PAYLOAD_BYTES);
             if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
                 dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
             }
-            dmr_homebrew_dump_data(homebrew->buffer, packet);
+            dmr_homebrew_dump_data(packet);
             homebrew->proto.rx(homebrew, packet);
             free(packet);
         } else if (len > 7 && !memcmp(homebrew->buffer, dmr_homebrew_repeater_pong, 7)) {
@@ -511,9 +463,9 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             dmr_log_debug("homebrew: master sent synchronous site beacon (ignored)");
         } else if (len > 7 && !memcmp(homebrew->buffer, dmr_homebrew_repeater_rssi, 7)) {
             dmr_log_debug("homebrew: master sent repeater RSSI (ignored)");
-        } else if (len > 6 && !memcmp(homebrew->buffer, dmr_homebrew_master_ack, 6)) {
+        } else if (len == 12 && !memcmp(homebrew->buffer, dmr_homebrew_master_ack, 6)) {
             dmr_log_debug("homebrew: master sent ack");
-        } else if (len > 5 && !memcmp(homebrew->buffer, dmr_homebrew_master_closing, 5)) {
+        } else if (len == 12 && !memcmp(homebrew->buffer, dmr_homebrew_master_closing, 5)) {
             dmr_log_critical("homebrew: master closing");
             break;
         } else {
@@ -526,100 +478,53 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
 
 int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet)
 {
-    //uint8_t *buf, pos = 0;
-
     if (homebrew == NULL || packet == NULL || ts > DMR_TS2)
         return dmr_error(DMR_EINVAL);
-
-    /*
-    buf = malloc(DMR_PAYLOAD_BYTES + 20);
-    if (buf == NULL)
-        return dmr_error(DMR_ENOMEM);
-
-    memset(buf, 0, DMR_PAYLOAD_BYTES + 20);
-    */
-    uint8_t buf[DMR_PAYLOAD_BYTES + 20], pos = 0;
 
     if (packet->repeater_id == 0)
         packet->repeater_id = homebrew->id;
 
-    bool reset = false;
-#define C(field) do { if (homebrew->tx[ts].field != (*packet).field) { dmr_log_debug("homebrew: stream 0x%08lx expired: " #field " changed", homebrew->tx[ts].stream_id); reset = true; }} while(0)
-    C(src_id);
-    C(dst_id);
-    C(call_type);
-#undef C
-    double delta = dmr_time_ms_since(homebrew->tx[ts].last_voice_packet_sent);
-    if (delta > 200.0) {
-        dmr_log_debug("homebrew: stream 0x%08lx expired: delta %.2f > 200.0",
-            homebrew->tx[ts].stream_id, delta);
-        reset = true;
-    }
-
-    if (reset) {
-        homebrew->tx[ts].src_id      = packet->src_id;
-        homebrew->tx[ts].dst_id      = packet->dst_id;
-        homebrew->tx[ts].call_type   = packet->call_type;
-        homebrew->tx[ts].slot_type   = packet->slot_type;
-        homebrew->tx[ts].seq         = 0;
-        homebrew->tx[ts].stream_id   = (rand() % 0xffU);
-        homebrew->tx[ts].stream_id  |= (rand() % 0xffU) << 8;
-        homebrew->tx[ts].stream_id  |= (rand() % 0xffU) << 16;
-        homebrew->tx[ts].stream_id  |= (rand() % 0xffU) << 24;
-        dmr_log_debug("homebrew: new stream on ts %d, %lu->%lu via %lu, id 0x%08lx",
-            packet->ts, packet->src_id, packet->dst_id, packet->repeater_id,
-            homebrew->tx[ts].stream_id);
-    }
-
-    memcpy(buf, dmr_homebrew_data_signature, 4);
-    pos = 4;
-    buf[pos++] = homebrew->tx[ts].seq++ % 0xffU;
-    buf[pos++] = (packet->src_id >> 16);
-    buf[pos++] = (packet->src_id >> 8);
-    buf[pos++] = (packet->src_id >> 0);
-    buf[pos++] = (packet->dst_id >> 16);
-    buf[pos++] = (packet->dst_id >> 8);
-    buf[pos++] = (packet->dst_id >> 0);
-    buf[pos++] = (packet->repeater_id >> 0);
-    buf[pos++] = (packet->repeater_id >> 8);
-    buf[pos++] = (packet->repeater_id >> 16);
-    buf[pos++] = (packet->repeater_id >> 24);
-    buf[pos] = ((ts)                                   & B00000001) |
-               ((packet->call_type << 1)               & B00000010);
-
-    switch (packet->slot_type) {
-    case DMR_SLOT_TYPE_VOICE_BURST_A:
-        buf[pos] |= (0x00 << 2)                        & B00001100;
-        buf[pos] |= ((packet->slot_type - 0x0aU) << 4) & B11110000;
-        gettimeofday(&homebrew->tx[ts].last_voice_packet_sent, NULL);
+    uint8_t buf[DMR_PAYLOAD_BYTES + 20];
+    buf[0x00] = 'D';
+    buf[0x01] = 'M';
+    buf[0x02] = 'R';
+    buf[0x03] = 'D';
+    buf[0x04] = packet->meta.sequence;
+    buf[0x05] = packet->src_id >> 16;
+    buf[0x06] = packet->src_id >> 8;
+    buf[0x07] = packet->src_id >> 0;
+    buf[0x08] = packet->src_id >> 16;
+    buf[0x09] = packet->src_id >> 8;
+    buf[0x0a] = packet->src_id >> 0;
+    buf[0x0b] = packet->repeater_id >> 24;
+    buf[0x0c] = packet->repeater_id >> 16;
+    buf[0x0d] = packet->repeater_id >> 8;
+    buf[0x0e] = packet->repeater_id >> 0;
+    buf[0x0f]  = 0;
+    buf[0x0f] |= (packet->ts   & B00000001) << 7;
+    buf[0x0f] |= (packet->flco & B00000001) << 6;
+    switch (packet->data_type) {
+    case DMR_DATA_TYPE_VOICE_SYNC:
+        buf[0x0f] |= B00010000;
         break;
-    case DMR_SLOT_TYPE_VOICE_BURST_B:
-    case DMR_SLOT_TYPE_VOICE_BURST_C:
-    case DMR_SLOT_TYPE_VOICE_BURST_D:
-    case DMR_SLOT_TYPE_VOICE_BURST_E:
-    case DMR_SLOT_TYPE_VOICE_BURST_F:
-        buf[pos] |= (0x01 << 2)                        & B00001100;
-        buf[pos] |= ((packet->slot_type - 0x0aU) << 4) & B11110000;
-        gettimeofday(&homebrew->tx[ts].last_voice_packet_sent, NULL);
+    case DMR_DATA_TYPE_VOICE:
+        buf[0x0f] |= packet->meta.voice_frame;
         break;
     default:
-        buf[pos] |= (0x02 << 2)                        & B00001100;
-        buf[pos] |= ((packet->slot_type & 0x0f) << 4)  & B11110000;
-        gettimeofday(&homebrew->tx[ts].last_data_packet_sent, NULL);
+        if ((packet->data_type == DMR_DATA_TYPE_VOICE_LC || packet->data_type == DMR_DATA_TYPE_DATA) && packet->meta.sequence == 0) {
+            homebrew->tx[ts].stream_id = dmr_homebrew_generate_stream_id();
+            dmr_log_debug("homebrew: new stream on ts %d, %lu->%lu via %lu, id 0x%08lx",
+                packet->ts, packet->src_id, packet->dst_id, packet->repeater_id,
+                homebrew->tx[ts].stream_id);
+        }
+        buf[0x0f] |= (B00100000 | packet->data_type);
         break;
     }
-    pos++;
+    DMR_UINT32_BE_PACK(buf + 0x10, homebrew->tx[ts].stream_id);
+    memcpy(buf + 0x14, packet->payload, DMR_PAYLOAD_BYTES);
 
-    buf[pos++] = (homebrew->tx[ts].stream_id >> 24) & 0xffU;
-    buf[pos++] = (homebrew->tx[ts].stream_id >> 16) & 0xffU;
-    buf[pos++] = (homebrew->tx[ts].stream_id >>  8) & 0xffU;
-    buf[pos++] = (homebrew->tx[ts].stream_id >>  0) & 0xffU;
-#ifdef DMR_DEBUG
-    assert(pos == 20);
-#endif
-    memcpy(&buf[pos], packet->payload, DMR_PAYLOAD_BYTES);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dmr_homebrew_dump_data(buf, packet);
+        dmr_homebrew_dump_data(packet);
     }
     int ret = dmr_homebrew_sendraw(homebrew, buf, sizeof(buf));
     //free(buf);
@@ -701,58 +606,42 @@ dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned
 }
 
 /* The result from this function needs to be freed */
-dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len)
+dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *data, unsigned int len)
 {
-    if (bytes == NULL)
+    if (data == NULL)
         return NULL;
-    if (dmr_homebrew_frame_type(bytes, len) != DMR_HOMEBREW_DMR_DATA_FRAME)
+    if (memcmp(data, dmr_homebrew_data_signature, 4) || len != 53) {
+        dmr_log_error("homebrew: can't parse packet, not a DMRD buffer");
         return NULL;
+    }
 
-    dmr_homebrew_packet_t *packet = malloc(sizeof(dmr_homebrew_packet_t));
+    dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
     if (packet == NULL) {
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
 
-    memset(packet, 0, sizeof(dmr_homebrew_packet_t));
-    memcpy(&packet->data, bytes, sizeof(dmr_homebrew_data_fields_t));
-    /*
-    memcpy(packet->fields.flags.signature, bytes, 4);
-    packet->fields.flags.sequence = bytes[4];
-    packet->packet.src_id = (bytes[5] << 16) | (bytes[6] << 8) | bytes[7];
-    packet->packet.dst_id = (bytes[8] << 16) | (bytes[9] << 8) | bytes[10];
-    packet->packet.repeater_id  = (bytes[11] << 24);
-    packet->packet.repeater_id |= (bytes[12] << 16);
-    packet->packet.repeater_id |= (bytes[13] <<  8);
-    packet->packet.repeater_id |= (bytes[14] <<  0);
-    packet->fields.flags.byte = bytes[15];
-    packet->fields.src_id = packet->packet.src_id;
-    packet->fields.dst_id = packet->packet.dst_id;
-    packet->fields.repeater_id = packet->packet.repeater_id;
-    */
-    /*
-    packet->packet.ts = (bytes[15]) & 0x01;
-    packet->fields.flags.call_type = (bytes[15] >> 1) & 0x01;
-    packet->dmr_packet.call_type = packet->call_type;
-    packet->frame_type = (bytes[15] >> 2) & 0x03;
-    packet->data_type = (bytes[15] >> 4) & 0x0f;
-    */
-    switch (packet->data.fields.flags.frame_type) {
-    case DMR_HOMEBREW_DATA_TYPE_VOICE:
-    case DMR_HOMEBREW_DATA_TYPE_VOICE_SYNC:
-        packet->packet.slot_type = packet->data.fields.flags.data_type + DMR_SLOT_TYPE_VOICE_BURST_A;
+    packet->meta.sequence = data[4];
+    packet->src_id = DMR_UINT32_BE(0, data[5], data[6], data[7]);
+    packet->dst_id = DMR_UINT32_BE(0, data[8], data[9], data[10]);
+    packet->repeater_id = DMR_UINT32_LE(data[11], data[12], data[13], data[14]);
+    packet->ts   = (data[15] & B10000000) >> 7;
+    packet->flco = (data[15] & B01000000) >> 6;
+    switch        ((data[15] & B00110000) >> 4) {
+    case B00000000:
+        packet->data_type = DMR_DATA_TYPE_VOICE;
+        packet->meta.voice_frame = (data[15] & B00001111);
         break;
-    case DMR_HOMEBREW_DATA_TYPE_DATA_SYNC: // data sync
-        packet->packet.slot_type = packet->data.fields.flags.data_type;
+    case B00000001:
+        packet->data_type = DMR_DATA_TYPE_VOICE_SYNC;
+        packet->meta.voice_frame = 0;
         break;
-    default:
-        packet->packet.slot_type = DMR_SLOT_TYPE_UNKNOWN;
+    case B00000010:
+        packet->data_type = (data[15] & B00001111);
+        break;
     }
-
-    memcpy(&packet->packet.payload, &bytes[20], DMR_PAYLOAD_BYTES);
-    /*
-    memcpy(&packet->fields.dmr_data, &bytes[20], DMR_PAYLOAD_BYTES);
-    */
+    packet->meta.stream_id = DMR_UINT32_BE(data[16], data[17], data[18], data[19]);
+    memcpy(packet->payload, data + 20, DMR_PAYLOAD_BYTES);
 
     return packet;
 }

@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "dmr/bits.h"
 #include "dmr/error.h"
 #include "dmr/log.h"
 #include "dmr/proto/repeater.h"
+#include "dmr/payload/emb.h"
 #include "dmr/payload/lc.h"
 #include "dmr/payload/sync.h"
 
@@ -163,7 +165,7 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
         if (repeater->route != NULL) {
             if (repeater->route(repeater, proto, slot->proto, packet)) {
                 dmr_log_debug("repeater: routing %s packet from %s->%s",
-                    dmr_slot_type_name(packet->slot_type),
+                    dmr_data_type_name(packet->data_type),
                     proto->name, slot->proto->name);
                 dmr_repeater_fix_headers(repeater, packet);
                 dmr_proto_tx(slot->proto, slot->userdata, packet);
@@ -241,77 +243,129 @@ int dmr_repeater_add(dmr_repeater_t *repeater, void *userdata, dmr_proto_t *prot
 int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 {
     dmr_log_trace("repeater: fixed headers in %s packet",
-        dmr_slot_type_name(packet->slot_type));
+        dmr_data_type_name(packet->data_type));
     if (repeater == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-    switch (packet->slot_type) {
-    case DMR_SLOT_TYPE_VOICE_LC:
-        dmr_log_trace("repeater: constructing Full Link Control");
-        dmr_lc_t lc = {
-            .flco            = DMR_LC_GROUP_VOICE_CHANNEL_USER,
-            .fid             = 0,
-            .service_options = {
-                .byte        = 0,
-            },
-            .dst_id          = packet->dst_id,
-            .src_id          = packet->src_id
-        };
-        if (dmr_lc_full_encode(&lc, packet) != 0) {
-            dmr_log_error("repeater: can't fix headers, full LC failed");
-            return -1;
-        }
-        break;
+    dmr_repeater_timeslot_t rts = repeater->ts[packet->ts];
+    switch (packet->data_type) {
+    case DMR_DATA_TYPE_VOICE_LC:
+    case DMR_DATA_TYPE_VOICE_SYNC:
+    case DMR_DATA_TYPE_VOICE:
+    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
+        switch (packet->data_type) {
+        case DMR_DATA_TYPE_VOICE_LC:
+            dmr_log_trace("repeater: constructing Full Link Control");
 
-    case DMR_SLOT_TYPE_VOICE_BURST_B:
-    case DMR_SLOT_TYPE_VOICE_BURST_C:
-    case DMR_SLOT_TYPE_VOICE_BURST_D:
-    case DMR_SLOT_TYPE_VOICE_BURST_E:
-    case DMR_SLOT_TYPE_VOICE_BURST_F:
-        dmr_log_trace("repeater: constructing NULL EMB for %s",
-            dmr_slot_type_name(packet->slot_type));
-        dmr_emb_t emb;
-        memset(&emb, 0, sizeof(dmr_emb_t));
-        dmr_emb_encode(&emb, packet);
-        break;
-    }
-
-    if (packet->slot_type == DMR_SLOT_TYPE_PRIVACY_INDICATOR        ||
-        packet->slot_type == DMR_SLOT_TYPE_VOICE_LC                 ||
-        packet->slot_type == DMR_SLOT_TYPE_TERMINATOR_WITH_LC       ||
-        packet->slot_type == DMR_SLOT_TYPE_CSBK                     ||
-        packet->slot_type == DMR_SLOT_TYPE_MULTI_BLOCK_CONTROL      ||
-        packet->slot_type == DMR_SLOT_TYPE_MULTI_BLOCK_CONTROL_CONT ||
-        packet->slot_type == DMR_SLOT_TYPE_DATA                     ||
-        packet->slot_type == DMR_SLOT_TYPE_RATE12_DATA              ||
-        packet->slot_type == DMR_SLOT_TYPE_RATE34_DATA              ||
-        packet->slot_type == DMR_SLOT_TYPE_IDLE) {
-        dmr_log_trace("repeater: constructing slot type PDU for %s",
-            dmr_slot_type_name(packet->slot_type));
-        dmr_slot_t pdu = {
-            .fields = {
-                .color_code = repeater->color_code,
-                .data_type  = packet->slot_type,
-                .fec        = 0
+            // Regenerate full LC
+            dmr_full_lc_t full_lc;
+            memset(&full_lc, 0, sizeof(full_lc));
+            DMR_UINT32_BE_PACK3(full_lc.fields.dst_id, packet->dst_id);
+            DMR_UINT32_BE_PACK3(full_lc.fields.src_id, packet->src_id);
+            if (packet->flco == DMR_FLCO_PRIVATE) {
+                full_lc.fields.flco = 3;
             }
-        };
-        dmr_slot_type_encode(&pdu, packet);
+            if (dmr_full_lc_encode(&full_lc, packet) != 0) {
+                dmr_log_error("repeater: can't fix headers, full LC failed");
+                return -1;
+            }
+            dmr_log_trace("repeater: constructing sync pattern for voice LC");
+            dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_VOICE, packet);
+
+            dmr_log_trace("repeater: setting slot type to voice LC");
+            dmr_slot_type_encode(packet);
+
+            dmr_log_trace("repeater: constructing emb LC");
+            if (repeater->ts[packet->ts].vbptc_emb_lc != NULL) {
+                dmr_vbptc_16_11_free(rts.vbptc_emb_lc);
+            }
+            if ((rts.vbptc_emb_lc = dmr_vbptc_16_11_new(8, repeater)) == NULL) {
+                return dmr_error(DMR_ENOMEM);
+            }
+
+            dmr_emb_signalling_lc_bits_t *ebits = talloc(repeater, dmr_emb_signalling_lc_bits_t);
+            dmr_emb_signalling_lc_bits_t *ibits;
+            if (ebits == NULL)
+                return dmr_error(DMR_ENOMEM);
+
+            if (dmr_emb_encode_signalling_lc_from_full_lc(&full_lc, ebits) != 0)
+                return dmr_error(DMR_LASTERROR);
+            if ((ibits = dmr_emb_signalling_lc_interlave(ebits)) == NULL)
+                return dmr_error(DMR_ENOMEM);
+            if (dmr_vbptc_16_11_encode(rts.vbptc_emb_lc, ibits->bits, sizeof(dmr_emb_signalling_lc_bits_t)) != 0)
+                return dmr_error(DMR_LASTERROR);
+
+            break;
+
+        case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
+            if (rts.vbptc_emb_lc != NULL) {
+                talloc_free(rts.vbptc_emb_lc);
+                rts.vbptc_emb_lc = NULL;
+            }
+            break;
+
+        case DMR_DATA_TYPE_VOICE_SYNC:
+        case DMR_DATA_TYPE_VOICE:
+            dmr_log_trace("repeater: setting SYNC data");
+            dmr_emb_signalling_lc_bits_t emb_bits;
+            memset(&emb_bits, 0, sizeof(emb_bits));
+
+            switch (packet->meta.voice_frame + 'A') {
+            case 'A':
+                dmr_log_trace("repeater: constructing sync pattern for voice SYNC");
+                dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_VOICE, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            case 'B':
+                dmr_log_trace("repeater: inserting first LCSS fragment");
+                dmr_emb_lcss_fragment_encode(DMR_EMB_LCSS_FIRST_FRAGMENT, rts.vbptc_emb_lc, 0, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            case 'C':
+                dmr_log_trace("repeater: inserting continuation LCSS fragment");
+                dmr_emb_lcss_fragment_encode(DMR_EMB_LCSS_CONTINUATION, rts.vbptc_emb_lc, 1, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            case 'D':
+                dmr_log_trace("repeater: inserting continuation LCSS fragment");
+                dmr_emb_lcss_fragment_encode(DMR_EMB_LCSS_CONTINUATION, rts.vbptc_emb_lc, 2, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            case 'E':
+                dmr_log_trace("repeater: inserting last LCSS fragment");
+                dmr_emb_lcss_fragment_encode(DMR_EMB_LCSS_LAST_FRAGMENT, rts.vbptc_emb_lc, 3, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            case 'F':
+                dmr_log_trace("repeater: inserting NULL EMB LCSS fragment");
+                dmr_emb_lcss_fragment_encode(DMR_EMB_LCSS_SINGLE_FRAGMENT, NULL, 0, packet);
+                dmr_slot_type_encode(packet);
+                break;
+
+            default:
+                break;
+            }
+            break;
+
+
+            break;
+
+        default:
+            break;
+        }
+        break;
+
+    default:
+        break;
     }
 
-    if (packet->slot_type == DMR_SLOT_TYPE_VOICE_BURST_A ||
-        packet->slot_type == DMR_SLOT_TYPE_VOICE_LC) {
-        // Make sure it has the right sync pattern
-        dmr_log_trace("repeater: checking sync pattern");
-        dmr_sync_pattern_t patt = dmr_sync_pattern_decode(packet),
-                           want = DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
-        if (patt != want) {
-            dmr_log_debug("repeater: fixing sync pattern, want \"bs sourced voice\", got \"%s\"",
-                dmr_sync_pattern_name(patt));
-            dmr_sync_pattern_encode(want, packet);
-        }
-        dmr_log_trace("repeater: now we have \"%s\"",
-            dmr_sync_pattern_name(dmr_sync_pattern_decode(packet)));
-    }
+    if (packet->data_type < DMR_DATA_TYPE_INVALID)
+        dmr_slot_type_encode(packet);
 
     return 0;
 }

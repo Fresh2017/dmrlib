@@ -3,17 +3,16 @@
 
 uint32_t dmr_time_since(struct timeval tv)
 {
-    struct timeval now;
+    struct timeval now, res;
     gettimeofday(&now, NULL);
-    return (uint32_t)(now.tv_sec - tv.tv_sec);
+    timersub(&now, &tv, &res);
+    return (uint32_t)(res.tv_sec);
 }
 
-double dmr_time_ms_since(struct timeval tv)
+uint32_t dmr_time_ms_since(struct timeval tv)
 {
-    struct timeval now;
+    struct timeval now, res;
     gettimeofday(&now, NULL);
-    double delta;
-    delta  = (now.tv_sec  - tv.tv_sec)  / 1000.0;
-    delta += (now.tv_usec - tv.tv_usec) * 1000.0;
-    return delta;
+    timersub(&now, &tv, &res);
+    return (res.tv_sec * 1000) + ((res.tv_usec + 500) / 1000);
 }

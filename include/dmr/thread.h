@@ -71,6 +71,7 @@ extern "C" {
 
 /* Generic includes */
 #include <time.h>
+#include <talloc.h>
 
 /* Platform specific includes */
 #if defined(_DMR_THREAD_POSIX_) || defined(_DMR_THREAD_MAC_)
@@ -148,6 +149,8 @@ int _dmr_thread_timespec_get(struct timespec *ts, int base);
   #define _dmr_thread_local __declspec(thread)
  #endif
 #elif defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) < ((4 << 8) | 9))
+ #define _dmr_thread_local __thread
+#else
  #define _dmr_thread_local __thread
 #endif
 
@@ -445,6 +448,29 @@ void *dmr_locals_get(dmr_locals_t key);
 */
 int dmr_locals_set(dmr_locals_t key, void *val);
 
+/*
+#define dmr_locals_setup(_type,_name) static _type _name;             \ 
+static inline int __dmr_locals_dtor_##_name(dmr_locals_dtor_t *ctx)   \
+{                                                                     \
+    dmr_locals_dtor_t func = ctx;                                     \
+    func(_name);                                                      \
+    return 0;                                                         \
+}                                                                     \
+static inline _type __dmr_locals_init_##_name(dmr_locals_dtor_t func) \
+{                                                                     \
+    static dmr_locals_dtor_t *ctx;                                    \
+    if (!ctx) {                                                       \
+        ctx = talloc(talloc_autofree_context(), dmr_locals_dtor_t);   \
+        talloc_set_destructor(ctx, __dmr_locals_dtor_##_name);        \
+        *ctx = func;                                                  \
+    }                                                                 \
+    return _name;                                                     \
+}
+#define dmr_locals_init(_name, _func) __dmr_locals_init_##_name(_func)
+#define dmr_locals_set_(_name, _v)    ((int)!((_name = _v) || 1))
+#define dmr_locals_get_(_name)        (_name)
+*/
+
 #if defined(_DMR_THREAD_WIN32_)
   typedef struct {
     LONG volatile status;
@@ -466,6 +492,26 @@ int dmr_locals_set(dmr_locals_t key, void *val);
 #else
   #define dmr_call_once(flag,func) pthread_once(flag,func)
 #endif
+
+
+#define dmr_thread_local_setup(_t, _n) static _dmr_thread_local _t _n;\
+static dmr_locals_t __dmr_thread_local_key_##_n;\
+static dmr_once_flag __dmr_thread_local_once_##_n = DMR_ONCE_FLAG_INIT;\
+static dmr_locals_dtor_t __dmr_thread_local_dtor_##_n = NULL;\
+static inline void __dmr_thread_local_key_init_##_n(void)\
+{\
+  (void) dmr_locals_create(&__dmr_thread_local_key_##_n, __dmr_thread_local_dtor_##_n);\
+}\
+static inline _t __dmr_thread_local_init_##_n(dmr_locals_dtor_t func)\
+{\
+  __dmr_thread_local_dtor_##_n = func;\
+  (void) dmr_call_once(&__dmr_thread_local_once_##_n, __dmr_thread_local_key_init_##_n);\
+  return _n;\
+}
+
+#define dmr_thread_local_init(_n, _f)  __dmr_thread_local_init_##_n(_f)
+#define dmr_thread_local_set(_n, _v) ((int)!((_n = _v) || 1))
+#define dmr_thread_local_get(_n) _n
 
 #ifdef __cplusplus
 }

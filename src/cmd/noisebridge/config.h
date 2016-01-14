@@ -10,6 +10,7 @@
 #include <dmr/payload/voice.h>
 
 #include "route.h"
+#include "module.h"
 
 extern const char *software_id, *package_id;
 
@@ -20,6 +21,18 @@ typedef enum {
     PEER_MMDVM
 } peer_t;
 
+#define NOISEBRIDGE_MAX_PLUGINS 64
+
+typedef struct {
+    const char *filename;
+    const char **argv;
+    int        argc;
+    module_t   *module;
+#if defined(HAVE_DL)
+    void       *handle;
+#endif
+} plugin_t;
+
 typedef struct config_s {
     const char            *filename;
     peer_t                upstream, modem;
@@ -27,7 +40,7 @@ typedef struct config_s {
     size_t                repeater_routes;
     dmr_color_code_t      repeater_color_code;
     dmr_homebrew_t        *homebrew;
-    dmr_homebrew_config_t *homebrew_config;
+    dmr_homebrew_config_t homebrew_config;
     dmr_id_t              homebrew_id;
     struct in_addr        homebrew_bind;
     char                  *homebrew_host_s;
@@ -39,8 +52,11 @@ typedef struct config_s {
     int                   mmdvm_rate;
     dmr_mbe_t             *mbe;
     uint8_t               mbe_quality;
+    bool                  audio_needed;
     char                  *audio_device;
     dmr_log_priority_t    log_level;
+    plugin_t              *plugin[NOISEBRIDGE_MAX_PLUGINS];
+    size_t                plugins;
 } config_t;
 
 config_t *load_config(void);

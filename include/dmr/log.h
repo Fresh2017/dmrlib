@@ -5,14 +5,14 @@
 #ifndef _DMR_LOG_H
 #define _DMR_LOG_H
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <dmr/config.h>
 #include <dmr/platform.h>
 
 #define DMR_LOG_MESSAGE_MAX 1024
@@ -42,7 +42,11 @@ extern void dmr_log_priority_reset(void);
 extern const char *dmr_log_prefix(void);
 extern void dmr_log_prefix_set(const char *prefix);
 extern void dmr_log(const char *fmt, ...);
+#if defined(DMR_DEBUG)
 extern void dmr_log_trace(const char *fmt, ...);
+#else
+#define dmr_log_trace(fmt, ...)
+#endif
 extern void dmr_log_debug(const char *fmt, ...);
 extern void dmr_log_info(const char *fmt, ...);
 extern void dmr_log_warn(const char *fmt, ...);

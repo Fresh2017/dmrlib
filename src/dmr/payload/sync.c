@@ -3,44 +3,70 @@
 
 #include "dmr/payload/sync.h"
 
-static uint8_t dmr_payload_sync_pattern_bs_sourced_voice[6] = { 0x75, 0x5f, 0xd7, 0xdf, 0x75, 0xf7 };
-static uint8_t dmr_payload_sync_pattern_bs_sourced_data[6]  = { 0xdf, 0xf5, 0x7d, 0x75, 0xdf, 0x5d };
-static uint8_t dmr_payload_sync_pattern_ms_sourced_voice[6] = { 0x7f, 0x7d, 0x5d, 0xd5, 0x7d, 0xfd };
-static uint8_t dmr_payload_sync_pattern_ms_sourced_data[6]  = { 0xd5, 0xd7, 0xf7, 0x7f, 0xd7, 0x57 };
-static uint8_t dmr_payload_sync_pattern_ms_sourced_rc[6]    = { 0x77, 0xd5, 0x5f, 0x7d, 0xfd, 0x77 };
-static uint8_t dmr_payload_sync_pattern_direct_voice_ts1[6] = { 0x5d, 0x57, 0x7f, 0x77, 0x57, 0xff };
-static uint8_t dmr_payload_sync_pattern_direct_data_ts1[6]  = { 0xf7, 0xfd, 0xd5, 0xdd, 0xfd, 0x55 };
-static uint8_t dmr_payload_sync_pattern_direct_voice_ts2[6] = { 0x7d, 0xff, 0xd5, 0xf5, 0x5d, 0x5f };
-static uint8_t dmr_payload_sync_pattern_direct_data_ts2[6]  = { 0xd7, 0x55, 0x7f, 0x5f, 0xf7, 0xf5 };
+static const uint8_t dmr_sync_pattern_bs_sourced_voice[] = { 0x07, 0x55, 0xFD, 0x7D, 0xF7, 0x5F, 0x70 };
+static const uint8_t dmr_sync_pattern_bs_sourced_data[]  = { 0x0D, 0xFF, 0x57, 0xD7, 0x5D, 0xF5, 0xD0 };
+static const uint8_t dmr_sync_pattern_ms_sourced_voice[] = { 0x07, 0xF7, 0xD5, 0xDD, 0x57, 0xDF, 0xD0 };
+static const uint8_t dmr_sync_pattern_ms_sourced_data[]  = { 0x0D, 0x5D, 0x7F, 0x77, 0xFD, 0x75, 0x70 };
+static const uint8_t dmr_sync_pattern_ms_sourced_rc[]    = { 0x07, 0x7D, 0x55, 0xF7, 0xDF, 0xD7, 0x70 };
+static const uint8_t dmr_sync_pattern_direct_voice_ts1[] = { 0x05, 0xD5, 0x77, 0xF7, 0x75, 0x7F, 0xF0 };
+static const uint8_t dmr_sync_pattern_direct_data_ts1[]  = { 0x0F, 0x7F, 0xDD, 0x5D, 0xDF, 0xD5, 0x50 };
+static const uint8_t dmr_sync_pattern_direct_voice_ts2[] = { 0x07, 0xDF, 0xFD, 0x5F, 0x55, 0xD5, 0xF0 };
+static const uint8_t dmr_sync_pattern_direct_data_ts2[]  = { 0x0D, 0x75, 0x57, 0xF5, 0xFF, 0x7F, 0x50 };
+static const uint8_t dmr_sync_pattern_mask[]             = { 0x0F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xF0 };
+static const uint8_t dmr_sync_delta_max = 4;
+static const uint8_t dmr_sync_bits[] = {
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
+};
+
+uint8_t dmr_bit_diff(const uint8_t *a, const uint8_t *b)
+{
+    uint8_t delta = 0, i, j;
+    for (i = 0; i < 7; i++) {
+        j = dmr_sync_pattern_mask[i] & (a[i] ^ b[i]);
+        delta += dmr_sync_bits[j];
+    }
+    return delta;
+}
 
 dmr_sync_pattern_t dmr_sync_pattern_decode(dmr_packet_t *packet)
 {
-    uint8_t sync_bytes[6], i;
-    for (i = 0; i < 6; i++) {
-        sync_bytes[i]  = (packet->payload[17 + i] & 0x0f) << 4;
-        sync_bytes[i] |= (packet->payload[18 + i] & 0xf0) >> 4;
-    }
+    const uint8_t *buf = (const uint8_t *)(packet->payload + 13);
 
-    if (!memcmp(sync_bytes, dmr_payload_sync_pattern_bs_sourced_voice, sizeof(sync_bytes)))
+    if (dmr_bit_diff(packet->payload + 13, dmr_sync_pattern_bs_sourced_voice) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_bs_sourced_data, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_bs_sourced_data) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_BS_SOURCED_DATA;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_ms_sourced_voice, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_ms_sourced_voice) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_MS_SOURCED_VOICE;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_ms_sourced_data, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_ms_sourced_data) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_MS_SOURCED_DATA;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_ms_sourced_rc, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_ms_sourced_rc) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_MS_SOURCED_RC;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts1, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_direct_voice_ts1) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_DIRECT_VOICE_TS1;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_direct_data_ts1, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_direct_data_ts1) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_DIRECT_DATA_TS1;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts2, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_direct_voice_ts2) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_DIRECT_VOICE_TS2;
-    else if (!memcmp(sync_bytes, dmr_payload_sync_pattern_direct_data_ts2, sizeof(sync_bytes)))
+    if (dmr_bit_diff(buf, dmr_sync_pattern_direct_data_ts2) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_DIRECT_DATA_TS2;
-    else
-        return DMR_SYNC_PATTERN_UNKNOWN;
+
+    return DMR_SYNC_PATTERN_UNKNOWN;
 }
 
 char *dmr_sync_pattern_name(dmr_sync_pattern_t sync_pattern)
@@ -75,43 +101,43 @@ int dmr_sync_pattern_encode(dmr_sync_pattern_t pattern, dmr_packet_t *packet)
     if (packet == NULL)
         return -1;
 
-    uint8_t sync_bytes[6], i;
+    const uint8_t *sync_pattern;
     switch (pattern) {
     case DMR_SYNC_PATTERN_BS_SOURCED_VOICE:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_bs_sourced_voice, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_bs_sourced_voice;
         break;
     case DMR_SYNC_PATTERN_BS_SOURCED_DATA:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_bs_sourced_data, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_bs_sourced_data;
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_VOICE:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_voice, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_ms_sourced_voice;
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_DATA:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_data, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_ms_sourced_data;
         break;
     case DMR_SYNC_PATTERN_MS_SOURCED_RC:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_ms_sourced_rc, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_ms_sourced_rc;
         break;
     case DMR_SYNC_PATTERN_DIRECT_VOICE_TS1:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts1, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_direct_voice_ts1;
         break;
     case DMR_SYNC_PATTERN_DIRECT_DATA_TS1:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_data_ts1, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_direct_data_ts1;
         break;
     case DMR_SYNC_PATTERN_DIRECT_VOICE_TS2:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_voice_ts2, sizeof(sync_bytes));
+        sync_pattern = dmr_sync_pattern_direct_voice_ts2;
         break;
     case DMR_SYNC_PATTERN_DIRECT_DATA_TS2:
-        memcpy(sync_bytes, dmr_payload_sync_pattern_direct_data_ts2, sizeof(sync_bytes));
+        sync_pattern = &dmr_sync_pattern_direct_data_ts2[0];
         break;
     case DMR_SYNC_PATTERN_UNKNOWN:
     default:
         return -1;
     }
 
-    for (i = 0; i < 6; i++) {
-        packet->payload[17 + i] |= ((sync_bytes[i] >> 4) & 0x0f);
-        packet->payload[18 + i] |= ((sync_bytes[i] << 4) & 0xf0);
+    uint8_t i;
+    for (i = 0; i < 7; i++) {
+        packet->payload[i + 13] = (packet->payload[i + 13] & ~dmr_sync_pattern_mask[i]) | sync_pattern[i];
     }
     return 0;
 }

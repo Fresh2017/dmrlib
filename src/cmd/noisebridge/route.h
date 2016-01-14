@@ -8,16 +8,15 @@ typedef enum {
     ROUTE_REJECT
 } route_policy_t;
 
-// route_rule=from_mmdvm_modem:{mmdvm,mmdvm,reject}
-// route_rule=from_mmdvm_modem:{mmdvm,*,1,2042214,9990}
 typedef struct {
-    char  *name;
-    char  *src_proto;
-    char  *dst_proto;
-    dmr_ts_t    ts;
-    dmr_id_t    src_id;
-    dmr_id_t    dst_id;
+    char           *name;
+    char           *src_proto;
+    char           *dst_proto;
     route_policy_t policy;
+    dmr_ts_t       ts;
+    dmr_flco_t     flco;
+    dmr_id_t       src_id;
+    dmr_id_t       dst_id;
 } route_rule_t;
 
 route_rule_t *route_rule_parse(char *line);

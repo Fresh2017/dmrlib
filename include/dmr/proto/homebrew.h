@@ -43,32 +43,6 @@ typedef enum {
 } dmr_homebrew_auth_t;
 
 typedef struct __attribute__((packed)) {
-    char     signature[4];
-    uint8_t  sequence;
-    dmr_id_t src_id      : 24;
-    dmr_id_t dst_id      : 24;
-    dmr_id_t repeater_id : 32;
-    struct {
-        dmr_ts_t slot       : 1;
-        uint8_t  call_type  : 1;
-        uint8_t  frame_type : 2;
-        uint8_t  data_type  : 4;
-    } flags;
-    uint32_t stream_id;
-    uint8_t  dmr_data[DMR_PAYLOAD_BYTES];
-} dmr_homebrew_data_fields_t;
-
-typedef union __attribute__((packed)) {
-    dmr_homebrew_data_fields_t fields;
-    uint8_t                    bytes[DMR_PAYLOAD_BYTES + 20];
-} dmr_homebrew_data_t;
-
-typedef struct {
-    dmr_homebrew_data_t data;
-    dmr_packet_t        packet;
-} dmr_homebrew_packet_t;
-
-typedef struct __attribute__((packed)) {
     uint8_t signature[4];
     char    callsign[8];        // %-8.8s
     char    repeater_id[8];
@@ -100,8 +74,8 @@ typedef struct {
         uint32_t        stream_id;
         dmr_id_t        src_id;
         dmr_id_t        dst_id;
-        dmr_call_type_t call_type;
-        dmr_slot_type_t slot_type;
+        dmr_flco_t      flco;
+        dmr_data_type_t data_type;
         struct timeval  last_voice_packet_sent;
         struct timeval  last_data_packet_sent;
     } tx[2];
@@ -117,7 +91,7 @@ extern int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t
 extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len);
 extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout);
 extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
-extern dmr_homebrew_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
+extern dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
 
 extern void dmr_homebrew_config_init(dmr_homebrew_config_t *config);
 extern void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign);

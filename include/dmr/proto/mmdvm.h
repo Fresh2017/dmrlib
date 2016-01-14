@@ -140,21 +140,16 @@ typedef struct {
         uint8_t dmr_ts2;
         uint8_t ysf;
     } space;
-    dmr_ring_t   *dstar_rx_buffer;
-    dmr_ring_t   *dstar_tx_buffer;
-    dmr_ring_t   *dmr_ts1_rx_buffer;
-    dmr_ring_t   *dmr_ts1_tx_buffer;
-    dmr_ring_t   *dmr_ts2_rx_buffer;
-    dmr_ring_t   *dmr_ts2_tx_buffer;
-    dmr_ring_t   *ysf_rx_buffer;
-    dmr_ring_t   *ysf_tx_buffer;
 
     // Book keeping
-    struct timeval  last_packet_received;
-    dmr_slot_type_t last_dmr_slot_type;
-    struct timeval  last_dmr_data_packet_received;
-    struct timeval  last_dmr_voice_packet_received;
-    uint8_t         last_dmr_voice_frame;
+    struct timeval last_packet_received;
+    struct {
+        dmr_data_type_t last_data_type;
+        struct timeval  last_packet_received;
+        uint32_t        last_sequence;
+        uint8_t         last_voice_frame;
+    } dmr_ts[3];
+    dmr_ts_t last_dmr_ts;
 } dmr_mmdvm_t;
 
 extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes);

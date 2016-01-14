@@ -151,13 +151,9 @@ static void mmdvm_proto_tx(void *modemptr, dmr_packet_t *packet)
         return;
 
     uint8_t buf[37];
-    switch (packet->slot_type) {
-    case DMR_SLOT_TYPE_VOICE_BURST_A:
-    case DMR_SLOT_TYPE_VOICE_BURST_B:
-    case DMR_SLOT_TYPE_VOICE_BURST_C:
-    case DMR_SLOT_TYPE_VOICE_BURST_D:
-    case DMR_SLOT_TYPE_VOICE_BURST_E:
-    case DMR_SLOT_TYPE_VOICE_BURST_F:
+    switch (packet->data_type) {
+    case DMR_DATA_TYPE_VOICE:
+    case DMR_DATA_TYPE_VOICE_SYNC:
         dmr_log_trace("mmdvm: sending voice frames to modem");
         if (modem->last_mode != DMR_MMDVM_MODE_DMR) {
             dmr_log_trace("mmdvm: putting modem in DMR mode");
@@ -181,7 +177,7 @@ static void mmdvm_proto_tx(void *modemptr, dmr_packet_t *packet)
         }
         break;
 
-    case DMR_SLOT_TYPE_TERMINATOR_WITH_LC:
+    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
         if (modem->last_mode != DMR_MMDVM_MODE_DMR) {
             dmr_log_debug("mmdvm: received voice terminator, but not in DMR mode (ignored)");
             return;
@@ -272,7 +268,7 @@ FILE *dump;
 
 dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes)
 {
-    dmr_mmdvm_t *modem = malloc(sizeof(dmr_mmdvm_t));
+    dmr_mmdvm_t *modem = talloc_zero(NULL, dmr_mmdvm_t);
     if (modem == NULL)
         return NULL;
 
@@ -305,27 +301,12 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_
     char portbuf[64];
     memset(portbuf, 0, 64);
     snprintf(portbuf, 64, "\\\\.\\%s", port);
-    modem->port = portbuf;
+    modem->port = talloc_strdup(modem, portbuf);
 #else
-modem->port = strdup(port);
+    modem->port = talloc_strdup(modem, port);
 #endif
-    modem->dstar_rx_buffer = dmr_ring_new(buffer_sizes);
-    modem->dstar_tx_buffer = dmr_ring_new(buffer_sizes);
-    modem->dmr_ts1_rx_buffer = dmr_ring_new(buffer_sizes);
-    modem->dmr_ts1_tx_buffer = dmr_ring_new(buffer_sizes);
-    modem->dmr_ts2_rx_buffer = dmr_ring_new(buffer_sizes);
-    modem->dmr_ts2_tx_buffer = dmr_ring_new(buffer_sizes);
-    modem->ysf_rx_buffer = dmr_ring_new(buffer_sizes);
-    modem->ysf_tx_buffer = dmr_ring_new(buffer_sizes);
-    if (modem->port              == NULL ||
-        modem->dstar_rx_buffer   == NULL ||
-        modem->dstar_tx_buffer   == NULL ||
-        modem->dmr_ts1_rx_buffer == NULL ||
-        modem->dmr_ts1_tx_buffer == NULL ||
-        modem->dmr_ts2_rx_buffer == NULL ||
-        modem->dmr_ts2_tx_buffer == NULL ||
-        modem->ysf_rx_buffer     == NULL ||
-        modem->ysf_tx_buffer     == NULL) {
+    if (modem->port == NULL) {
+        dmr_error(DMR_ENOMEM);
         dmr_mmdvm_free(modem);
         return NULL;
     }
@@ -340,35 +321,68 @@ modem->port = strdup(port);
     return modem;
 }
 
+static void dmr_mmdvm_poll_timeouts(dmr_mmdvm_t *modem)
+{
+    dmr_ts_t ts;
+    for (ts = 0; ts < 3; ts++) {
+        if (modem->dmr_ts[ts].last_data_type == DMR_DATA_TYPE_VOICE ||
+            modem->dmr_ts[ts].last_data_type == DMR_DATA_TYPE_VOICE_SYNC) {
+            uint32_t delta = dmr_time_ms_since(modem->dmr_ts[ts].last_packet_received);
+            if (delta > 120) {
+                dmr_log_debug("mmdvm: voice stream on TS%u closed after %ums, sending terminator", ts + 1, delta);
+
+                // Append terminator with LC header
+                dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
+                packet->data_type = DMR_DATA_TYPE_TERMINATOR_WITH_LC;
+                packet->ts = ts;
+                packet->meta.sequence = modem->dmr_ts[ts].last_sequence++ % 0xff;
+                dmr_proto_rx_cb_run(&modem->proto, packet);
+
+                // Ignore in next iteration
+                modem->dmr_ts[ts].last_data_type = DMR_DATA_TYPE_INVALID;
+
+                // Cleanup
+                talloc_free(packet);
+            }
+        }
+    }
+}
+
 int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
 {
     if (modem == NULL || modem->fd == 0)
         return dmr_error(DMR_EINVAL);
 
-    uint8_t len, length, data;
+    uint8_t len, length;
     uint16_t val[4];
     struct timeval timeout = { 1, 0 };
     dmr_mmdvm_response_t res = dmr_mmdvm_get_response(modem, &len, &timeout, 1);
 
+    dmr_ts_t ts = DMR_TS_INVALID;
     switch (res) {
     case dmr_mmdvm_timeout:
+        dmr_mmdvm_poll_timeouts(modem);
         return 0; // Nothing to do here
 
     case dmr_mmdvm_error:
-        if (len == 0)
+        if (len == 0) {
+            dmr_mmdvm_poll_timeouts(modem);
             return 0; // Nothing to do here
+        }
 
         dmr_log_debug("mmdvm: error reading response");
         return 1;
 
     case dmr_mmdvm_ok:
+        dmr_mmdvm_poll_timeouts(modem);
+
         length = modem->buffer[1];
         switch (modem->buffer[2]) {
         case DMR_MMDVM_DMR_DATA1:
         case DMR_MMDVM_DMR_DATA2:
             dmr_log_debug("mmdvm: DMR data on TS%d, slot type %s (%d)",
                 modem->buffer[2] - DMR_MMDVM_DMR_DATA1,
-                dmr_slot_type_name(modem->buffer[3]),
+                dmr_data_type_name(modem->buffer[3]),
                 modem->buffer[3]);
             dump_hex(modem->buffer, len);
 
@@ -378,79 +392,93 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 return -1;
             }
 
-            packet->slot_type = modem->buffer[3];
-            packet->ts = modem->buffer[2] - DMR_MMDVM_DMR_DATA1;
-            packet->call_type = DMR_CALL_TYPE_GROUP;
+            // This can actually be ts 0-2 (so TS3!), because that's how mmdvm
+            // works in hot spot mode.
+            ts = modem->buffer[2] - DMR_MMDVM_DMR_DATA1;
+            packet->data_type = modem->buffer[3];
+            packet->ts = ts;
 
-            switch (packet->slot_type) {
-            case DMR_SLOT_TYPE_SYNC_VOICE:
-                // If this is a new voice stream or it has been too long since
-                // we've last seen a voice frame, prepend a voice LC header.
-                /*
-                if (modem->last_dmr_slot_type != packet->slot_type ||
-                    dmr_time_ms_since(modem->last_dmr_voice_packet_received) > 125) {
-                    dmr_log_debug("mmdvm: prepending voice LC");
-                    dmr_packet_t *voice_lc = malloc(sizeof(dmr_packet_t));
-                    if (voice_lc == NULL) {
-                        dmr_error(DMR_ENOMEM);
-                        return -1;
-                    }
-                    memset(voice_lc, 0, sizeof(dmr_packet_t));
-                    voice_lc->slot_type = DMR_SLOT_TYPE_VOICE_LC;
+            bool reset = false;
+            uint32_t delta = dmr_time_ms_since(modem->dmr_ts[ts].last_packet_received);
+            if (modem->dmr_ts[ts].last_data_type != modem->buffer[3]) {
+                dmr_log_debug("mmdvm: change in data type %s -> %s, starting new stream",
+                    dmr_data_type_name(modem->dmr_ts[packet->ts].last_data_type),
+                    dmr_data_type_name(modem->buffer[3]));
+                reset = true;
+            } else if (delta > 120) {
+                dmr_log_debug("mmdvm: last packet received %ums ago, starting new stream",
+                    delta);
+                reset = true;
+            }
 
-                    // Reset frame counter (so we start with frame A)
-                    modem->last_dmr_voice_frame = 0;
+            if (reset) {
+                modem->dmr_ts[ts].last_sequence = 0;
+                modem->dmr_ts[ts].last_voice_frame = 0;
+            }
 
-                    //dmr_proto_rx(&modem->proto, modem, voice_lc);
-                    dmr_proto_rx_cb_run(&modem->proto, voice_lc);
-                    free(voice_lc);
-                }
-                */
+            packet->flco = DMR_FLCO_GROUP;
+            packet->meta.sequence = modem->dmr_ts[ts].last_sequence++ % 0xff;
+            switch (packet->data_type) {
+            case DMR_DATA_TYPE_VOICE:
+            case DMR_DATA_TYPE_VOICE_SYNC:
+            case DMR_DATA_TYPE_SYNC_VOICE:
+                packet->meta.voice_frame = modem->dmr_ts[ts].last_voice_frame++ % 6;
 
                 // Number it as a valid voice burst frame
-                packet->slot_type = DMR_SLOT_TYPE_VOICE_BURST_A + modem->last_dmr_voice_frame;
-                switch (packet->slot_type) {
-                case DMR_SLOT_TYPE_VOICE_BURST_A:
+                if (packet->meta.voice_frame == 0) { /* burst A */
+                    packet->data_type = DMR_DATA_TYPE_VOICE_SYNC;
                     dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet);
-                    break;
+                } else { /* burst B-F */
+                    packet->data_type = DMR_DATA_TYPE_VOICE;
+                    // We let the other protocols take care of inserting the EMB LC,
+                    // because we have no src_id/dst_id anyway.
                 }
+                break;
 
-                // Track progress
-                modem->last_dmr_voice_frame = (modem->last_dmr_voice_frame + 1) % 6;
-                modem->last_dmr_slot_type = packet->slot_type;
-                gettimeofday(&modem->last_dmr_voice_packet_received, NULL);
+            default:
                 break;
             }
 
-            dmr_log_trace("mmdvm: rx %s", dmr_slot_type_name(packet->slot_type));
-            //dmr_proto_rx(&modem->proto, modem, packet);
+            // For the start of a new voice call, we prepend an (empty) LC header
+            if (packet->data_type == DMR_DATA_TYPE_VOICE_SYNC && reset) {
+                dmr_packet_t *header = talloc_zero(NULL, dmr_packet_t);
+                if (header == NULL) {
+                    return dmr_error(DMR_ENOMEM);
+                }
+
+                header->data_type = DMR_DATA_TYPE_VOICE_LC;
+                header->ts = packet->ts;
+                header->flco = packet->flco;
+                header->meta.sequence = packet->meta.sequence++;
+                dmr_log_trace("mmdvm: rx %s (prepended)", dmr_data_type_name(header->data_type));
+                dmr_proto_rx_cb_run(&modem->proto, header);
+            }
+
+            dmr_log_trace("mmdvm: rx %s", dmr_data_type_name(packet->data_type));
             dmr_proto_rx_cb_run(&modem->proto, packet);
+
+            // Cleanup
+            talloc_free(packet);
+
+            // Book keeping
+            gettimeofday(&modem->dmr_ts[ts].last_packet_received, NULL);
+            modem->dmr_ts[ts].last_data_type = packet->data_type;
+            modem->last_dmr_ts = ts;
+
             break;
 
         case DMR_MMDVM_DMR_LOST1:
-            dmr_log_debug("mmdvm: DMR lost TS1");
-            data = 1;
-            dmr_ring_write(modem->dmr_ts1_rx_buffer, &data, 1);
-            data = DMR_MMDVM_TAG_LOST;
-            dmr_ring_write(modem->dmr_ts1_rx_buffer, &data, 1);
-            break;
-
         case DMR_MMDVM_DMR_LOST2:
-            dmr_log_debug("mmdvm: DMR lost TS2");
-            data = 1;
-            dmr_ring_write(modem->dmr_ts2_rx_buffer, &data, 1);
-            data = DMR_MMDVM_TAG_LOST;
-            dmr_ring_write(modem->dmr_ts2_rx_buffer, &data, 1);
+            dmr_log_debug("mmdvm: DMR lost TS%u", modem->buffer[2] - DMR_MMDVM_DMR_LOST1 + 1);
+            ts = modem->buffer[2] - DMR_MMDVM_DMR_LOST1;
+
+            // Expire our last packet received and run the timeout handler.
+            modem->dmr_ts[ts].last_packet_received.tv_sec = 0;
+            dmr_mmdvm_poll_timeouts(modem);
             break;
 
         case DMR_MMDVM_GET_STATUS:
             dmr_log_debug("mmdvm: get status response");
-            modem->rx = (modem->buffer[5] & 0x01) == 0x01;
-            modem->adc_overflow = (modem->buffer[5] & 0x02) == 0x02;
-            modem->space.dstar = modem->buffer[6];
-            modem->space.dmr_ts1 = modem->buffer[7];
-            modem->space.dmr_ts2 = modem->buffer[8];
-            modem->space.ysf = modem->buffer[9];
             break;
 
         case DMR_MMDVM_GET_VERSION:
@@ -519,7 +547,6 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             break;
         }
 
-        modem->last_dmr_slot_type = modem->buffer[3];
         gettimeofday(&modem->last_packet_received, NULL);
     }
     return 0;
@@ -733,26 +760,7 @@ int dmr_mmdvm_free(dmr_mmdvm_t *modem)
         error = modem->error;
     }
 
-    if (modem->port != NULL)
-        free(modem->port);
-    if (modem->dstar_rx_buffer != NULL)
-        free(modem->dstar_rx_buffer);
-    if (modem->dstar_tx_buffer != NULL)
-        free(modem->dstar_tx_buffer);
-    if (modem->dmr_ts1_rx_buffer != NULL)
-        free(modem->dmr_ts1_rx_buffer);
-    if (modem->dmr_ts1_tx_buffer != NULL)
-        free(modem->dmr_ts1_tx_buffer);
-    if (modem->dmr_ts2_rx_buffer != NULL)
-        free(modem->dmr_ts2_rx_buffer);
-    if (modem->dmr_ts2_tx_buffer != NULL)
-        free(modem->dmr_ts2_tx_buffer);
-    if (modem->ysf_rx_buffer != NULL)
-        free(modem->ysf_rx_buffer);
-    if (modem->ysf_tx_buffer != NULL)
-        free(modem->ysf_tx_buffer);
-
-    free(modem);
+    talloc_free(modem);
     return error;
 }
 

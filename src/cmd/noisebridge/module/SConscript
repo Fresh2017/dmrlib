@@ -1,0 +1,59 @@
+import os
+import sys
+from scons_checks import CheckPKG
+
+Import('env')
+
+mod_python_env = env.Clone()
+mod_python_env.Append(
+	CPPPATH=[
+		'..',
+	],
+	CCFLAGS=[
+		'-Wno-missing-field-initializers',
+	],
+	LIBPATH=[
+		'#build/libdmr',
+	],
+	LIBS=[
+		'dmr',
+	],
+)
+
+mod_python_pkgs = []
+
+if sys.platform == 'darwin':
+	mod_python_pkgs = ()
+	mod_python_env.Append(
+		LDMODULEPREFIX='mod_',
+	)
+	mod_python_env.ParseConfig('/usr/bin/python-config --cflags --libs')
+
+if sys.platform == 'linux2':
+	mod_python_pkgs = ('python', 'python2', 'python2.7')
+	mod_python_env.Append(
+		LDMODULEPREFIX='mod_',
+	)
+
+if not env.GetOption('clean'):
+	mod_python_conf = Configure(mod_python_env, custom_tests={
+		'CheckPKG': CheckPKG,
+	})
+	if mod_python_pkgs:
+		found = False
+		for pkg in mod_python_pkgs:
+			if mod_python_conf.CheckPKG(pkg):
+				mod_python_env.ParseConfig('pkg-config --cflags --libs {0}'.format(pkg))
+				found = True
+				break
+		if not found:
+			print('could not find a suitable Python installation')
+			Exit(1)
+
+	else:
+		print('Skipping python version check...')
+
+	mod_python_env = mod_python_conf.Finish()
+
+mod_python = mod_python_env.LoadableModule('mod_python', 'python.c')
+Return(['mod_python'])

@@ -5,10 +5,10 @@
 typedef struct {
 	uint8_t error_locations[256];
 	uint8_t errors_num;
-} dmr_fec_rs_12_9_roots_t;
+} dmr_rs_12_9_roots_t;
 
 // See DMR AI. spec. page 138.
-static uint8_t dmr_fec_rs_12_9_galois_exp_table[256] = {
+static uint8_t dmr_rs_12_9_galois_exp_table[256] = {
 	0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1D, 0x3A, 0x74, 0xE8, 0xCD, 0x87, 0x13, 0x26,
 	0x4C, 0x98, 0x2D, 0x5A, 0xB4, 0x75, 0xEA, 0xC9, 0x8F, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xC0,
 	0x9D, 0x27, 0x4E, 0x9C, 0x25, 0x4A, 0x94, 0x35, 0x6A, 0xD4, 0xB5, 0x77, 0xEE, 0xC1, 0x9F, 0x23,
@@ -28,7 +28,7 @@ static uint8_t dmr_fec_rs_12_9_galois_exp_table[256] = {
 };
 
 // See DMR AI. spec. page 138.
-static uint8_t dmr_fec_rs_12_9_galois_log_table[256] = {
+static uint8_t dmr_rs_12_9_galois_log_table[256] = {
 	0,		0,		1,		25,		2,		50,		26,		198,	3,		223,	51,		238,	27,		104,	199,	75,
 	4,		100,	224,	14,		52,		141,	239,	129,	28,		193,	105,	248,	200,	8,		76,		113,
 	5,		138,	101,	47,		225,	36,		15,		33,		53,		147,	142,	218,	240,	18,		130,	69,
@@ -47,76 +47,76 @@ static uint8_t dmr_fec_rs_12_9_galois_log_table[256] = {
 	79,		174,	213,	233,	230,	231,	173,	232,	116,	214,	244,	234,	168,	80,		88,		175
 };
 
-static uint8_t dmr_fec_rs_12_9_galois_exp_table_get(uint8_t pos) {
-	return dmr_fec_rs_12_9_galois_exp_table[pos];
+static uint8_t dmr_rs_12_9_galois_exp_table_get(uint8_t pos) {
+	return dmr_rs_12_9_galois_exp_table[pos];
 }
 
-static uint8_t dmr_fec_rs_12_9_galois_multiplication(uint8_t a, uint8_t b) {
+static uint8_t dmr_rs_12_9_galois_multiplication(uint8_t a, uint8_t b) {
 	if (a == 0 || b == 0)
 		return 0;
 
-	return dmr_fec_rs_12_9_galois_exp_table[(dmr_fec_rs_12_9_galois_log_table[a] + dmr_fec_rs_12_9_galois_log_table[b]) % 255];
+	return dmr_rs_12_9_galois_exp_table[(dmr_rs_12_9_galois_log_table[a] + dmr_rs_12_9_galois_log_table[b]) % 255];
 }
 
-static uint8_t dmr_fec_rs_12_9_galois_inv(uint8_t elt) {
-	return dmr_fec_rs_12_9_galois_exp_table[255-dmr_fec_rs_12_9_galois_log_table[elt]];
+static uint8_t dmr_rs_12_9_galois_inv(uint8_t elt) {
+	return dmr_rs_12_9_galois_exp_table[255-dmr_rs_12_9_galois_log_table[elt]];
 }
 
 // Multiply by z (shift right by 1).
-static void dmr_fec_rs_12_9_multiply_poly_z(dmr_fec_rs_12_9_poly_t *poly) {
+static void dmr_rs_12_9_multiply_poly_z(dmr_rs_12_9_poly_t *poly) {
 	uint8_t i;
 
-	for (i = DMR_FEC_RS_12_9_POLY_MAXDEG-1; i > 0; i--)
+	for (i = DMR_RS_12_9_POLY_MAXDEG-1; i > 0; i--)
 		poly->data[i] = poly->data[i-1];
 	poly->data[0] = 0;
 }
 
-static void dmr_fec_rs_12_9_multiplicate_polys(uint8_t dst[], dmr_fec_rs_12_9_poly_t *p1, dmr_fec_rs_12_9_poly_t *p2) {
+static void dmr_rs_12_9_multiplicate_polys(uint8_t dst[], dmr_rs_12_9_poly_t *p1, dmr_rs_12_9_poly_t *p2) {
 	uint8_t i;
 	int8_t j;
-	int8_t tmp1[DMR_FEC_RS_12_9_POLY_MAXDEG*2];
+	int8_t tmp1[DMR_RS_12_9_POLY_MAXDEG*2];
 
-	for (i = 0; i < DMR_FEC_RS_12_9_POLY_MAXDEG*2; i++)
+	for (i = 0; i < DMR_RS_12_9_POLY_MAXDEG*2; i++)
 		dst[i] = 0;
 
-	for (i = 0; i < DMR_FEC_RS_12_9_POLY_MAXDEG; i++) {
-		for(j = DMR_FEC_RS_12_9_POLY_MAXDEG; j < (DMR_FEC_RS_12_9_POLY_MAXDEG*2); j++)
+	for (i = 0; i < DMR_RS_12_9_POLY_MAXDEG; i++) {
+		for(j = DMR_RS_12_9_POLY_MAXDEG; j < (DMR_RS_12_9_POLY_MAXDEG*2); j++)
 			tmp1[j] = 0;
 
 		// Scale tmp1 by p1[i]
-		for(j = 0; j < DMR_FEC_RS_12_9_POLY_MAXDEG; j++)
-			tmp1[j] = dmr_fec_rs_12_9_galois_multiplication(p2->data[j], p1->data[i]);
+		for(j = 0; j < DMR_RS_12_9_POLY_MAXDEG; j++)
+			tmp1[j] = dmr_rs_12_9_galois_multiplication(p2->data[j], p1->data[i]);
 
 		// Shift (multiply) tmp1 right by i
-		for (j = (DMR_FEC_RS_12_9_POLY_MAXDEG*2)-1; j >= i; j--)
+		for (j = (DMR_RS_12_9_POLY_MAXDEG*2)-1; j >= i; j--)
 			tmp1[j] = tmp1[j-i];
 		for (j = 0; j < i; j++)
 			tmp1[j] = 0;
 
 		// Add into partial product.
-		for (j = 0; j < (DMR_FEC_RS_12_9_POLY_MAXDEG*2); j++)
+		for (j = 0; j < (DMR_RS_12_9_POLY_MAXDEG*2); j++)
 			dst[j] ^= tmp1[j];
 	}
 }
 
 // Computes the combined erasure/error evaluator polynomial (error_locator_poly*syndrome mod z^4)
-static void dmr_fec_rs_12_9_calc_error_evaluator_poly(dmr_fec_rs_12_9_poly_t *error_locator_poly, dmr_fec_rs_12_9_poly_t *syndrome, dmr_fec_rs_12_9_poly_t *error_evaluator_poly) {
+static void dmr_rs_12_9_calc_error_evaluator_poly(dmr_rs_12_9_poly_t *error_locator_poly, dmr_rs_12_9_poly_t *syndrome, dmr_rs_12_9_poly_t *error_evaluator_poly) {
 	uint8_t i;
-	uint8_t product[DMR_FEC_RS_12_9_POLY_MAXDEG*2];
+	uint8_t product[DMR_RS_12_9_POLY_MAXDEG*2];
 
-	dmr_fec_rs_12_9_multiplicate_polys(product, error_locator_poly, syndrome);
-	for (i = 0; i < DMR_FEC_RS_12_9_CHECKSUMSIZE; i++)
+	dmr_rs_12_9_multiplicate_polys(product, error_locator_poly, syndrome);
+	for (i = 0; i < DMR_RS_12_9_CHECKSUMSIZE; i++)
 		error_evaluator_poly->data[i] = product[i];
-	for (; i < DMR_FEC_RS_12_9_POLY_MAXDEG; i++)
+	for (; i < DMR_RS_12_9_POLY_MAXDEG; i++)
 		error_evaluator_poly->data[i] = 0;
 }
 
-static uint8_t dmr_fec_rs_12_9_compute_discrepancy(dmr_fec_rs_12_9_poly_t *error_locator_poly, dmr_fec_rs_12_9_poly_t *syndrome, uint8_t L, uint8_t n) {
+static uint8_t dmr_rs_12_9_compute_discrepancy(dmr_rs_12_9_poly_t *error_locator_poly, dmr_rs_12_9_poly_t *syndrome, uint8_t L, uint8_t n) {
 	uint8_t i;
 	uint8_t sum = 0;
 
 	for (i = 0; i <= L; i++)
-		sum ^= dmr_fec_rs_12_9_galois_multiplication(error_locator_poly->data[i], syndrome->data[n-i]);
+		sum ^= dmr_rs_12_9_galois_multiplication(error_locator_poly->data[i], syndrome->data[n-i]);
 
 	return sum;
 }
@@ -124,65 +124,65 @@ static uint8_t dmr_fec_rs_12_9_compute_discrepancy(dmr_fec_rs_12_9_poly_t *error
 // This finds the coefficients of the error locator polynomial, and then calculates
 // the error evaluator polynomial using the Berlekamp-Massey algorithm.
 // From  Cain, Clark, "Error-Correction Coding For Digital Communications", pp. 216.
-static void dmr_fec_rs_12_9_calculate(dmr_fec_rs_12_9_poly_t *syndrome, dmr_fec_rs_12_9_poly_t *error_locator_poly, dmr_fec_rs_12_9_poly_t *error_evaluator_poly) {
+static void dmr_rs_12_9_calculate(dmr_rs_12_9_poly_t *syndrome, dmr_rs_12_9_poly_t *error_locator_poly, dmr_rs_12_9_poly_t *error_evaluator_poly) {
 	uint8_t n;
 	uint8_t L = 0;
 	uint8_t L2;
 	int8_t k;
 	uint8_t d;
 	uint8_t i;
-	uint8_t psi2[DMR_FEC_RS_12_9_POLY_MAXDEG];
-	dmr_fec_rs_12_9_poly_t D = { .data = { 0, 1, 0, } };
+	uint8_t psi2[DMR_RS_12_9_POLY_MAXDEG];
+	dmr_rs_12_9_poly_t D = { .data = { 0, 1, 0, } };
 
 	k = -1;
-	memset(error_locator_poly, 0, sizeof(dmr_fec_rs_12_9_poly_t));
+	memset(error_locator_poly, 0, sizeof(dmr_rs_12_9_poly_t));
 	error_locator_poly->data[0] = 1;
 
-	for (n = 0; n < DMR_FEC_RS_12_9_CHECKSUMSIZE; n++) {
-		d = dmr_fec_rs_12_9_compute_discrepancy(error_locator_poly, syndrome, L, n);
+	for (n = 0; n < DMR_RS_12_9_CHECKSUMSIZE; n++) {
+		d = dmr_rs_12_9_compute_discrepancy(error_locator_poly, syndrome, L, n);
 
 		if (d != 0) {
 			// psi2 = error_locator_poly - d*D
-			for (i = 0; i < DMR_FEC_RS_12_9_POLY_MAXDEG; i++)
-				psi2[i] = error_locator_poly->data[i] ^ dmr_fec_rs_12_9_galois_multiplication(d, D.data[i]);
+			for (i = 0; i < DMR_RS_12_9_POLY_MAXDEG; i++)
+				psi2[i] = error_locator_poly->data[i] ^ dmr_rs_12_9_galois_multiplication(d, D.data[i]);
 
 			if (L < (n-k)) {
 				L2 = n-k;
 				k = n-L;
 
-				for (i = 0; i < DMR_FEC_RS_12_9_POLY_MAXDEG; i++)
-					D.data[i] = dmr_fec_rs_12_9_galois_multiplication(error_locator_poly->data[i], dmr_fec_rs_12_9_galois_inv(d));
+				for (i = 0; i < DMR_RS_12_9_POLY_MAXDEG; i++)
+					D.data[i] = dmr_rs_12_9_galois_multiplication(error_locator_poly->data[i], dmr_rs_12_9_galois_inv(d));
 
 				L = L2;
 			}
 
 			// error_locator_poly = psi2
-			for (i = 0; i < DMR_FEC_RS_12_9_POLY_MAXDEG; i++)
+			for (i = 0; i < DMR_RS_12_9_POLY_MAXDEG; i++)
 				error_locator_poly->data[i] = psi2[i];
 		}
 
-		dmr_fec_rs_12_9_multiply_poly_z(&D);
+		dmr_rs_12_9_multiply_poly_z(&D);
 	}
 
-	dmr_fec_rs_12_9_calc_error_evaluator_poly(error_locator_poly, syndrome, error_evaluator_poly);
+	dmr_rs_12_9_calc_error_evaluator_poly(error_locator_poly, syndrome, error_evaluator_poly);
 }
 
 // The error-locator polynomial's roots are found by looking for the values of a^n where
-// evaluating the polynomial yields zero (evaluating dmr_fec_rs_12_9_error_locator_poly at
+// evaluating the polynomial yields zero (evaluating dmr_rs_12_9_error_locator_poly at
 // successive values of alpha (Chien's search)).
-static dmr_fec_rs_12_9_roots_t *dmr_fec_rs_12_9_find_roots(dmr_fec_rs_12_9_poly_t *error_locator_poly) {
-	static dmr_fec_rs_12_9_roots_t roots;
+static dmr_rs_12_9_roots_t *dmr_rs_12_9_find_roots(dmr_rs_12_9_poly_t *error_locator_poly) {
+	static dmr_rs_12_9_roots_t roots;
 	uint8_t sum;
 	uint16_t r;
 	uint8_t k;
 
-	memset(&roots, 0, sizeof(dmr_fec_rs_12_9_roots_t));
+	memset(&roots, 0, sizeof(dmr_rs_12_9_roots_t));
 
 	for (r = 1; r < 256; r++) {
 		sum = 0;
-		// Evaluate dmr_fec_rs_12_9_error_locator_poly at r
-		for (k = 0; k < DMR_FEC_RS_12_9_CHECKSUMSIZE+1; k++)
-			sum ^= dmr_fec_rs_12_9_galois_multiplication(dmr_fec_rs_12_9_galois_exp_table_get((k*r) % 255), error_locator_poly->data[k]);
+		// Evaluate dmr_rs_12_9_error_locator_poly at r
+		for (k = 0; k < DMR_RS_12_9_CHECKSUMSIZE+1; k++)
+			sum ^= dmr_rs_12_9_galois_multiplication(dmr_rs_12_9_galois_exp_table_get((k*r) % 255), error_locator_poly->data[k]);
 
 		if (sum == 0)
 			roots.error_locations[roots.errors_num++] = (255-r);
@@ -190,19 +190,19 @@ static dmr_fec_rs_12_9_roots_t *dmr_fec_rs_12_9_find_roots(dmr_fec_rs_12_9_poly_
 	return &roots;
 }
 
-void dmr_fec_rs_12_9_calc_syndrome(dmr_fec_rs_12_9_codeword_t *codeword, dmr_fec_rs_12_9_poly_t *syndrome) {
+void dmr_rs_12_9_calc_syndrome(dmr_rs_12_9_codeword_t *codeword, dmr_rs_12_9_poly_t *syndrome) {
 	uint8_t i, j;
 
 	syndrome->data[0] = syndrome->data[1] = syndrome->data[2] = 0;
 
 	for (j = 0; j < 3;  j++) {
-		for (i = 0; i < sizeof(dmr_fec_rs_12_9_codeword_t); i++)
-			syndrome->data[j] = codeword->data[i] ^ dmr_fec_rs_12_9_galois_multiplication(dmr_fec_rs_12_9_galois_exp_table_get(j+1), syndrome->data[j]);
+		for (i = 0; i < sizeof(dmr_rs_12_9_codeword_t); i++)
+			syndrome->data[j] = codeword->data[i] ^ dmr_rs_12_9_galois_multiplication(dmr_rs_12_9_galois_exp_table_get(j+1), syndrome->data[j]);
 	}
 }
 
 // Returns 1 if syndrome differs from all zeroes.
-bool dmr_fec_rs_12_9_check_syndrome(dmr_fec_rs_12_9_poly_t *syndrome) {
+bool dmr_rs_12_9_check_syndrome(dmr_rs_12_9_poly_t *syndrome) {
 	uint8_t i;
 
 	for (i = 0; i < 3; i++) {
@@ -214,71 +214,71 @@ bool dmr_fec_rs_12_9_check_syndrome(dmr_fec_rs_12_9_poly_t *syndrome) {
 }
 // Returns 1 if errors have been found and corrected, returns 0 if
 // no errors found or errors can't be corrected.
-dmr_fec_rs_12_9_correct_errors_result_t dmr_fec_rs_12_9_correct_errors(dmr_fec_rs_12_9_codeword_t *codeword, dmr_fec_rs_12_9_poly_t *syndrome, uint8_t *errors_found) {
+dmr_rs_12_9_correct_errors_result_t dmr_rs_12_9_correct_errors(dmr_rs_12_9_codeword_t *codeword, dmr_rs_12_9_poly_t *syndrome, uint8_t *errors_found) {
 	uint8_t r;
 	uint8_t i;
 	uint8_t j;
 	uint8_t err;
-	dmr_fec_rs_12_9_poly_t error_locator_poly;
-	dmr_fec_rs_12_9_poly_t error_evaluator_poly;
-	dmr_fec_rs_12_9_roots_t *roots;
+	dmr_rs_12_9_poly_t error_locator_poly;
+	dmr_rs_12_9_poly_t error_evaluator_poly;
+	dmr_rs_12_9_roots_t *roots;
 	uint8_t num, denom;
 
-	dmr_fec_rs_12_9_calculate(syndrome, &error_locator_poly, &error_evaluator_poly);
-	roots = dmr_fec_rs_12_9_find_roots(&error_locator_poly);
+	dmr_rs_12_9_calculate(syndrome, &error_locator_poly, &error_evaluator_poly);
+	roots = dmr_rs_12_9_find_roots(&error_locator_poly);
 	*errors_found = roots->errors_num;
 
 	if (roots->errors_num == 0)
-		return DMR_FEC_RS_12_9_CORRECT_ERRORS_RESULT_NO_ERRORS_FOUND;
+		return DMR_RS_12_9_CORRECT_ERRORS_RESULT_NO_ERRORS_FOUND;
 
 	// Error correction is done using the error-evaluator equation on pp 207.
-	if (roots->errors_num > 0 && roots->errors_num <= DMR_FEC_RS_12_9_CHECKSUMSIZE) {
+	if (roots->errors_num > 0 && roots->errors_num <= DMR_RS_12_9_CHECKSUMSIZE) {
 		// First check for illegal error locations.
 		for (r = 0; r < roots->errors_num; r++) {
-			if (roots->error_locations[r] >= DMR_FEC_RS_12_9_DATASIZE+DMR_FEC_RS_12_9_CHECKSUMSIZE)
-				return DMR_FEC_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CANT_BE_CORRECTED;
+			if (roots->error_locations[r] >= DMR_RS_12_9_DATASIZE+DMR_RS_12_9_CHECKSUMSIZE)
+				return DMR_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CANT_BE_CORRECTED;
 		}
 
-		// Evaluates dmr_fec_rs_12_9_error_evaluator_poly/dmr_fec_rs_12_9_error_locator_poly' at the roots
+		// Evaluates dmr_rs_12_9_error_evaluator_poly/dmr_rs_12_9_error_locator_poly' at the roots
 		// alpha^(-i) for error locs i.
 		for (r = 0; r < roots->errors_num; r++) {
 			i = roots->error_locations[r];
 
-			// Evaluate dmr_fec_rs_12_9_error_evaluator_poly at alpha^(-i)
+			// Evaluate dmr_rs_12_9_error_evaluator_poly at alpha^(-i)
 			num = 0;
-			for (j = 0; j < DMR_FEC_RS_12_9_POLY_MAXDEG; j++)
-				num ^= dmr_fec_rs_12_9_galois_multiplication(error_evaluator_poly.data[j], dmr_fec_rs_12_9_galois_exp_table_get(((255-i)*j) % 255));
+			for (j = 0; j < DMR_RS_12_9_POLY_MAXDEG; j++)
+				num ^= dmr_rs_12_9_galois_multiplication(error_evaluator_poly.data[j], dmr_rs_12_9_galois_exp_table_get(((255-i)*j) % 255));
 
-			// Evaluate dmr_fec_rs_12_9_error_evaluator_poly' (derivative) at alpha^(-i). All odd powers disappear.
+			// Evaluate dmr_rs_12_9_error_evaluator_poly' (derivative) at alpha^(-i). All odd powers disappear.
 			denom = 0;
-			for (j = 1; j < DMR_FEC_RS_12_9_POLY_MAXDEG; j += 2)
-				denom ^= dmr_fec_rs_12_9_galois_multiplication(error_locator_poly.data[j], dmr_fec_rs_12_9_galois_exp_table_get(((255-i)*(j-1)) % 255));
+			for (j = 1; j < DMR_RS_12_9_POLY_MAXDEG; j += 2)
+				denom ^= dmr_rs_12_9_galois_multiplication(error_locator_poly.data[j], dmr_rs_12_9_galois_exp_table_get(((255-i)*(j-1)) % 255));
 
-			err = dmr_fec_rs_12_9_galois_multiplication(num, dmr_fec_rs_12_9_galois_inv(denom));
-			codeword->data[sizeof(dmr_fec_rs_12_9_codeword_t)-i-1] ^= err;
+			err = dmr_rs_12_9_galois_multiplication(num, dmr_rs_12_9_galois_inv(denom));
+			codeword->data[sizeof(dmr_rs_12_9_codeword_t)-i-1] ^= err;
 		}
-		return DMR_FEC_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CORRECTED;
+		return DMR_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CORRECTED;
 	}
 
-	return DMR_FEC_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CANT_BE_CORRECTED;
+	return DMR_RS_12_9_CORRECT_ERRORS_RESULT_ERRORS_CANT_BE_CORRECTED;
 }
 
 // Simulates an LFSR with the generator polynomial and calculates checksum bytes for the given data.
-dmr_fec_rs_12_9_checksum_t *dmr_fec_rs_12_9_calc_checksum(dmr_fec_rs_12_9_codeword_t *codeword) {
+dmr_rs_12_9_checksum_t *dmr_rs_12_9_calc_checksum(dmr_rs_12_9_codeword_t *codeword) {
 	// See DMR AI. spec. page 136 for these coefficients.
 	static uint8_t genpoly[] = { 0x40, 0x38, 0x0e, 0x01 };
-	static dmr_fec_rs_12_9_checksum_t dmr_fec_rs_12_9_checksum;
+	static dmr_rs_12_9_checksum_t dmr_rs_12_9_checksum;
 	uint8_t i;
 	uint8_t feedback;
 
-	dmr_fec_rs_12_9_checksum.bytes[0] = dmr_fec_rs_12_9_checksum.bytes[1] = dmr_fec_rs_12_9_checksum.bytes[2] = 0;
+	dmr_rs_12_9_checksum.bytes[0] = dmr_rs_12_9_checksum.bytes[1] = dmr_rs_12_9_checksum.bytes[2] = 0;
 
 	for (i = 0; i < 9; i++) {
-		feedback = codeword->data[i] ^ dmr_fec_rs_12_9_checksum.bytes[0];
+		feedback = codeword->data[i] ^ dmr_rs_12_9_checksum.bytes[0];
 
-		dmr_fec_rs_12_9_checksum.bytes[0] = dmr_fec_rs_12_9_checksum.bytes[1] ^ dmr_fec_rs_12_9_galois_multiplication(genpoly[2], feedback);
-		dmr_fec_rs_12_9_checksum.bytes[1] = dmr_fec_rs_12_9_checksum.bytes[2] ^ dmr_fec_rs_12_9_galois_multiplication(genpoly[1], feedback);
-		dmr_fec_rs_12_9_checksum.bytes[2] = dmr_fec_rs_12_9_galois_multiplication(genpoly[0], feedback);
+		dmr_rs_12_9_checksum.bytes[0] = dmr_rs_12_9_checksum.bytes[1] ^ dmr_rs_12_9_galois_multiplication(genpoly[2], feedback);
+		dmr_rs_12_9_checksum.bytes[1] = dmr_rs_12_9_checksum.bytes[2] ^ dmr_rs_12_9_galois_multiplication(genpoly[1], feedback);
+		dmr_rs_12_9_checksum.bytes[2] = dmr_rs_12_9_galois_multiplication(genpoly[0], feedback);
 	}
-	return &dmr_fec_rs_12_9_checksum;
+	return &dmr_rs_12_9_checksum;
 }

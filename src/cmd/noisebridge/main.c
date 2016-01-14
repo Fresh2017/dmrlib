@@ -35,14 +35,15 @@ int main(int argc, char **argv)
     config = load_config();
     dmr_log_priority_set(config->log_level);
 
-    if (!init_audio()) {
-        status = 1;
-        goto bail;
-    }
-
-    if (!boot_audio()) {
-        status = 1;
-        goto bail;
+    if (config->audio_needed) {
+        if (!init_audio()) {
+            status = 1;
+            goto bail;
+        }
+        if (!boot_audio()) {
+            status = 1;
+            goto bail;
+        }
     }
 
     if (!init_repeater()) {
@@ -57,7 +58,9 @@ int main(int argc, char **argv)
 
 bail:
     kill_config();
-    kill_audio();
+
+    if (config->audio_needed)
+        kill_audio();
 
     return status;
 }

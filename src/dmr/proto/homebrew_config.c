@@ -10,12 +10,13 @@ static const char *dmr_package_id = "git:dmrlib-20160112";
 static const char *dmr_location = "Unknown";
 static const char *dmr_description = "dmrlib by PD0MZ";
 static const char *dmr_url = "https://github.com/pd0mz";
+static const char hb_rptc[4] = {'R', 'P', 'T', 'C'};
 
-#define CONFIG_VAR(buf, fmt, arg) do {                              \
-    char tmp[sizeof(buf) + 1];                                      \
-    snprintf(tmp, sizeof(tmp), fmt, arg);                           \
-    memcpy(buf, tmp, sizeof(buf));                                  \
-    dmr_log_debug("homebrew: config " #arg " = " #fmt, arg); \
+#define CONFIG_VAR(d, f, a) do {                                          \
+    dmr_log_trace("homebrew: config " #a " = " #f " (%d)", a, sizeof(d)); \
+    char tmp[sizeof(d) + 1];                                              \
+    snprintf(tmp, sizeof(tmp), f, a);                                     \
+    memcpy(d, tmp, sizeof(d));                                            \
 } while (0)
 
 void dmr_homebrew_config_init(dmr_homebrew_config_t *config)
@@ -24,7 +25,7 @@ void dmr_homebrew_config_init(dmr_homebrew_config_t *config)
     memset(config, 0, sizeof(dmr_homebrew_config_t));
 
     // Defaults
-    memcpy(config->signature, "RPTC", 4);
+    memcpy(config->signature, hb_rptc, sizeof(hb_rptc));
     dmr_homebrew_config_repeater_id(config, 0);
     dmr_homebrew_config_tx_power(config, 0);
     dmr_homebrew_config_rx_freq(config, 0);

@@ -198,10 +198,11 @@ int dmr_serial_write(dmr_serial_t fd, void *buf, size_t len)
 
 int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len, struct timeval *timeout)
 {
-    if (timeout == NULL)
+    if (timeout == NULL) {
         dmr_log_trace("serial: read %d", len);
-    else
+    } else {
         dmr_log_trace("serial: read %d in %ld.%06ld", len, timeout->tv_sec, timeout->tv_usec);
+    }
 
     if (len == 0)
         return 0;

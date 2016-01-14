@@ -100,6 +100,9 @@ dmr_log_priority_t dmr_log_priority(void)
 
 void dmr_log_priority_set(dmr_log_priority_t priority)
 {
+    if (priority == log_priority)
+        return;
+        
     log_priority = min(DMR_LOG_PRIORITY_TRACE, max(priority, DMR_LOG_PRIORITIES - 1));
     dmr_log_info("log: priority set to %s", dmr_log_priority_names[log_priority]);
 }
@@ -127,6 +130,7 @@ void dmr_log(const char *fmt, ...)
     va_end(ap);
 }
 
+#if defined(DMR_DEBUG)
 void dmr_log_trace(const char *fmt, ...)
 {
     va_list ap;
@@ -134,6 +138,7 @@ void dmr_log_trace(const char *fmt, ...)
     dmr_log_messagev(DMR_LOG_PRIORITY_TRACE, fmt, ap);
     va_end(ap);
 }
+#endif
 
 void dmr_log_debug(const char *fmt, ...)
 {

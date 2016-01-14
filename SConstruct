@@ -1,14 +1,8 @@
+import glob
 import os
 import sys
 
-def generate_config_h(target, source, env):
-    print(env.Dictionary())
-    for dst, src in zip(target, source):
-        config_h = open(str(dst), 'w')
-        config_t = open(str(src), 'r')
-        config_h.write(config_t.read() % env.Dictionary())
-        config_t.close()
-        config_h.close()
+from scons_generate import GenerateHeader
 
 env = Environment(
     BUILDDIR='#build',
@@ -61,6 +55,10 @@ env.Append(
     WITH_DMALLOC=int(GetOption('with_dmalloc')),
 )
 
+required_libs_with_header = (
+    (1, 'talloc', 'talloc.h', 'c'),
+)
+
 if GetOption('with_debug'):
     env.Append(
         CCFLAGS=[
@@ -84,6 +82,7 @@ if GetOption('with_dmalloc'):
             'WITH_DMALLOC',
         ],
     )
+    required_libs_with_header += ((0, 'dmalloc', 'dmalloc.h', 'c'),)
 
 if sys.platform == 'darwin':
     env.ParseConfig('pkg-config --cflags --libs talloc')
@@ -113,11 +112,6 @@ if sys.platform == 'win32':
 
 Export('env')
 
-env.AlwaysBuild(env.Command(
-    'include/dmr/config.h',
-    'include/dmr/config.h.in',
-    generate_config_h))
-
 if GetOption('enable_all') or GetOption('enable_proto_mbe'):
     mbelib = env.SConscript(
         os.path.join('src', 'mbelib', 'SConscript'),
@@ -125,6 +119,31 @@ if GetOption('enable_all') or GetOption('enable_proto_mbe'):
         duplicate=0,
     )
     env.Install('dist', mbelib)
+
+if sys.platform in ('darwin', 'linux2'):
+    required_libs_with_header += (
+        (1, 'pthread', 'pthread.h', 'c'),
+    )
+
+if not env.GetOption('clean'):
+    conf = Configure(env)
+    for required, lib, header, compiler in required_libs_with_header:
+        result = {}
+        if conf.CheckLibWithHeader(lib, header, compiler):
+            result['HAVE_' + lib.upper()] = 1
+        elif required:
+            print(lib + ' is required')
+            Exit(1)
+        else:
+            result['HAVE_' + lib.upper()] = 0
+
+        conf.env.Append(**result)
+    env = conf.Finish()
+
+env.AlwaysBuild(env.Command(
+    'include/dmr/config.h',
+    'include/dmr/config.h.in',
+    GenerateHeader))
 
 dmr = env.SConscript(
     os.path.join('src', 'dmr', 'SConscript'),
@@ -170,6 +189,16 @@ if sys.platform in ('darwin', 'linux2'):
     )
     env.Install('dist', noisebridge)
     env.Depends(noisebridge, dmr)
+
+    '''
+    noisebridge_modules = env.SConscript(
+        os.path.join('src', 'cmd', 'noisebridge', 'module', 'SConscript'),
+        variant_dir='build/cmd/noisebridge/module',
+        duplicate=0,
+    )
+    env.Install(os.path.join('dist', 'module'), noisebridge_modules)
+    env.Depends(noisebridge_modules, dmr)
+    '''
 
 if sys.platform == 'win32':
     for dst, src in (

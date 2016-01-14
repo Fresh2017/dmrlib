@@ -11,6 +11,7 @@
 
 #include <dmr/proto.h>
 #include <dmr/packet.h>
+#include <dmr/fec/vbptc_16_11.h>
 
 struct dmr_repeater_s;
 typedef struct dmr_repeater_s dmr_repeater_t;
@@ -28,19 +29,21 @@ typedef struct dmr_repeater_slot_s {
 } dmr_repeater_slot_t;
 
 typedef struct dmr_repeater_timeslot_s {
-    dmr_slot_type_t last_slot_type;
-    dmr_id_t        src_id, dst_id;
-    bool            voice_call_active;
-    uint8_t         voice_frame;
-    bool            data_call_active;
+    dmr_data_type_t   last_data_type;
+    dmr_id_t          src_id, dst_id;
+    bool              voice_call_active;
+    uint8_t           voice_frame;
+    bool              data_call_active;
+    dmr_vbptc_16_11_t *vbptc_emb_lc;
 } dmr_repeater_timeslot_t;
 
 struct dmr_repeater_s {
-    dmr_proto_t          proto;
-    dmr_repeater_route_t route;
-    dmr_repeater_slot_t  slot[DMR_REPEATER_MAX_SLOTS];
-    size_t               slots;
-    dmr_color_code_t     color_code;
+    dmr_proto_t             proto;
+    dmr_repeater_route_t    route;
+    dmr_repeater_slot_t     slot[DMR_REPEATER_MAX_SLOTS];
+    size_t                  slots;
+    dmr_repeater_timeslot_t ts[2];
+    dmr_color_code_t        color_code;
 };
 
 /** Create a new repeater. */

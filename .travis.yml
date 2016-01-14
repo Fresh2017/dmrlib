@@ -1,0 +1,12 @@
+language: c
+
+compiler:
+  - clang
+  - gcc
+
+install:
+  - libtalloc-dev
+  - libpcap-dev
+  - portaudio-dev
+
+script: scons --with-debug --enable-all

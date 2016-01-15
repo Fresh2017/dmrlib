@@ -85,12 +85,12 @@ if not env.GetOption('clean'):
             features.append(feature)
     for required, lib, header, compiler in required_libs_with_header:
         if conf.CheckLibWithHeader(lib, header, compiler):
-            conf.env.Append{**{'HAVE_' + lib.upper(): 1}}
+            conf.env.Append(**{'HAVE_' + lib.upper(): 1})
         elif required:
             print(lib + ' is required')
             Exit(1)
         else:
-            conf.env.Append{**{'HAVE_' + lib.upper(): 0}}
+            conf.env.Append(**{'HAVE_' + lib.upper(): 0})
         features.append(feature)
 
     localenv = conf.Finish()

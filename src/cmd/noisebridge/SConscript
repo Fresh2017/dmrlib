@@ -82,7 +82,9 @@ if not env.GetOption('clean'):
 
     for feature, source in testcode.items():
         if conf.CheckCompileSource(feature, source):
-            features.append(feature)
+            conf.env.Append(**{'HAVE_' + feature.upper(): 1})
+        else:
+            conf.env.Append(**{'HAVE_' + feature.upper(): 0})
     for required, lib, header, compiler in required_libs_with_header:
         if conf.CheckLibWithHeader(lib, header, compiler):
             conf.env.Append(**{'HAVE_' + lib.upper(): 1})

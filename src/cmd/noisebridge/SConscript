@@ -93,7 +93,6 @@ if not env.GetOption('clean'):
             Exit(1)
         else:
             conf.env.Append(**{'HAVE_' + lib.upper(): 0})
-        features.append(feature)
 
     localenv = conf.Finish()
 

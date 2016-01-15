@@ -3,6 +3,9 @@
 *.ko
 *.obj
 *.elf
+*.pyc
+*.pyo
+__pycache__
 
 # Precompiled Headers
 *.gch

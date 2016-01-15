@@ -52,7 +52,7 @@ if sys.platform == 'linux2':
     )
 
     required_libs_with_header += (
-        (1, 'dl', 'dlfcn.h', 'c'),
+        (0, 'dl', 'dlfcn.h', 'c'),
     )
 
 if sys.platform == 'darwin':
@@ -80,26 +80,20 @@ if not env.GetOption('clean'):
         'CheckCompileSource': CheckCompileSource,
     })
 
-    features = []
     for feature, source in testcode.items():
         if conf.CheckCompileSource(feature, source):
             features.append(feature)
     for required, lib, header, compiler in required_libs_with_header:
         if conf.CheckLibWithHeader(lib, header, compiler):
-            conf.env._Have(lib, 1)
+            conf.env.Append{**{'HAVE_' + lib.upper(): 1}}
         elif required:
             print(lib + ' is required')
             Exit(1)
         else:
-            conf.env._Have(lib, 0)
+            conf.env.Append{**{'HAVE_' + lib.upper(): 0}}
         features.append(feature)
 
     localenv = conf.Finish()
-    localenv.Append(
-        CPPDEFINES=[
-            'HAVE_' + feature.upper() for feature in features
-        ]
-    )
 
 
 '''

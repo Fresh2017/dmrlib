@@ -1,12 +1,14 @@
 # dmrlib
 C library for Digital Mobile Radio
 
+[![Build Status](https://travis-ci.org/pd0mz/dmrlib.svg?branch=master)](https://travis-ci.org/pd0mz/dmrlib)
+
 # About
 
 `dmrlib` is a C library for building Digital Mobile Radio applications,
 included are a couple of utilities that build on `dmrlib`.
 
-**These applications are for educational purposes and should be used by 
+**These applications are for educational purposes and should be used by
 licensed HAM radio operators, commercial use is strictly prohibited.**
 
 # Compiling

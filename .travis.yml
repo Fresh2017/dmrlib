@@ -11,4 +11,4 @@ addons:
       - libpcap-dev
       - portaudio-dev
 
-script: scons --with-debug || cat config.log
+script: scons --with-debug || (cat config.log && false)

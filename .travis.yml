@@ -13,4 +13,4 @@ addons:
 
 cache: apt
 
-script: scons --with-debug || (cat config.log && false)
+script: scons --with-debug CC=$CC || (cat config.log && false)

@@ -13,15 +13,21 @@ int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet)
     if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-#ifdef DMR_DEBUG
-    assert(sizeof(dmr_emb_t) == 2);
-#endif
-    memset(emb, 0, sizeof(dmr_emb_t));
-    emb->bytes[0]  = (packet->payload[13] << 4) & 0xf0U;
-    emb->bytes[0] |= (packet->payload[14] >> 4) & 0x0fU;
-    emb->bytes[1]  = (packet->payload[18] << 4) & 0xf0U;
-    emb->bytes[1] |= (packet->payload[19] >> 4) & 0x0fU;
-    //dmr_fec_qr_16_7_decode(emb->bytes);
+    uint8_t emb_bytes[2];
+    memset(emb_bytes, 0, sizeof(emb_bytes));
+    emb_bytes[0]  = (packet->payload[13] << 4) & 0xf0U;
+    emb_bytes[0] |= (packet->payload[14] >> 4) & 0x0fU;
+    emb_bytes[1]  = (packet->payload[18] << 4) & 0xf0U;
+    emb_bytes[1] |= (packet->payload[19] >> 4) & 0x0fU;
+    if (!dmr_qr_16_7_decode(emb_bytes)) {
+        dmr_log_debug("emb: qr_16_7 checksum failed");
+        return -1;
+    }
+
+    emb->color_code = ((emb_bytes[0] >> 0) & 0x0f);
+    emb->pi         = ((emb_bytes[0] >> 4) & 0x01) == 0x01;
+    emb->lcss       = ((emb_bytes[0] >> 5) & 0x03);
+
     return 0;
 }
 
@@ -30,11 +36,17 @@ int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
     if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-    dmr_fec_qr_16_7_encode(emb->bytes);
-    packet->payload[13] = (packet->payload[13] & 0xf0U) | (emb->bytes[0] >> 4);
-    packet->payload[14] = (packet->payload[14] & 0x0fU) | (emb->bytes[0] << 4);
-    packet->payload[18] = (packet->payload[18] & 0xf0U) | (emb->bytes[1] >> 4);
-    packet->payload[19] = (packet->payload[19] & 0x0fU) | (emb->bytes[1] << 4);
+    uint8_t emb_bytes[2];
+    emb_bytes[0]  = (emb->color_code & 0x0f);
+    emb_bytes[0] |= (emb->pi  ? 0x01 : 0x00) << 4;
+    emb_bytes[0] |= (emb->lcss       & 0x03) << 5;
+    emb_bytes[1]  = 0; // Will be calculated
+    dmr_qr_16_7_encode(emb_bytes);
+
+    packet->payload[13] = (packet->payload[13] & 0xf0U) | (emb_bytes[0] >> 4);
+    packet->payload[14] = (packet->payload[14] & 0x0fU) | (emb_bytes[0] << 4);
+    packet->payload[18] = (packet->payload[18] & 0xf0U) | (emb_bytes[1] >> 4);
+    packet->payload[19] = (packet->payload[19] & 0x0fU) | (emb_bytes[1] << 4);
     return 0;
 }
 
@@ -94,12 +106,16 @@ static int dmr_emb_encode_signalling_lc_bytes(uint8_t *bytes, dmr_emb_signalling
     return 0;
 }
 
-int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signalling_lc_bits_t *emb_bits)
+int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signalling_lc_bits_t *emb_bits, dmr_data_type_t data_type)
 {
     if (emb_bits == NULL || lc == NULL)
         return dmr_error(DMR_EINVAL);
 
-    return dmr_emb_encode_signalling_lc_bytes(lc->bytes, emb_bits);
+    uint8_t bytes[12];
+    if (dmr_full_lc_encode_bytes(lc, bytes, data_type) != 0)
+        return dmr_error(DMR_LASTERROR);
+
+    return dmr_emb_encode_signalling_lc_bytes(bytes, emb_bits);
 }
 
 int dmr_emb_encode_signalling_lc(dmr_emb_signalling_lc_bits_t *emb_bits, dmr_packet_t *packet)
@@ -134,40 +150,27 @@ char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss)
     }
 }
 
-int dmr_emb_lcss_fragment_encode(dmr_emb_lcss_t lcss, dmr_vbptc_16_11_t *vbptc, uint8_t fragment, dmr_packet_t *packet)
+int dmr_emb_lcss_fragment_encode(dmr_emb_t *emb, dmr_vbptc_16_11_t *vbptc, uint8_t fragment, dmr_packet_t *packet)
 {
-    if (vbptc == NULL || packet == NULL)
+    if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
     bool bits[32];
-    uint8_t bytes[4];
+    uint8_t lc_bytes[4];
+    memset(lc_bytes, 0, sizeof(lc_bytes));
     uint16_t offset = (uint16_t)(fragment) * 32;
     memset(bits, 0, sizeof(bits));
-    if (dmr_vbptc_16_11_get_fragment(vbptc, bits, offset, 32) != 0)
-        return dmr_error(DMR_LASTERROR);
-    dmr_bits_to_bytes(bits, sizeof(bits), bytes, sizeof(bytes));
 
-    dmr_emb_t emb = {
-        .flags = {
-            .color_code = packet->color_code,
-            .pi         = 0,
-            .lcss       = lcss,
-            .qr0        = 0,
-            .qr1        = 0
-        }
-    };
-    dmr_fec_qr_16_7_encode(emb.bytes);
+    if (vbptc != NULL && dmr_vbptc_16_11_get_fragment(vbptc, bits, offset, 32) != 0) {
+       return dmr_error(DMR_LASTERROR);
+    }    
+    dmr_bits_to_bytes(bits, sizeof(bits), lc_bytes, sizeof(lc_bytes));
+    
+    packet->payload[14] = (packet->payload[14] & 0xf0) | (lc_bytes[0]         >> 4);
+    packet->payload[15] = (lc_bytes[0]  << 4)          | (lc_bytes[1]         >> 4);
+    packet->payload[16] = (lc_bytes[1]  << 4)          | (lc_bytes[2]         >> 4);
+    packet->payload[17] = (lc_bytes[2]  << 4)          | (lc_bytes[3]         >> 4);
+    packet->payload[18] = (lc_bytes[3]  << 4)          | (packet->payload[18] >> 4);
 
-    // Figure 6.4: Voice burst with embedded signalling
-    // |  VOICE (108 bits)  |  SYNC (48 bits)  |  VOICE (108 bits)  |
-    // |  VOICE (108 bits)  |E|  ES (32 bits)|E|  VOICE (108 bits)  |
-    packet->payload[12] = (packet->payload[12] & 0xf0) | (emb.bytes[0] >> 4);
-    packet->payload[13] = (emb.bytes[0] << 4)          | (bytes[0]     >> 4);
-    packet->payload[14] = (bytes[0]     << 4)          | (bytes[1]     >> 4);
-    packet->payload[15] = (bytes[1]     << 4)          | (bytes[2]     >> 4);
-    packet->payload[16] = (bytes[2]     << 4)          | (bytes[3]     >> 4);
-    packet->payload[17] = (bytes[3]     << 4)          | (emb.bytes[1] >> 4);
-    packet->payload[18] = (emb.bytes[1] << 4)          | (packet->payload[18] & 0x0f);
-
-    return 0;
+    return dmr_emb_encode(emb, packet);
 }

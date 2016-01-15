@@ -28,20 +28,18 @@ typedef struct {
 #define DMR_FLCO_PDU_GROUP   0x00U
 #define DMR_FLCO_PDU_PRIVATE 0x03U
 
-typedef union __attribute__((packed)) {
-    struct {
-        uint8_t flco            : 6;
-        uint8_t reserved        : 1;
-        uint8_t protected       : 1;
-        uint8_t fid;
-        uint8_t service_options;
-        uint8_t dst_id[3];
-        uint8_t src_id[3];
-        uint8_t crc[3];
-    } fields;
-    uint8_t bytes[12];
+typedef struct {
+    uint8_t    flco_pdu;
+    bool       reserved;
+    bool       privacy;
+    dmr_fid_t  fid;
+    uint8_t    service_options;
+    dmr_id_t   dst_id;
+    dmr_id_t   src_id;
+    uint8_t    crc[3];
 } dmr_full_lc_t;
 
+extern int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type_t data_type);
 /** Insert Link Control message with Reed-Solomon check data */
 extern int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet);
 

@@ -130,16 +130,6 @@ void dmr_log(const char *fmt, ...)
     va_end(ap);
 }
 
-#if defined(DMR_DEBUG)
-void dmr_log_trace(const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    dmr_log_messagev(DMR_LOG_PRIORITY_TRACE, fmt, ap);
-    va_end(ap);
-}
-#endif
-
 void dmr_log_debug(const char *fmt, ...)
 {
     va_list ap;

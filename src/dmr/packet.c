@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "dmr/bits.h"
 #include "dmr/error.h"
 #include "dmr/log.h"
 #include "dmr/packet.h"
+#include "dmr/payload/sync.h"
 #include "dmr/fec/golay_20_8.h"
 
 static char *flco_name[] = {
@@ -28,6 +30,136 @@ static char *ts_name[] = {
     "invalid",
     NULL
 };
+
+#define PACKET_DUMP_COLS 11
+void dmr_dump_packet(dmr_packet_t *packet)
+{
+    if (packet == NULL) {
+        dmr_log_error("dump: packet is NULL");
+        return;
+    }
+
+    char buf[8];
+    memset(buf, 0, sizeof(buf));
+    if (packet->data_type == DMR_DATA_TYPE_VOICE) {
+        sprintf(buf, "%c", 'A' + (char)packet->meta.voice_frame);
+    } else {
+        sprintf(buf, "%d", packet->data_type);
+    }
+    dmr_log_debug("packet: [%lu->%lu] via %lu, seq 0x%02x, slot %d, flco %s (%d), data type %s (%s), stream id 0x%08lx:",
+        packet->src_id,
+        packet->dst_id,
+        packet->repeater_id,
+        packet->meta.sequence,
+        packet->ts,
+        dmr_flco_name(packet->flco),
+        packet->flco,
+        dmr_data_type_name_short(packet->data_type),
+        buf,
+        packet->meta.stream_id);
+
+    dmr_sync_pattern_t pattern = dmr_sync_pattern_decode(packet);    
+    if (packet->data_type < DMR_DATA_TYPE_INVALID) {
+        dmr_log_debug("packet: sync pattern: %s", dmr_sync_pattern_name(pattern));
+    }
+
+    size_t i, j, len = DMR_PAYLOAD_BYTES;
+    char *mem = (char *)packet->payload;
+    for(i = 0; i < len + ((len % PACKET_DUMP_COLS) ? (PACKET_DUMP_COLS - len % PACKET_DUMP_COLS) : 0); i++) {
+        /* print offset */
+        if (i % PACKET_DUMP_COLS == 0) {
+            printf("0x%06zx  ", i);
+        }
+
+        bool print_hex = true;
+        if (pattern == DMR_SYNC_PATTERN_UNKNOWN) {
+            switch (packet->data_type) {
+            /* highlight emb bits and emb lc */
+            case DMR_DATA_TYPE_VOICE:
+                switch (i) {
+                case 13:
+                    print_hex = false;
+                    printf("%01x\x1b[1;32m%01x\x1b[0m ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                    break;
+                case 14:
+                    print_hex = false;
+                    printf("\x1b[1;32m%01x\x1b[1;33m%01x\x1b[0m ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                    break;
+                case 15:
+                case 16:
+                case 17:
+                    print_hex = false;
+                    printf("\x1b[1;33m%02x\x1b[0m ", mem[i] & 0xff);
+                    break;
+                case 18:
+                    print_hex = false;
+                    printf("\x1b[1;33m%01x\x1b[1;32m%01x\x1b[0m ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                    break;
+                case 19:
+                    print_hex = false;
+                    printf("\x1b[1;32m%01x\x1b[0m%01x ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                    break;
+                }
+                break;
+                
+            default:
+                break;
+            }
+
+        } else {
+
+            /* highlight sync pattern, if found */
+            switch (i) {
+            case 13:
+                print_hex = false;
+                printf("%01x\x1b[1;34m%01x\x1b[0m ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                break;
+            case 14:
+            case 15:
+            case 16:
+            case 17:
+            case 18:
+                print_hex = false;
+                printf("\x1b[1;34m%02x\x1b[0m ", mem[i] & 0xff);
+                break;
+            case 19:
+                print_hex = false;
+                printf("\x1b[1;34m%01x\x1b[0m%01x ", (mem[i] & 0xf0) >> 4, mem[i] & 0x0f);
+                break;
+            default:
+                break;
+            }
+        }
+
+        if (print_hex) {
+            /* print hex data */
+            if (i < DMR_PAYLOAD_BYTES) {
+                printf("%02x ", mem[i] & 0xff);
+            } else { /* end of block, just aligning for ASCII dump */
+                printf("   ");
+            }
+        }
+
+        /* print ASCII dump */
+        if (i % PACKET_DUMP_COLS == (PACKET_DUMP_COLS - 1)) {
+            putchar('|');
+            for (j = i - (PACKET_DUMP_COLS - 1); j <= i; j++) {
+                if (j >= len) { /* end of block, not really printing */
+                    putchar(' ');
+                } else if (isprint(mem[j])) { /* printable char */
+                    putchar(0xff & mem[j]);
+                } else { /* other char */
+                    putchar('.');
+                }
+            }
+            putchar('|');
+            putchar('\n');
+        }
+    }
+
+    fflush(stdout);
+}
+
 
 dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
 {

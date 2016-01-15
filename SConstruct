@@ -155,7 +155,6 @@ env.Install('dist', dmr)
 if GetOption('enable_all') or GetOption('enable_proto_mbe'):
     env.Depends(dmr, mbelib)
 
-'''
 dmrdump = env.SConscript(
     os.path.join('src', 'cmd', 'dmrdump', 'SConscript'),
     variant_dir='build/cmd/dmrdump',
@@ -164,6 +163,7 @@ dmrdump = env.SConscript(
 env.Install('dist', dmrdump)
 env.Depends(dmrdump, dmr)
 
+'''
 mmdvmplay = env.SConscript(
     os.path.join('src', 'cmd', 'mmdvmplay', 'SConscript'),
     variant_dir='build/cmd/mmdvmplay',

@@ -21,5 +21,8 @@
 #include <dmr/config.h>
 #include <dmr/packet.h>
 #include <dmr/payload.h>
+#include <dmr/payload/emb.h>
+#include <dmr/payload/lc.h>
+#include <dmr/payload/sync.h>
 
 #endif // _DMR_H

@@ -10,6 +10,7 @@
 
 #include "config.h"
 #include "audio.h"
+#include "http.h"
 #include "repeater.h"
 
 int main(int argc, char **argv)
@@ -44,6 +45,16 @@ int main(int argc, char **argv)
             status = 1;
             goto bail;
         }
+    }
+
+    if (!init_http()) {
+        status = 1;
+        goto bail;
+    }
+
+    if (!boot_http()) {
+        status = 1;
+        goto bail;   
     }
 
     if (!init_repeater()) {

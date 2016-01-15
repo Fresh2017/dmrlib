@@ -16,8 +16,9 @@
 #endif
 
 #include <dmr.h>
+#include <dmr/log.h>
 #include <dmr/proto/homebrew.h>
-#include <dmrfec.h>
+#include <dmr/fec.h>
 
 #define ETHER_TYPE_IP (0x0800)
 
@@ -63,12 +64,6 @@ static struct option long_options[] = {
     {NULL, 0, NULL, 0} /* Sentinel */
 };
 
-void init(void)
-{
-    fprintf(stderr, "initializing dmrfec\n");
-    dmrfec_init();
-}
-
 void usage(const char *program)
 {
     fprintf(stderr, "%s <args>\n\n", program);
@@ -80,21 +75,31 @@ void usage(const char *program)
 
 void dump_dmr_packet(dmr_packet_t *packet)
 {
-    dmr_payload_info_bits_t info_bits, deinfo_bits;
-    dmr_payload_sync_pattern_t sync_pattern;
-    dmr_payload_sync_bits_t *sync_bits;
-    dmrfec_bptc_196_96_data_bits_t *data_bits;
-    dmr_csbk_t *csbk;
+    dmr_sync_pattern_t sync_pattern;
+    dmr_emb_t *emb = NULL;
 
-    printf("[ts%d][%u->%u(%u)] %s\n",
+    printf("[ts%d][%u->%u(%u)][%02x/%08x] %s",
         packet->ts + 1,
         packet->src_id, packet->dst_id,
         packet->repeater_id,
-        dmr_packet_get_slot_type_name(packet->slot_type));
-    dump_hex(packet->payload.bytes, DMR_PAYLOAD_BYTES);
+        packet->meta.sequence,
+        packet->meta.stream_id,
+        dmr_data_type_name(packet->data_type));
+    
+    sync_pattern = dmr_sync_pattern_decode(packet);
+    if (sync_pattern != DMR_SYNC_PATTERN_UNKNOWN) {
+        printf(", sync pattern: %s\n", dmr_sync_pattern_name(sync_pattern));
+    } else if (packet->data_type == DMR_DATA_TYPE_VOICE) {
+        printf(", frame %c\n", 'A' + packet->meta.voice_frame);
+    } else {
+        putchar('\n');
+    }
 
-    switch (packet->slot_type) {
-    case DMR_SLOT_TYPE_CSBK:
+    dmr_dump_packet(packet);
+
+    switch (packet->data_type) {
+    /*
+    case DMR_DATA_TYPE_CSBK:
         dmr_payload_get_info_bits(&packet->payload, &info_bits);
         dmr_info_bits_deinterleave(&info_bits, &deinfo_bits);
         data_bits = dmrfec_bptc_196_96_decode(deinfo_bits.bits);
@@ -112,66 +117,68 @@ void dump_dmr_packet(dmr_packet_t *packet)
             csbk->src_id, csbk->dst_id,
             csbk->last);
         break;
+    */
 
-    case DMR_SLOT_TYPE_VOICE_LC:
-        sync_bits = dmr_payload_get_sync_bits(&packet->payload);
-        sync_pattern = dmr_sync_bits_get_sync_pattern(sync_bits);
-        printf("sync pattern: %s\n", dmr_payload_get_sync_pattern_name(sync_pattern));
+    case DMR_DATA_TYPE_VOICE_LC:
         break;
 
-    case DMR_SLOT_TYPE_VOICE_BURST_A:
-    case DMR_SLOT_TYPE_VOICE_BURST_B:
-    case DMR_SLOT_TYPE_VOICE_BURST_C:
-    case DMR_SLOT_TYPE_VOICE_BURST_D:
-    case DMR_SLOT_TYPE_VOICE_BURST_E:
-    case DMR_SLOT_TYPE_VOICE_BURST_F:
-        sync_bits = dmr_payload_get_sync_bits(&packet->payload);
-        sync_pattern = dmr_sync_bits_get_sync_pattern(sync_bits);
-        if (sync_pattern != DMR_PAYLOAD_SYNC_PATTERN_UNKNOWN) {
-            printf("sync pattern: %s\n", dmr_payload_get_sync_pattern_name(sync_pattern));
-        } else {
-            // Frame should contain embedded signalling.
-            dmr_emb_t *emb = dmr_emb_decode(dmr_emb_from_payload_sync_bits(sync_bits));
-            if (emb == NULL) {
-                fprintf(stderr, "embedded signalling decode failed\n");
-                return;
-            }
-            printf("embedded signalling: color code %d, lcss %d (%s)\n",
-                emb->color_code, emb->lcss, dmr_emb_lcss_name(emb->lcss));
+    case DMR_DATA_TYPE_VOICE_SYNC:
+        break;
 
-            if (emb->lcss == DMR_EMB_LCSS_SINGLE_FRAGMENT) {
-
-            }
+    case DMR_DATA_TYPE_VOICE:
+        // Frame should contain embedded signalling.
+        if (dmr_emb_decode(emb, packet) != 0) {
+            fprintf(stderr, "embedded signalling decode failed: %s\n", dmr_error_get());
+            return;
         }
+        printf("embedded signalling: color code %d, lcss %d (%s)\n",
+            emb->color_code,
+            emb->lcss, dmr_emb_lcss_name(emb->lcss));
+
+        if (emb->lcss == DMR_EMB_LCSS_SINGLE_FRAGMENT) {
+        }
+        break;
+
+    default:
         break;
     }
 }
 
 void dump_homebrew(struct ip *ip_hdr, struct udphdr *udp, const uint8_t *bytes, unsigned int len)
 {
-    dmr_homebrew_packet_t *packet;
-    dmr_homebrew_frame_type_t frame_type = dmr_homebrew_frame_type(bytes, len);
+    dmr_packet_t *packet;
+    dmr_homebrew_frame_type_t frame_type = dmr_homebrew_dump((uint8_t *)bytes, len);
 
-    printf("%s:%d->%s:%d, %d bytes homebrew proto",
+    printf("%s:%d->%s:%d (%u bytes), ",
         inet_ntoa(ip_hdr->ip_src), ntohs(udp->uh_sport),
         inet_ntoa(ip_hdr->ip_dst), ntohs(udp->uh_dport),
         len);
 
     switch (frame_type) {
     case DMR_HOMEBREW_DMR_DATA_FRAME:
-        printf(", DMR data frame\n");
+        printf("DMR data frame\n");
         packet = dmr_homebrew_parse_packet(bytes, len);
-        if (packet == NULL)
+        if (packet == NULL) {
+            fprintf(stderr, "failed to parse frame: %s\n", dmr_error_get());
             return;
+        }
 
-        dump_dmr_packet(&packet->dmr_packet);
-        free(packet);
+        dump_dmr_packet(packet);
         break;
-    default:
-        printf(", unknown frame\n");
+
+    case DMR_HOMEBREW_INVALID:
+        printf("\x1b[1;31mnot a homebrew frame frame:\x1b[0m\n");
         dump_hex((void *)bytes, len);
-        return;
+        break;
+
+    default:
+        printf("\x1b[1;31munknown frame:\x1b[0m\n");
+        dump_hex((void *)bytes, len);
+        break;
     }
+    printf("\n");
+    fflush(stdout);
+    fflush(stderr);
 }
 
 int main(int argc, char **argv)
@@ -183,7 +190,7 @@ int main(int argc, char **argv)
     struct pcap_pkthdr header;
     const uint8_t *packet;
 
-    while ((ch = getopt_long(argc, argv, "r:h?", long_options, NULL)) != -1) {
+    while ((ch = getopt_long(argc, argv, "r:h?v", long_options, NULL)) != -1) {
         switch (ch) {
         case -1:       /* no more arguments */
         case 0:        /* long options toggles */
@@ -194,6 +201,9 @@ int main(int argc, char **argv)
             return 0;
         case 'r':
             source = strdup(optarg);
+            break;
+        case 'v':
+            dmr_log_priority_set(dmr_log_priority() - 1);
             break;
         default:
             return 1;
@@ -209,8 +219,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "error opening %s: %s\n", source, errbuf);
         return 1;
     }
-
-    init();
 
     size_t packets = 0;
     while ((packet = pcap_next(handle, &header)) != NULL) {

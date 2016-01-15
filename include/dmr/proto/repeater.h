@@ -31,10 +31,12 @@ typedef struct dmr_repeater_slot_s {
 typedef struct dmr_repeater_timeslot_s {
     dmr_data_type_t   last_data_type;
     dmr_id_t          src_id, dst_id;
+    uint32_t          stream_id;
     bool              voice_call_active;
     uint8_t           voice_frame;
     bool              data_call_active;
     dmr_vbptc_16_11_t *vbptc_emb_lc;
+    uint16_t          sequence;
 } dmr_repeater_timeslot_t;
 
 struct dmr_repeater_s {

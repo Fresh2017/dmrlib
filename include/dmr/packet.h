@@ -44,7 +44,7 @@ typedef enum {
     DMR_DATA_TYPE_INVALID,
     DMR_DATA_TYPE_SYNC_VOICE = 0x20,    /* for MMDVM modems */
     DMR_DATA_TYPE_VOICE_SYNC = 0xf0,
-    DMR_DATA_TYPE_VOICE = 0xf1
+    DMR_DATA_TYPE_VOICE      = 0xf1
 } dmr_data_type_t;
 
 typedef struct {
@@ -80,6 +80,7 @@ typedef struct {
     uint8_t     data_length;
 } dmr_packet_data_block_t;
 
+extern void dmr_dump_packet(dmr_packet_t *packet);
 extern dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len);
 extern char *dmr_flco_name(dmr_flco_t flco);
 extern char *dmr_ts_name(dmr_ts_t ts);

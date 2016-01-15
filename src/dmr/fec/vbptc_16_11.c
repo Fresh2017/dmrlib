@@ -3,6 +3,7 @@
 #include "dmr/fec/vbptc_16_11.h"
 #include "dmr/bits.h"
 #include "dmr/error.h"
+#include "dmr/log.h"
 
 typedef struct {
     bool bits[5];
@@ -126,6 +127,7 @@ bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
 
 dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
 {
+    dmr_log_trace("vbptc_16_11: new with parent %p", parent);
     dmr_vbptc_16_11_t *vbptc = talloc_zero(parent, dmr_vbptc_16_11_t);
     if (vbptc == NULL)
         return NULL;
@@ -142,6 +144,7 @@ dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
 
 void dmr_vbptc_16_11_free(dmr_vbptc_16_11_t *vbptc)
 {
+    dmr_log_trace("vbptc_16_11: free %p", vbptc);
     if (vbptc == NULL)
         return;
 
@@ -167,7 +170,7 @@ static size_t dmr_vbptc_16_11_matrix_free(dmr_vbptc_16_11_t *vbptc)
     return (vbptc->rows * 16) - (vbptc->col * vbptc->rows + vbptc->row);
 }
 
-int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, size_t len)
+int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || vbptc->matrix == NULL || bits == NULL)
         return dmr_error(DMR_EINVAL);
@@ -213,7 +216,7 @@ int dmr_vbptc_16_11_get_fragment(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t 
     return 0;
 }
 
-int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, size_t len)
+int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || bits == NULL || vbptc->rows == 0)
         return dmr_error(DMR_EINVAL);
@@ -231,7 +234,7 @@ int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, size_t len)
     return 0;
 }
 
-int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, size_t len)
+int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || bits == NULL || len == 0)
         return dmr_error(DMR_EINVAL);

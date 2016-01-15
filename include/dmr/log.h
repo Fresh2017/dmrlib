@@ -42,8 +42,16 @@ extern void dmr_log_priority_reset(void);
 extern const char *dmr_log_prefix(void);
 extern void dmr_log_prefix_set(const char *prefix);
 extern void dmr_log(const char *fmt, ...);
+#if defined(DMR_DEBUG_THREAD)
+#define dmr_log_mutex(fmt, ...) dmr_log_message(DMR_LOG_PRIORITY_TRACE, fmt, ## __VA_ARGS__)
+#else
+#define dmr_log_mutex(fmt, ...)
+#endif
 #if defined(DMR_DEBUG)
-extern void dmr_log_trace(const char *fmt, ...);
+#define dmr_log_trace(fmt, ...) do { \
+	dmr_log_message(DMR_LOG_PRIORITY_TRACE, "%s[%d]:", __FILE__, __LINE__); \
+	dmr_log_message(DMR_LOG_PRIORITY_TRACE, fmt, ## __VA_ARGS__ ); \
+} while(0)
 #else
 #define dmr_log_trace(fmt, ...)
 #endif

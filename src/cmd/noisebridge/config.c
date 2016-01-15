@@ -5,6 +5,12 @@
 #include <dmr/config.h>
 #include "config.h"
 #include "util.h"
+#if defined(DMR_PLATFORM_UNIX)
+#include <sys/param.h>
+#endif
+#if defined(DMR_PLATFORM_LINUX)
+#include <bsd/string.h>
+#endif
 #if defined(HAVE_DL)
 #include <dlfcn.h>
 #endif
@@ -71,6 +77,20 @@ config_t *load_config(void)
     return config;
 }
 
+char *join_path(char *dir, char *filename)
+{
+#if defined(DMR_PLATFORM_WINDOWS)
+    char sep[] = "\\";
+#else
+    char sep[] = "/";
+#endif
+    size_t len = strlen(dir) + sizeof(sep) + strlen(filename) + 1;
+    char *tmp = realloc(dir, len);
+    strlcat(tmp, sep, len);
+    strlcat(tmp, filename, len);
+    return tmp;
+}
+
 config_t *init_config(const char *filename)
 {
     bool valid = true;
@@ -90,7 +110,10 @@ config_t *init_config(const char *filename)
 
     config->filename = filename;
     config->log_level = DMR_LOG_PRIORITY_INFO;
+    config->http_port = 62080;
+    config->http_root = join_path(getcwd(NULL, MAXPATHLEN), "/html");
     config->mbe_quality = 3;
+    dmr_homebrew_config_init(&config->homebrew_config);
 
     if ((fp = fopen(filename, "r")) == NULL) {
         dmr_log_critical("failed to open %s: %s", filename, strerror(errno));
@@ -136,6 +159,16 @@ config_t *init_config(const char *filename)
                 valid = false;
                 break;
             }
+
+        } else if (!strcmp(k, "http_addr")) {
+            config->http_addr = strdup(v);
+
+        } else if (!strcmp(k, "http_port")) {
+            config->http_port = atoi(v);
+
+        } else if (!strcmp(k, "http_root")) {
+            free(config->http_root);
+            config->http_root = strdup(v);
 
         } else if (!strcmp(k, "repeater_color_code")) {
             config->repeater_color_code = atoi(v);

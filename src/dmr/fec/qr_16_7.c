@@ -1,4 +1,6 @@
 #include "dmr/fec/qr_16_7.h"
+#include "dmr/bits.h"
+#include "dmr/log.h"
 
 static uint16_t qr_16_7_encoder_map[] = {
     0x0000U, 0x0273U, 0x04E5U, 0x0696U, 0x09C9U, 0x0BBAU,
@@ -71,7 +73,7 @@ static uint16_t qr_16_7_decoder_map[] = {
 	0x5000U, 0x2200U, 0x5002U, 0x2202U
 };
 
-uint16_t dmr_fec_qr_16_7_syndrome(uint16_t pattern)
+uint16_t dmr_qr_16_7_syndrome(uint16_t pattern)
 {
     uint16_t i = 0x4000;                        // x^14
     if (pattern >= 0x0100) {                    // x^8
@@ -85,17 +87,18 @@ uint16_t dmr_fec_qr_16_7_syndrome(uint16_t pattern)
     return pattern;
 }
 
-void dmr_fec_qr_16_7_encode(uint8_t buf[2])
+void dmr_qr_16_7_encode(uint8_t buf[2])
 {
-    uint16_t dv = buf[0] >> 1;
+    uint8_t dv = buf[0] >> 1;
     uint16_t qr = qr_16_7_encoder_map[dv & 0x7fU];
-    buf[0] = qr >> 8;
-    buf[1] = qr & 0xffU;
+    dmr_log_debug("qr_16_7: encode %02x%02x: dv = %s, qr = %04x", buf[0], buf[1], dmr_byte_to_binary(dv), qr);
+    buf[0] |= (qr >> 8) & 0x80;
+    buf[1]  = (qr     ) & 0xff;
 }
 
-void dmr_fec_qr_16_7_decode(uint8_t buf[2], uint8_t *byte)
+bool dmr_qr_16_7_decode(uint8_t buf[2])
 {
     uint16_t value = (buf[0] << 7) | (buf[1] >> 1);
-    uint16_t syndrome = dmr_fec_qr_16_7_syndrome(value);
-    *byte  = (value ^ qr_16_7_decoder_map[syndrome]) >> 7;
+    uint16_t syndrome = dmr_qr_16_7_syndrome(value);
+    return ((value ^ qr_16_7_decoder_map[syndrome]) >> 7) == 1;
 }

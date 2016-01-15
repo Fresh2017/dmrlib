@@ -7,11 +7,9 @@ localenv = env.Clone()
 localenv.Append(
     LIBS=[
         env['libdmr_name'],
-        'mbe',
     ],
     LIBPATH=[
         '#build/libdmr',
-        '#build/mbelib',
     ],
 )
 

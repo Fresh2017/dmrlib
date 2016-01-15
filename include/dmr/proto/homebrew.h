@@ -25,9 +25,22 @@
 #define DMR_HOMEBREW_PORT               62030
 #define DMR_HOMEBREW_DMR_DATA_SIZE      53
 
-#define DMR_HOMEBREW_UNKNOWN_FRAME      0x00
-#define DMR_HOMEBREW_DMR_DATA_FRAME     0x10
-typedef uint8_t dmr_homebrew_frame_type_t;
+typedef enum {
+    DMR_HOMEBREW_INVALID        = 0x00,
+    DMR_HOMEBREW_DMR_DATA_FRAME = 0x01,
+    DMR_HOMEBREW_MASTER_ACK,
+    DMR_HOMEBREW_MASTER_ACK_NONCE,
+    DMR_HOMEBREW_MASTER_CLOSING,
+    DMR_HOMEBREW_MASTER_NAK,
+    DMR_HOMEBREW_MASTER_PING,
+    DMR_HOMEBREW_REPEATER_BEACON,
+    DMR_HOMEBREW_REPEATER_CLOSING,
+    DMR_HOMEBREW_REPEATER_KEY,
+    DMR_HOMEBREW_REPEATER_LOGIN,
+    DMR_HOMEBREW_REPEATER_PONG,
+    DMR_HOMEBREW_REPEATER_RSSI,
+    DMR_HOMEBREW_UNKNOWN
+} dmr_homebrew_frame_type_t;
 
 #define DMR_HOMEBREW_DATA_TYPE_VOICE      0x00
 #define DMR_HOMEBREW_DATA_TYPE_VOICE_SYNC 0x01
@@ -82,7 +95,7 @@ typedef struct {
     struct timeval last_ping_sent;
 } dmr_homebrew_t;
 
-extern dmr_homebrew_t *dmr_homebrew_new(struct in_addr bind, int port, struct in_addr peer);
+extern dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer);
 extern int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
 extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);
@@ -90,8 +103,10 @@ extern void dmr_homebrew_loop(dmr_homebrew_t *homebrew);
 extern int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
 extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len);
 extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout);
-extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, unsigned int len);
-extern dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, unsigned int len);
+extern char *dmr_homebrew_frame_type_name(dmr_homebrew_frame_type_t frame_type);
+extern dmr_homebrew_frame_type_t dmr_homebrew_frame_type(const uint8_t *bytes, ssize_t len);
+extern dmr_homebrew_frame_type_t dmr_homebrew_dump(uint8_t *buf, ssize_t len);
+extern dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *bytes, ssize_t len);
 
 extern void dmr_homebrew_config_init(dmr_homebrew_config_t *config);
 extern void dmr_homebrew_config_callsign(dmr_homebrew_config_t *config, const char *callsign);

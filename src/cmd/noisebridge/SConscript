@@ -47,6 +47,7 @@ if sys.platform == 'linux2':
     name = 'noisebridge'
     localenv.Append(
         LIBS=[
+            'bsd',
             'pthread',
         ],
     )

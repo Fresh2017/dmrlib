@@ -39,10 +39,12 @@ typedef struct config_s {
     route_rule_t          *repeater_route[ROUTE_RULE_MAX];
     size_t                repeater_routes;
     dmr_color_code_t      repeater_color_code;
+    char                  *http_addr;
+    int                   http_port;
+    char                  *http_root;
     dmr_homebrew_t        *homebrew;
     dmr_homebrew_config_t homebrew_config;
     dmr_id_t              homebrew_id;
-    struct in_addr        homebrew_bind;
     char                  *homebrew_host_s;
     struct hostent        *homebrew_host;
     int                   homebrew_port;
@@ -59,6 +61,7 @@ typedef struct config_s {
     size_t                plugins;
 } config_t;
 
+char *join_path(char *dir, char *filename);
 config_t *load_config(void);
 config_t *init_config(const char *filename);
 void kill_config();

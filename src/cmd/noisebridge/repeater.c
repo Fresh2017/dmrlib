@@ -109,14 +109,15 @@ bool init_repeater()
         addr_list = (struct in_addr **)config->homebrew_host->h_addr_list;
         for (i = 0; addr_list[i] != NULL; i++) {
             server_addr.s_addr = (*addr_list[0]).s_addr;
-            dmr_log_debug("noisebridge: %s resolved to %s",
+            dmr_log_debug("noisebridge: connecting to homebrew system %s(%s) as %d",
                 config->homebrew_host->h_name,
-                inet_ntoa(server_addr));
+                inet_ntoa(server_addr),
+                config->homebrew_id);
 
             config->homebrew = dmr_homebrew_new(
-                config->homebrew_bind,
                 config->homebrew_port,
                 server_addr);
+            memcpy(&config->homebrew->config, &config->homebrew_config, sizeof(dmr_homebrew_config_t));
             config->homebrew->id = config->homebrew_id;
             valid = (dmr_homebrew_auth(config->homebrew, config->homebrew_auth) == 0);
             if (valid)
@@ -226,8 +227,9 @@ bool loop_repeater(void)
     signal(SIGINT, kill_handler);
 
     dmr_log_info("noisebridge: running repeater");
-    while (active)
-        dmr_sleep(1);
+    while (active) {
+        dmr_msleep(60);
+    }
     if ((ret = dmr_proto_call_wait(repeater)) != 0)
         goto bail_loop_repeater;
     goto stop_loop_repeater;

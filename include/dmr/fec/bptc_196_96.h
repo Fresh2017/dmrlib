@@ -7,7 +7,7 @@
 
 typedef struct {
 	bool raw[196];
-	bool dec[196];
+	bool deinterleaved_bits[196];
 } dmr_bptc_196_96_t;
 
 int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t *data);

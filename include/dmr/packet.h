@@ -84,6 +84,7 @@ extern void dmr_dump_packet(dmr_packet_t *packet);
 extern dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len);
 extern char *dmr_flco_name(dmr_flco_t flco);
 extern char *dmr_ts_name(dmr_ts_t ts);
+extern char *dmr_fid_name(dmr_fid_t fid);
 extern char *dmr_data_type_name(dmr_data_type_t data_type);
 extern char *dmr_data_type_name_short(dmr_data_type_t data_type);
 extern int dmr_payload_bits(dmr_packet_t *packet, void *bits);

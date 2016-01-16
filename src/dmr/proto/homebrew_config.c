@@ -4,9 +4,10 @@
 
 #include "dmr/log.h"
 #include "dmr/proto/homebrew.h"
+#include "dmr/version.h"
 
-static const char *dmr_software_id = "dmrlib-20160112";
-static const char *dmr_package_id = "git:dmrlib-20160112";
+static const char *dmr_software_id = DMRLIB_SOFTWARE_ID;
+static const char *dmr_package_id = DMRLIB_PACKAGE_ID;
 static const char *dmr_location = "Unknown";
 static const char *dmr_description = "dmrlib by PD0MZ";
 static const char *dmr_url = "https://github.com/pd0mz";

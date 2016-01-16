@@ -2,6 +2,7 @@ import os
 import sys
 
 from scons_checks import CheckCompileSource
+from scons_generate import GenerateHeader
 
 Import('env')
 

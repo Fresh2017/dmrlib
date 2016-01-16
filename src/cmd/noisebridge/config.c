@@ -3,8 +3,10 @@
 #include <netdb.h>
 #include <talloc.h>
 #include <dmr/config.h>
+#include <dmr/version.h>
 #include "config.h"
 #include "util.h"
+#include "version.h"
 #if defined(DMR_PLATFORM_UNIX)
 #include <sys/param.h>
 #endif
@@ -18,12 +20,7 @@
 #include <sys/auxv.h>
 #endif
 
-const char *software_id = "NoiseBridge";
-#ifdef PACKAGE_ID
-const char *package_id = PACKAGE_ID;
-#else
-const char *package_id = "git:NoiseBridge";
-#endif
+const char *software_id = NOISEBRIDGE_SOFTWARE_ID;
 
 static config_t *config = NULL;
 
@@ -114,6 +111,7 @@ config_t *init_config(const char *filename)
     config->http_root = join_path(getcwd(NULL, MAXPATHLEN), "/html");
     config->mbe_quality = 3;
     dmr_homebrew_config_init(&config->homebrew_config);
+    dmr_homebrew_config_software_id(&config->homebrew_config, software_id);
 
     if ((fp = fopen(filename, "r")) == NULL) {
         dmr_log_critical("failed to open %s: %s", filename, strerror(errno));

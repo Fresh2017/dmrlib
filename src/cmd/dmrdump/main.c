@@ -120,12 +120,38 @@ void dump_dmr_packet(dmr_packet_t *packet)
     */
 
     case DMR_DATA_TYPE_VOICE_LC:
-        break;
+    {
+        dmr_full_lc_t full_lc;
+        if (dmr_full_lc_decode(&full_lc, packet) != 0) {
+            fprintf(stderr, "full LC decode failed: %s\n", dmr_error_get());
+            return;
+        }
+        printf("full LC: flco=%s (%d), privacy=%s, fid=%s (%d), %u->%u\n",
+            dmr_flco_pdu_name(full_lc.flco_pdu), full_lc.flco_pdu,
+            DMR_LOG_BOOL(full_lc.privacy),
+            dmr_fid_name(full_lc.fid), full_lc.fid,
+            full_lc.src_id, full_lc.dst_id);
 
+        dmr_packet_t debug;
+        memcpy(&debug, packet, sizeof(dmr_packet_t));
+        if (dmr_full_lc_encode(&full_lc, &debug) != 0) {
+            fprintf(stderr, "full LC encode failed: %s\n", dmr_error_get());
+            return;
+        }
+        dmr_dump_packet(&debug);
+        printf("full LC: flco=%s (%d), privacy=%s, fid=%s (%d), %u->%u\n",
+            dmr_flco_pdu_name(full_lc.flco_pdu), full_lc.flco_pdu,
+            DMR_LOG_BOOL(full_lc.privacy),
+            dmr_fid_name(full_lc.fid), full_lc.fid,
+            full_lc.src_id, full_lc.dst_id);
+        break;
+    }
     case DMR_DATA_TYPE_VOICE_SYNC:
+    {
         break;
-
+    }
     case DMR_DATA_TYPE_VOICE:
+    {
         // Frame should contain embedded signalling.
         if (dmr_emb_decode(emb, packet) != 0) {
             fprintf(stderr, "embedded signalling decode failed: %s\n", dmr_error_get());
@@ -138,7 +164,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
         if (emb->lcss == DMR_EMB_LCSS_SINGLE_FRAGMENT) {
         }
         break;
-
+    }
     default:
         break;
     }

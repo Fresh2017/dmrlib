@@ -36,7 +36,7 @@ int dmr_error(dmr_errno err)
     case DMR_UNSUPPORTED:
         return _dmr_error_set(dmr_error_unsupported, DMR_LOG_PRIORITY_ERROR);
     case DMR_LASTERROR:
-        return _dmr_error_set(error.msg, error.priority);
+        return -1;
     default:
         return _dmr_error_set(dmr_error_unknown, DMR_LOG_PRIORITY_ERROR);
     }

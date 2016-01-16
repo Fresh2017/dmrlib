@@ -1,5 +1,6 @@
 #include <string.h>
 #include "dmr/error.h"
+#include "dmr/malloc.h"
 #include "dmr/payload/lc.h"
 #include "dmr/packet.h"
 #include "dmr/fec/rs_12_9.h"
@@ -18,10 +19,16 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     memset(bytes, 0, sizeof(bytes));
 
     // BPTC(196, 96) decode data
-    dmr_bptc_196_96_t bptc;
+    dmr_bptc_196_96_t *bptc = dmr_malloc(dmr_bptc_196_96_t);
+    if (bptc == NULL) {
+        return dmr_error(DMR_ENOMEM);
+    }
+
     dmr_log_trace("lc: decoding BPTC(196, 96)");
-    if (dmr_bptc_196_96_decode(&bptc, packet, bytes) != 0)
+    if (dmr_bptc_196_96_decode(bptc, packet, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
+
+    dmr_free(bptc);
 
     lc->flco_pdu = (bytes[0] & 0x3f);
     lc->privacy  = (bytes[0] & 0x80) == 0x80;
@@ -73,24 +80,23 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type
 
     // Calculate RS(12, 9) checksum
     dmr_log_trace("lc: calculating RS(12, 9) checksum:");
-    dmr_rs_12_9_codeword_t codeword;
-    dmr_rs_12_9_checksum_t *parity = dmr_rs_12_9_calc_checksum((dmr_rs_12_9_codeword_t *)bytes);
-
+    uint8_t crc[DMR_RS_12_9_CHECKSUMSIZE];
+    dmr_rs_12_9_encode(bytes, crc);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dump_hex(bytes + DMR_RS_12_9_DATASIZE, DMR_RS_12_9_CHECKSUMSIZE);
+        dump_hex(crc, sizeof(crc));
     }
 
     // Store checksum with CRC mask applied. See DMR AI. spec. page 143.
     switch (data_type) {
     case DMR_DATA_TYPE_VOICE_LC:
-        bytes[9]  = parity->bytes[2] ^ DMR_CRC_MASK_VOICE_LC[0];
-        bytes[10] = parity->bytes[1] ^ DMR_CRC_MASK_VOICE_LC[1];
-        bytes[11] = parity->bytes[0] ^ DMR_CRC_MASK_VOICE_LC[2];
+        bytes[9]  = crc[2] ^ DMR_CRC_MASK_VOICE_LC[0];
+        bytes[10] = crc[1] ^ DMR_CRC_MASK_VOICE_LC[1];
+        bytes[11] = crc[0] ^ DMR_CRC_MASK_VOICE_LC[2];
         break;
     case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-        bytes[9]  = parity->bytes[2] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[0];
-        bytes[10] = parity->bytes[1] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[1];
-        bytes[11] = parity->bytes[0] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[2];
+        bytes[9]  = crc[2] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[0];
+        bytes[10] = crc[1] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[1];
+        bytes[11] = crc[0] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[2];
         break;
     default:
         break;
@@ -131,4 +137,16 @@ int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     }
 
     return 0;
+}
+
+char *dmr_flco_pdu_name(dmr_flco_pdu_t flco_pdu)
+{
+    switch (flco_pdu) {
+    case DMR_FLCO_PDU_GROUP:
+        return "group";
+    case DMR_FLCO_PDU_PRIVATE:
+        return "unit to unit";
+    default:
+        return "invalid";
+    }
 }

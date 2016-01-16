@@ -25,22 +25,26 @@ typedef struct {
     dmr_so_priority_t priority : 2;
 } dmr_so_t;
 
-#define DMR_FLCO_PDU_GROUP   0x00U
-#define DMR_FLCO_PDU_PRIVATE 0x03U
+typedef enum {
+    DMR_FLCO_PDU_GROUP   = 0x00,
+    DMR_FLCO_PDU_PRIVATE = 0x03
+} dmr_flco_pdu_t;
 
 typedef struct {
-    uint8_t    flco_pdu;
-    bool       reserved;
-    bool       privacy;
-    dmr_fid_t  fid;
-    uint8_t    service_options;
-    dmr_id_t   dst_id;
-    dmr_id_t   src_id;
-    uint8_t    crc[3];
+    dmr_flco_pdu_t flco_pdu;
+    bool           reserved;
+    bool           privacy;
+    dmr_fid_t      fid;
+    uint8_t        service_options;
+    dmr_id_t       dst_id;
+    dmr_id_t       src_id;
+    uint8_t        crc[3];
 } dmr_full_lc_t;
 
+extern int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet);
 extern int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type_t data_type);
 /** Insert Link Control message with Reed-Solomon check data */
 extern int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet);
+extern char *dmr_flco_pdu_name(dmr_flco_pdu_t flco_pdu);
 
 #endif // _DMR_PAYLOAD_LC_H

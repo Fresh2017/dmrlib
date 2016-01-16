@@ -9,7 +9,6 @@ char *dmr_byte_to_binary(uint8_t byte)
 {
     static char bin[9];
     bin[0] = 0;
-
     int s;
     for (s = 128; s > 0; s >>= 1)
         strcat(bin, ((byte & s) == s) ? "1" : "0");
@@ -19,18 +18,19 @@ char *dmr_byte_to_binary(uint8_t byte)
 
 uint8_t dmr_bits_to_byte(bool bits[8])
 {
-    uint8_t val = 0, i = 0;
-    for (; i < 8; i++) {
-        if (bits[i])
+    uint8_t val = 0, i;
+    for (i = 0; i < 8; i++) {
+        if (bits[i]) {
             val |= (1 << (7 - i));
+        }
     }
     return val;
 }
 
 void dmr_bits_to_bytes(bool *bits, size_t bits_length, uint8_t *bytes, size_t bytes_length)
 {
-    uint16_t i = 0;
-    for (; i < min(bits_length/8, bytes_length); i++)
+    uint16_t i;
+    for (i = 0; i < min(bits_length/8, bytes_length); i++)
         bytes[i] = dmr_bits_to_byte(&bits[i * 8]);
 }
 

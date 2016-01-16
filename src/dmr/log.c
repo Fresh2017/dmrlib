@@ -68,7 +68,7 @@ static void log_stderr(void *mem, dmr_log_priority_t priority, const char *msg)
 #else
     struct timeval tv;
     struct tm *tm;
-    static char tbuf[21], nbuf[17];
+    char tbuf[21], nbuf[17];
     memset(tbuf, 0, sizeof(tbuf));
     memset(nbuf, 0, sizeof(nbuf));
     gettimeofday(&tv, NULL);

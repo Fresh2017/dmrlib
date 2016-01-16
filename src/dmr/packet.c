@@ -5,6 +5,7 @@
 #include "dmr/error.h"
 #include "dmr/log.h"
 #include "dmr/packet.h"
+#include "dmr/payload/lc.h"
 #include "dmr/payload/sync.h"
 #include "dmr/fec/golay_20_8.h"
 
@@ -155,6 +156,17 @@ void dmr_dump_packet(dmr_packet_t *packet)
             putchar('|');
             putchar('\n');
         }
+    }
+
+    dmr_log_critical("hi mom!");
+    if (packet->data_type == DMR_DATA_TYPE_VOICE_LC) {
+        dmr_full_lc_t full_lc;
+        if (dmr_full_lc_decode(&full_lc, packet) != 0) {
+            dmr_log_error("full LC decode failed: %s", dmr_error_get());
+            return;
+        }
+        dmr_log_info("full LC: flco=%d, %u->%u\n",
+            full_lc.flco_pdu, full_lc.src_id, full_lc.dst_id);
     }
 
     fflush(stdout);

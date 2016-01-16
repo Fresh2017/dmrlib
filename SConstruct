@@ -2,7 +2,28 @@ import glob
 import os
 import sys
 
-from scons_generate import GenerateHeader
+from scons_generate import GenerateHeader, GenerateVersions
+
+'''
+DMR_VERSION_MAJOR = '0'
+DMR_VERSION_MINOR = '1'
+DMR_VERSION_PATCH = '0'
+DMR_VERSION_TAG   = 'beta'
+if os.path.isdir('.git'):
+    GIT_VERSION = subprocess.check_output([
+        'git', 'describe', '--long',
+    ]).strip().split('-')
+    DMR_VERSION_TAG   = 'git'
+    DMR_VERSION_PATCH = '-'.join(GIT_VERSION[-2:])
+
+"""
+DMR_VERSION_MAJOR=DMR_VERSION_MAJOR,
+DMR_VERSION_MINOR=DMR_VERSION_MINOR,
+DMR_VERSION_PATCH=DMR_VERSION_PATCH,
+DMR_VERSION_TAG=DMR_VERSION_TAG,
+"""
+
+'''
 
 env = Environment(
     BUILDDIR='#build',
@@ -20,6 +41,8 @@ env = Environment(
         '-ffast-math',
     ],
 )
+
+GenerateVersions(env, 'versions')
 
 AddOption(
     '--enable-all',
@@ -140,10 +163,13 @@ if not env.GetOption('clean'):
         conf.env.Append(**result)
     env = conf.Finish()
 
-env.AlwaysBuild(env.Command(
-    'include/dmr/config.h',
-    'include/dmr/config.h.in',
-    GenerateHeader))
+for path in (
+        'include/dmr/config.h',
+        'include/dmr/version.h',
+        'src/cmd/noisebridge/version.h',
+    ):
+    env.AlwaysBuild(env.Command(path, path + '.in', GenerateHeader))
+
 
 dmr = env.SConscript(
     os.path.join('src', 'dmr', 'SConscript'),

@@ -104,23 +104,23 @@ Check out https://github.com/pd0mz/dmrlib
 
 ## Cyclic Redundancy Checks
 
-| **Algorithm**                      | **Encoding**  | **Decoding**  |
-|:-----------------------------------|:--------------|:--------------|
-| CRC-5                              | ⨉             | ⨉             |
-| CRC-9                              | √             | √             |
-| CRC-16 (*CCITT*)                   | √             | √             |
-| CRC-32                             | √             | √             |
+| **Algorithm**                      | **Encoding**   | **Decoding**   |
+|:-----------------------------------|:---------------|:---------------|
+| CRC-5                              | ⨉              | ⨉              |
+| CRC-9                              | √              | √              |
+| CRC-16 (*CCITT*)                   | √              | √              |
+| CRC-32                             | √              | √              |
 
 ## Forward Error Correction
 
-| **Algorithm**                      | **Encoding**  | **Decoding**  |
-|:-----------------------------------|:--------------|:--------------|
-| Block Product Turbo Code (196, 96) | √             | √<sup>1</sup> |
-| Golay (20, 8)                      | √             | √             |
-| Quadratic Residue (16, 7, 6)       | √             | √             |
-| Reed-Solomon (12, 9, 4)            | √             | √<sup>2</sup> |
-| Rate ¾ Trellis                     | ⨉             | ⨉             |
-| Variable length BPTC               | √             | √             |
+| **Algorithm**                      | **Encoding**   | **Decoding**   |
+|:-----------------------------------|:---------------|:---------------|
+| Block Product Turbo Code (196, 96) | √              | √ <sup>1</sup> |
+| Golay (20, 8)                      | √              | √              |
+| Quadratic Residue (16, 7, 6)       | √              | √              |
+| Reed-Solomon (12, 9, 4)            | √              | √ <sup>2</sup> |
+| Rate ¾ Trellis                     | ⨉              | ⨉              |
+| Variable length BPTC               | √              | √              |
 
 
 1.  Full Hamming error correction not yet available

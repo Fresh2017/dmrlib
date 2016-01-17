@@ -100,6 +100,23 @@ Start the Git Bash shell, then enter:
 
 Check out https://github.com/pd0mz/dmrlib
 
+# Supported features
+
+## Forward Error Correction
+
+| **Algorithm**                      | **Encoding**  | **Decoding**  |
+|:-----------------------------------|:--------------|:--------------|
+| Block Product Turbo Code (196, 96) | √<sup>1</sup> | √<sup>1</sup> |
+| Golay (20, 8)                      | √             | √             |
+| Quadratic Residue (16, 7, 6)       | √             | √             |
+| Reed-Solomon (12, 9, 4)            | √             | √<sup>2</sup> |
+| Rate ¾ Trellis                     | ⨉             | ⨉             |
+| Variable length BPTC               | √             | √             |
+
+
+1.  Full Hamming error correction not yet available
+2.  Simplified form, shortened syndrome not implemented
+
 # Acknowledgements
 
 The development of dmrlib wasn't possible without the help of the following

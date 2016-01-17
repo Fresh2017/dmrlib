@@ -126,6 +126,24 @@ Check out https://github.com/pd0mz/dmrlib
 1.  Full Hamming error correction not yet available
 2.  Simplified form, shortened syndrome not implemented
 
+## DMR Data Types
+
+| **Data Type**                      | **Encoding**   | **Decoding**   |
+|:-----------------------------------|:---------------|:---------------|
+| Privacy Indicator                  | ⨉              | ⨉              |
+| Voice Link Control                 | √              | √              |
+| Terminator with Link Control       | ⨉              | ⨉              |
+| Control Signaling Block            | ⨉              | ⨉              |
+| Multiple Block Control             | ⨉              | ⨉              |
+| Data Header                        | ⨉              | ⨉              |
+| Rate                               | ⨉              | ⨉              |
+| Rate ¾ Data                        | ⨉              | ⨉              |
+| Idle                               | ⨉              | ⨉              |
+| Voice                              | √ <sup>1</sup> | √ <sup>2</sup> |
+
+1.  Depends on the availability of compatible hardware
+2.  Depends on the availability of compatible hardware or *mbelib*
+
 # Acknowledgements
 
 The development of dmrlib wasn't possible without the help of the following

@@ -29,6 +29,7 @@ __pycache__
 # Generated files
 build/
 dist/
+doc/Doxyfile
 include/dmr/config.h
 include/dmr/version.h
 src/cmd/noisebridge/version.h

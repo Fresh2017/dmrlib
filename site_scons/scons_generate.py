@@ -2,10 +2,10 @@ import os
 import re
 import subprocess
 
-RE_VAR = re.compile(r'@([^@]+)@')
+RE_VAR = re.compile(r'@([_\w]+)@')
 
-def GenerateHeader(target, source, env):
-	"""Generate a header file using the passed Environment."""
+def GenerateFile(target, source, env):
+	"""Generate a (header) file using the passed Environment."""
 	for dst, src in zip(target, source):
 		print('Generating {dst} from {src}'.format(dst=dst, src=src))
 		config_t = open(str(src), 'r')
@@ -49,5 +49,8 @@ def GenerateVersions(env, versions):
 				name.upper() + '_VERSION_MINOR': minor,
 				name.upper() + '_VERSION_PATCH': patch_git or patch,
 				name.upper() + '_VERSION_TAG': tag,
+				name.upper() + '_VERSION': '.'.join([
+					major, minor, patch_git or patch,
+				]),
 			}
 			env.Append(**update)

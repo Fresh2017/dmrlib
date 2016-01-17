@@ -2,28 +2,7 @@ import glob
 import os
 import sys
 
-from scons_generate import GenerateHeader, GenerateVersions
-
-'''
-DMR_VERSION_MAJOR = '0'
-DMR_VERSION_MINOR = '1'
-DMR_VERSION_PATCH = '0'
-DMR_VERSION_TAG   = 'beta'
-if os.path.isdir('.git'):
-    GIT_VERSION = subprocess.check_output([
-        'git', 'describe', '--long',
-    ]).strip().split('-')
-    DMR_VERSION_TAG   = 'git'
-    DMR_VERSION_PATCH = '-'.join(GIT_VERSION[-2:])
-
-"""
-DMR_VERSION_MAJOR=DMR_VERSION_MAJOR,
-DMR_VERSION_MINOR=DMR_VERSION_MINOR,
-DMR_VERSION_PATCH=DMR_VERSION_PATCH,
-DMR_VERSION_TAG=DMR_VERSION_TAG,
-"""
-
-'''
+from scons_generate import GenerateFile, GenerateVersions
 
 env = Environment(
     BUILDDIR='#build',
@@ -76,6 +55,13 @@ AddOption(
     action='store_true',
     default=False,
     help='Compile with unit tests',
+)
+AddOption(
+    '--with-docs',
+    dest='with_docs',
+    action='store_true',
+    default=False,
+    help='Generate documentation',
 )
 
 env.Append(
@@ -179,7 +165,7 @@ for path in (
         'include/dmr/version.h',
         'src/cmd/noisebridge/version.h',
     ):
-    env.AlwaysBuild(env.Command(path, path + '.in', GenerateHeader))
+    env.AlwaysBuild(env.Command(path, path + '.in', GenerateFile))
 
 
 dmr = env.SConscript(
@@ -225,6 +211,15 @@ if GetOption('with_tests'):
         duplicate=0,
     )
     env.Depends(tests, dmr)
+
+if GetOption('with_docs'):
+    env.AlwaysBuild(env.Command('doc/Doxyfile', 'doc/Doxyfile.in', GenerateFile))
+    doxygen = env.Command(
+        source='doc/Doxyfile',
+        target='#build/doc',
+        action='doxygen doc/Doxyfile',
+    )
+    env.AlwaysBuild(doxygen)
 
 if sys.platform in ('darwin', 'linux2'):
     noisebridge = env.SConscript(

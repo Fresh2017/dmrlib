@@ -246,3 +246,6 @@ if sys.platform == 'win32':
             ('dist',     os.path.join('wpcap', 'Lib', '*.lib')),
         ):
         env.Install(dst, Glob(os.path.join('#support', 'windows', src)))
+
+#Default(None)
+#print("DEFAULT_TARGETS is now", map(str, DEFAULT_TARGETS))

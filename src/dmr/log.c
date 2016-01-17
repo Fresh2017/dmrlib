@@ -66,14 +66,20 @@ static void log_stderr(void *mem, dmr_log_priority_t priority, const char *msg)
         log_prefix, dmr_thread_id(NULL), tag,
         lt.wYear, lt.wMonth, lt.wDay, lt.wHour, lt.wMinute, lt.wSecond, msg);
 #else
-    struct timeval tv;
-    struct tm *tm;
+    time_t t = time(NULL);
+    struct tm *tm = malloc(sizeof(*tm));
+    if (tm == NULL) {
+        fprintf(stderr, "out of memory while trying to render log message!\n");
+        fprintf(stderr, "message was: %s\n", msg);
+        fflush(stderr);
+        return;
+    }
     char tbuf[21], nbuf[17];
     memset(tbuf, 0, sizeof(tbuf));
     memset(nbuf, 0, sizeof(nbuf));
-    gettimeofday(&tv, NULL);
-    tm = localtime(&tv.tv_sec);
+    localtime_r(&t, tm);
     strftime(tbuf, 20, DMR_LOG_TIME_FORMAT, tm);
+    free(tm);
     dmr_thread_name(nbuf, sizeof(nbuf));
     fprintf(stderr, "%s[%-16s][%s] %s %s\n",
         log_prefix, nbuf, tag, tbuf, msg);
@@ -196,7 +202,7 @@ void dmr_log_messagev(dmr_log_priority_t priority, const char *fmt, va_list ap)
     if (msg == NULL)
         return;
 
-    vsnprintf(msg, DMR_LOG_MESSAGE_MAX, fmt, ap);
+    vsnprintf(msg, DMR_LOG_MESSAGE_MAX - 1, fmt, ap);
 
     len = strlen(msg);
     if (len > 0 && msg[len - 1] == '\n') {

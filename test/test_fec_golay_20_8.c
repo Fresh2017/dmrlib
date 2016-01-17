@@ -16,6 +16,7 @@ bool test_all(void)
     return true;
 }
 
+
 static test_t tests[] = {
     {"Golay (20,8) encode & decode", test_all},
     {NULL, NULL} /* sentinel */

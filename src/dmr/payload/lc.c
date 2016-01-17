@@ -3,16 +3,26 @@
 #include "dmr/malloc.h"
 #include "dmr/payload/lc.h"
 #include "dmr/packet.h"
-#include "dmr/fec/rs_12_9.h"
+#include "dmr/fec/reed_solomon.h"
 #include "dmr/fec/bptc_196_96.h"
 
-static const uint8_t DMR_CRC_MASK_VOICE_LC[]           = {0x96, 0x96, 0x96};
-static const uint8_t DMR_CRC_MASK_TERMINATOR_WITH_LC[] = {0x99, 0x99, 0x99};
+static uint8_t lc_crc_mask[] = {
+    0x69, /* DMR_DATA_TYPE_VOICE_PI */
+    0x96, /* DMR_DATA_TYPE_VOICE_LC */
+    0x99, /* DMR_DATA_TYPE_TERMINATOR_WITH_LC */
+    0xa5, /* DMR_DATA_TYPE_CSBK */
+    0xaa, /* DMR_DATA_TYPE_MBC */
+    0x00, /* DMR_DATA_TYPE_MBCC (not required) */
+    0xcc, /* DMR_DATA_TYPE_DATA */
+    0xf0, /* DMR_DATA_TYPE_RATE12_DATA */
+    0xff, /* DMR_DATA_TYPE_RATE34_DATA */
+    0x00  /* DMR_DATA_TYPE_IDLE (not required) */
+};
 
 // Parse a packed Link Control message and checks/corrects the Reed-Solomon check data.
 int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
 {
-    if (packet == NULL || lc == NULL)
+    if (packet == NULL || lc == NULL || packet->data_type >= DMR_DATA_TYPE_INVALID)
         return dmr_error(DMR_EINVAL);
 
     uint8_t bytes[12];
@@ -28,6 +38,20 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     if (dmr_bptc_196_96_decode(bptc, packet, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
 
+    dmr_log_trace("lc: performing Reed-Solomon(12, 9, 4) check on data");
+    if (dmr_rs_12_9_4_decode_and_verify(bytes, lc_crc_mask[packet->data_type]) != 0) {
+        dmr_log_error("LC: parity check failed");
+#if defined(DMR_DEBUG)
+        dmr_log_debug("LC: parities received:");
+        dmr_dump_hex(bytes, 12);
+        memset(bytes + 9, 0, 3);
+        dmr_rs_12_9_4_encode(bytes, lc_crc_mask[packet->data_type]);
+        dmr_log_debug("LC: parities calculated locally:");
+        dmr_dump_hex(bytes, 12);
+#endif
+        return -1;
+    }
+
     dmr_free(bptc);
 
     lc->flco_pdu = (bytes[0] & 0x3f);
@@ -35,31 +59,14 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     lc->fid      = (bytes[1]);
     lc->dst_id   = (bytes[3] << 16) | (bytes[4] << 8) | (bytes[5]);
     lc->src_id   = (bytes[6] << 16) | (bytes[7] << 8) | (bytes[8]);
-    memcpy(lc->crc, bytes + DMR_RS_12_9_DATASIZE, sizeof(lc->crc));
-
-    // Retrieve checksum with CRC mask applied. See DMR AI. spec. page 143.
-    switch (packet->data_type) {
-    case DMR_DATA_TYPE_VOICE_LC:
-        lc->crc[0] ^= DMR_CRC_MASK_VOICE_LC[0];
-        lc->crc[1] ^= DMR_CRC_MASK_VOICE_LC[1];
-        lc->crc[2] ^= DMR_CRC_MASK_VOICE_LC[2];
-        break;
-    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-        lc->crc[0] ^= DMR_CRC_MASK_TERMINATOR_WITH_LC[0];
-        lc->crc[1] ^= DMR_CRC_MASK_TERMINATOR_WITH_LC[1];
-        lc->crc[2] ^= DMR_CRC_MASK_TERMINATOR_WITH_LC[2];
-        break;
-    default:
-        dmr_log_error("lc: unsupported data type %s", dmr_data_type_name(packet->data_type));
-        return -1;
-    }
+    memcpy(lc->crc, bytes + 9, 3);
 
     return 0;
 }
 
 int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type_t data_type)
 {
-    if (lc == NULL || bytes == NULL)
+    if (lc == NULL || bytes == NULL || data_type >= DMR_DATA_TYPE_INVALID)
         return dmr_error(DMR_EINVAL);
 
     memset(bytes, 0, 12);
@@ -75,31 +82,14 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type
     bytes[8]  = lc->src_id >>  0;
 
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dmr_dump_hex(bytes, DMR_RS_12_9_DATASIZE);
+        dmr_dump_hex(bytes, 12);
     }
 
     // Calculate RS(12, 9) checksum
-    dmr_log_trace("lc: calculating RS(12, 9) checksum:");
-    uint8_t crc[DMR_RS_12_9_CHECKSUMSIZE];
-    dmr_rs_12_9_encode(bytes, crc);
+    dmr_log_trace("lc: calculating Reed-Solomon (12, 9, 4) parities:");
+    dmr_rs_12_9_4_encode(bytes, lc_crc_mask[data_type]);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dmr_dump_hex(crc, sizeof(crc));
-    }
-
-    // Store checksum with CRC mask applied. See DMR AI. spec. page 143.
-    switch (data_type) {
-    case DMR_DATA_TYPE_VOICE_LC:
-        bytes[9]  = crc[2] ^ DMR_CRC_MASK_VOICE_LC[0];
-        bytes[10] = crc[1] ^ DMR_CRC_MASK_VOICE_LC[1];
-        bytes[11] = crc[0] ^ DMR_CRC_MASK_VOICE_LC[2];
-        break;
-    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-        bytes[9]  = crc[2] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[0];
-        bytes[10] = crc[1] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[1];
-        bytes[11] = crc[0] ^ DMR_CRC_MASK_TERMINATOR_WITH_LC[2];
-        break;
-    default:
-        break;
+        dmr_dump_hex(bytes, 12);
     }
 
     return 0;

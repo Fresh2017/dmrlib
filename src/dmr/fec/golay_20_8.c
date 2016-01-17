@@ -229,7 +229,7 @@ uint8_t dmr_golay_20_8_decode(uint8_t data[3])
     uint32_t code = (data[0] << 11) | (data[1] << 3) | (data[2] >> 5);
     uint32_t syndrome = dmr_golay_20_8_syndrome(code);
     uint32_t pattern = golay_20_8_decoder[syndrome];
-    dmr_log_trace("golay_20_8: decode 0x%04x", code);
+    dmr_log_trace("golay_20_8: decode %#04x", code);
 
     if (pattern != 0)
         code ^= pattern;
@@ -240,7 +240,7 @@ uint8_t dmr_golay_20_8_decode(uint8_t data[3])
 void dmr_golay_20_8_encode(uint8_t data[3])
 {
     uint16_t checksum = golay_20_8_encoder[data[0]];
-    dmr_log_trace("golay_20_8: encode 0x%02x, checksum=0x%04x",
+    dmr_log_trace("golay_20_8: encode %#02x, checksum=%#04x",
         data[0], checksum);
     data[1] = checksum;
     data[2] = checksum >> 8;

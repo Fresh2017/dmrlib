@@ -11,6 +11,10 @@ extern "C" {
 
 #include <inttypes.h>
 
+#define DMR_CRC8_MASK_VOICE_PI              (0x69)
+#define DMR_CRC8_MASK_VOICE_LC              (0x96)
+#define DMR_CRC8_MASK_TERMINATOR_WITH_LC    (0x99)
+
 extern void dmr_crc9(uint16_t *crc, uint8_t byte, uint8_t bitlen);
 extern void dmr_crc9_finish(uint16_t *crc, uint8_t bitlen);
 extern void dmr_crc16(uint16_t *crc, uint8_t byte);

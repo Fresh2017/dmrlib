@@ -54,6 +54,7 @@
 #include "dmr/fec/reed_solomon.h"
 #include "dmr/error.h"
 #include "dmr/malloc.h"
+#include "dmr/bits.h"
 
 static dmr_rs_t *rs8 = NULL;
 
@@ -376,9 +377,8 @@ int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd)
     return irrecoverable_error;
 }
 
-#include "dmr/bits.h"
-
-int dmr_rs_init(void) {
+int dmr_rs_init(void)
+{
     if (rs8 == NULL) {
         dmr_log_trace("Reed-Solomon(12,9,4): init");
         rs8 = dmr_rs_new(0x11d, 8, 2);

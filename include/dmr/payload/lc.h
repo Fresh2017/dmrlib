@@ -7,7 +7,7 @@
 #include <dmr/type.h>
 #include <dmr/packet.h>
 #include <dmr/payload.h>
-#include <dmr/fec/rs_12_9.h>
+#include <dmr/fec/reed_solomon.h>
 
 typedef enum {
     DMR_SO_PRIORITY_NONE,

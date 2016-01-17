@@ -30,6 +30,8 @@ typedef struct {
     unsigned int n;     /*!< distance = nn-kk+1 = 2*tt+1 */
 } dmr_rs_t;
 
+extern int dmr_rs_init(void);
+
 extern dmr_rs_t *dmr_rs_new(unsigned int generator_polinomial, int mm, unsigned char tt);
 extern void dmr_rs_encode(dmr_rs_t *rs, const unsigned char *data, unsigned char *bb);
 extern int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd);

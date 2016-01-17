@@ -11,10 +11,10 @@ extern "C" {
 
 #include <dmr/fec/bptc_196_96.h>
 #include <dmr/fec/qr_16_7.h>
-#include <dmr/fec/rs_12_9.h>
+#include <dmr/fec/reed_solomon.h>
 
 /** Initialize the Forward Error Correction functions. */
-extern void dmr_fec_init(void);
+extern int dmr_fec_init(void);
 
 #ifdef __cplusplus
 }

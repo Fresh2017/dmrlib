@@ -68,7 +68,7 @@ static void bptc_196_96_deinterleave(dmr_bptc_196_96_t *bptc)
 
 static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
 {
-	uint8_t attempt = 0, col, row, pos, i, err = 0;
+	uint8_t col, row, pos, err = 0;
 	bool parity[4], cbits[13], ok = true;
 
 	for (col = 0; col < 15; col++) {
@@ -183,62 +183,11 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	return 0;
 }
 
-static void bptc_196_96_encode_data(dmr_bptc_196_96_t *bptc, uint8_t data[12])
-{
-	bool bits[96];
-	uint8_t i, j = 0;
-
-	// All 12 bytes
-	for (i = 0; i < 12; i++)
-		dmr_byte_to_bits(*(data + i), bits + (i << 3));
-
-	// Store deinterleaved bits
-	memset(bptc->deinterleaved_bits, 0, sizeof(bptc->deinterleaved_bits));
-#define C(a, b) do { for (i = a; i < b; i++, j++) bptc->deinterleaved_bits[i] = bits[j]; } while(0)
-	C(  4,  12);
-	C( 16,  27);
-	C( 31,  42);
-	C( 46,  57);
-	C( 61,  72);
-	C( 76,  87);
-	C( 91, 102);
-	C(106, 117);
-	C(121, 132);
-#undef C
-}
-
 static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 {
 	bool parity[4], cbits[13];
-	uint8_t i, col, row, pos = 0;
+	uint8_t col, row, pos = 0;
 
-	/*
-	// For all 15 columns
-	for (col = 0; col < 15; col++) {
-		pos = col + 1;
-		for (i = 0; i < 13; i++) {
-			cbits[i] = bptc->deinterleaved_bits[pos];
-			pos += 15;
-		}
-		dmr_hamming_13_9_3_encode_bits(cbits, cbits + 9);
-
-		pos = col + 1;
-		for (i = 0; i < 13; i++) {
-			bptc->deinterleaved_bits[pos] = cbits[i];
-			pos += 15;
-		}
-	}
-
-	// For all 9 rows
-	for (row = 0; row < 9; row++) {
-		pos = (row * 15) + 1;
-		dmr_hamming_15_11_3_encode_bits(
-			bptc->deinterleaved_bits + pos,
-			bptc->deinterleaved_bits + pos + 11);
-	}
-	*/
-
-	pos = 0;
 	for (row = 0; row < 9; row++) {
 		if (row == 0) {
 			for (col = 3; col < 11; col++) {

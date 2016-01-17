@@ -71,12 +71,14 @@ void usage(const char *program)
     fprintf(stderr, "\t-?, -h\t\t\tShow this help.\n");
     fprintf(stderr, "\t--source <source>\tPCAP source file.\n");
     fprintf(stderr, "\t-r <source>\n");
+    fprintf(stderr, "\t-v\tIncrease verbosity.\n");
+    fprintf(stderr, "\t-q\tDecrease verbosity.\n");
 }
 
 void dump_dmr_packet(dmr_packet_t *packet)
 {
     dmr_sync_pattern_t sync_pattern;
-    dmr_emb_t *emb = NULL;
+    dmr_emb_t emb;
 
     printf("[ts%d][%u->%u(%u)][%02x/%08x] %s",
         packet->ts + 1,
@@ -85,7 +87,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
         packet->meta.sequence,
         packet->meta.stream_id,
         dmr_data_type_name(packet->data_type));
-    
+
     sync_pattern = dmr_sync_pattern_decode(packet);
     if (sync_pattern != DMR_SYNC_PATTERN_UNKNOWN) {
         printf(", sync pattern: %s\n", dmr_sync_pattern_name(sync_pattern));
@@ -96,6 +98,27 @@ void dump_dmr_packet(dmr_packet_t *packet)
     }
 
     dmr_dump_packet(packet);
+
+    /* For data types that have slot type encoding, try decoding on a test packet. */
+    if (packet->data_type == DMR_DATA_TYPE_VOICE_PI           ||
+        packet->data_type == DMR_DATA_TYPE_VOICE_LC           ||
+        packet->data_type == DMR_DATA_TYPE_TERMINATOR_WITH_LC ||
+        packet->data_type == DMR_DATA_TYPE_CSBK               ||
+        packet->data_type == DMR_DATA_TYPE_MBC                ||
+        packet->data_type == DMR_DATA_TYPE_MBCC               ||
+        packet->data_type == DMR_DATA_TYPE_DATA               ||
+        packet->data_type == DMR_DATA_TYPE_RATE12_DATA        ||
+        packet->data_type == DMR_DATA_TYPE_RATE34_DATA        ||
+        packet->data_type == DMR_DATA_TYPE_IDLE) {
+        dmr_packet_t test_packet;
+        memcpy(&test_packet, packet, sizeof(dmr_packet_t));
+        dmr_slot_type_decode(&test_packet);
+        if (packet->data_type != test_packet.data_type) {
+            dmr_log_error("packet: data type mismatch!!!, protocol said %s (%d), but we decoded %s (%d)",
+                dmr_data_type_name(packet->data_type), packet->data_type,
+                dmr_data_type_name(test_packet.data_type), test_packet.data_type);
+        }
+    }
 
     switch (packet->data_type) {
     /*
@@ -153,16 +176,43 @@ void dump_dmr_packet(dmr_packet_t *packet)
     case DMR_DATA_TYPE_VOICE:
     {
         // Frame should contain embedded signalling.
-        if (dmr_emb_decode(emb, packet) != 0) {
+        if (dmr_emb_decode(&emb, packet) != 0) {
             fprintf(stderr, "embedded signalling decode failed: %s\n", dmr_error_get());
             return;
         }
-        printf("embedded signalling: color code %d, lcss %d (%s)\n",
-            emb->color_code,
-            emb->lcss, dmr_emb_lcss_name(emb->lcss));
+        printf("embedded signalling: color code %d, lcss %d (%s)",
+            emb.color_code,
+            emb.lcss, dmr_emb_lcss_name(emb.lcss));
 
-        if (emb->lcss == DMR_EMB_LCSS_SINGLE_FRAGMENT) {
+        switch (emb.lcss) {
+        case DMR_EMB_LCSS_SINGLE_FRAGMENT:
+        {
+            printf(", single fragment");
+            uint8_t bytes[4];
+            if (dmr_emb_bytes_decode(bytes, packet) != 0) {
+                printf(", bytes decode failed: %s\n", dmr_error_get());
+                return;
+            }
+            if (dmr_emb_null(bytes)) {
+                printf(", NULL EMB\n");
+            } else {
+                printf(", RC info\n");
+            }
+            break;
         }
+        case DMR_EMB_LCSS_FIRST_FRAGMENT:
+            printf(", first fragment\n");
+            break;
+        case DMR_EMB_LCSS_CONTINUATION:
+            printf(", continuation\n");
+            break;
+        case DMR_EMB_LCSS_LAST_FRAGMENT:
+            printf(", last fragment\n");
+            break;
+        default:
+            break;
+        }
+
         break;
     }
     default:
@@ -216,7 +266,7 @@ int main(int argc, char **argv)
     struct pcap_pkthdr header;
     const uint8_t *packet;
 
-    while ((ch = getopt_long(argc, argv, "r:h?v", long_options, NULL)) != -1) {
+    while ((ch = getopt_long(argc, argv, "r:h?vq", long_options, NULL)) != -1) {
         switch (ch) {
         case -1:       /* no more arguments */
         case 0:        /* long options toggles */
@@ -230,6 +280,9 @@ int main(int argc, char **argv)
             break;
         case 'v':
             dmr_log_priority_set(dmr_log_priority() - 1);
+            break;
+        case 'q':
+            dmr_log_priority_set(dmr_log_priority() + 1);
             break;
         default:
             return 1;

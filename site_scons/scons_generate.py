@@ -51,5 +51,3 @@ def GenerateVersions(env, versions):
 				name.upper() + '_VERSION_TAG': tag,
 			}
 			env.Append(**update)
-
-	print(env.Dump())

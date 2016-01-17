@@ -30,8 +30,10 @@ typedef struct {
 } dmr_emb_signalling_lc_bits_t;
 
 extern int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet);
+extern int dmr_emb_bytes_decode(uint8_t bytes[4], dmr_packet_t *packet);
 extern int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet);
 extern int dmr_emb_encode_lc(dmr_full_lc_t *lc, dmr_emb_lcss_t lcss, uint8_t fragment, dmr_packet_t *packet);
+extern bool dmr_emb_null(uint8_t bytes[4]);
 extern char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss);
 extern dmr_emb_signalling_lc_bits_t *dmr_emb_signalling_lc_interlave(dmr_emb_signalling_lc_bits_t *emb_bits);
 extern int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signalling_lc_bits_t *emb_bitss, dmr_data_type_t data_type);

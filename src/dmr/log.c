@@ -100,11 +100,14 @@ dmr_log_priority_t dmr_log_priority(void)
 
 void dmr_log_priority_set(dmr_log_priority_t priority)
 {
-    if (priority == log_priority)
+    dmr_log_priority_t old_priority = log_priority;
+    if (priority == old_priority)
         return;
-        
+
     log_priority = min(DMR_LOG_PRIORITY_TRACE, max(priority, DMR_LOG_PRIORITIES - 1));
-    dmr_log_info("log: priority set to %s", dmr_log_priority_names[log_priority]);
+    dmr_log_debug("log: priority changed %s -> %s",
+        dmr_log_priority_names[old_priority],
+        dmr_log_priority_names[log_priority]);
 }
 
 const char *dmr_log_prefix(void)

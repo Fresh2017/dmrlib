@@ -58,6 +58,8 @@ int dmr_error_set(const char *fmt, ...)
 
 const char *dmr_error_get(void)
 {
+    if (strlen(error.msg) == 0)
+        return "no error";
     return error.msg;
 }
 

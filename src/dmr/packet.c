@@ -59,7 +59,7 @@ void dmr_dump_packet(dmr_packet_t *packet)
         buf,
         packet->meta.stream_id);
 
-    dmr_sync_pattern_t pattern = dmr_sync_pattern_decode(packet);    
+    dmr_sync_pattern_t pattern = dmr_sync_pattern_decode(packet);
     if (packet->data_type < DMR_DATA_TYPE_INVALID) {
         dmr_log_debug("packet: sync pattern: %s", dmr_sync_pattern_name(pattern));
     }
@@ -102,7 +102,7 @@ void dmr_dump_packet(dmr_packet_t *packet)
                     break;
                 }
                 break;
-                
+
             default:
                 break;
             }
@@ -158,7 +158,6 @@ void dmr_dump_packet(dmr_packet_t *packet)
         }
     }
 
-    dmr_log_critical("hi mom!");
     if (packet->data_type == DMR_DATA_TYPE_VOICE_LC) {
         dmr_full_lc_t full_lc;
         if (dmr_full_lc_decode(&full_lc, packet) != 0) {
@@ -299,6 +298,7 @@ int dmr_slot_type_decode(dmr_packet_t *packet)
 
     uint8_t bytes[3];
     memset(bytes, 0, sizeof(bytes));
+    /* See Table E.1: Transmit bit order for BPTC general data burst with SYNC */
     bytes[0]  = (packet->payload[12] << 2) & B11111100;
     bytes[0] |= (packet->payload[13] >> 6) & B00000011;
     bytes[1]  = (packet->payload[13] << 2) & B11000000;
@@ -307,6 +307,8 @@ int dmr_slot_type_decode(dmr_packet_t *packet)
     bytes[2]  = (packet->payload[20] << 2) & B11110000;
 
     uint8_t code = dmr_golay_20_8_decode(bytes);
+    dmr_log_debug("packet: slot type Golay(20, 8) code: 0x%02x%02x%02x -> 0x%02x",
+        bytes[0], bytes[1], bytes[2], code);
     packet->color_code = (code & B11110000) >> 4;
     packet->data_type  = (code & B00001111);
 
@@ -336,8 +338,8 @@ int dmr_slot_type_encode(dmr_packet_t *packet)
 
     uint8_t bytes[3];
     memset(bytes, 0, sizeof(bytes));
-    bytes[0]  = (packet->color_code << 4) & B11110000;
-    bytes[0] |= (packet->data_type  << 0) & B00001111;
+    bytes[0]  = (packet->color_code << 4) & 0xf0;
+    bytes[0] |= (packet->data_type  << 0) & 0x0f;
 
     dmr_golay_20_8_encode(bytes);
 

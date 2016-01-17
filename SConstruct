@@ -70,6 +70,13 @@ AddOption(
     default=False,
     help='Compile with dmalloc',
 )
+AddOption(
+    '--with-tests',
+    dest='with_tests',
+    action='store_true',
+    default=False,
+    help='Compile with unit tests',
+)
 
 env.Append(
     ENABLE_ALL=int(GetOption('enable_all')),
@@ -206,6 +213,14 @@ mmdvmtest = env.SConscript(
 env.Install('dist', mmdvmtest)
 env.Depends(mmdvmtest, dmr)
 '''
+
+if GetOption('with_tests'):
+    tests = env.SConscript(
+        os.path.join('test', 'SConscript'),
+        variant_dir='build/test',
+        duplicate=0,
+    )
+    env.Depends(tests, dmr)
 
 if sys.platform in ('darwin', 'linux2'):
     noisebridge = env.SConscript(

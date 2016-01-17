@@ -15,20 +15,44 @@ int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet)
 
     uint8_t emb_bytes[2];
     memset(emb_bytes, 0, sizeof(emb_bytes));
-    emb_bytes[0]  = (packet->payload[13] << 4) & 0xf0U;
-    emb_bytes[0] |= (packet->payload[14] >> 4) & 0x0fU;
-    emb_bytes[1]  = (packet->payload[18] << 4) & 0xf0U;
-    emb_bytes[1] |= (packet->payload[19] >> 4) & 0x0fU;
+    emb_bytes[0]  = (packet->payload[13] << 4) & 0xf0;
+    emb_bytes[0] |= (packet->payload[14] >> 4) & 0x0f;
+    emb_bytes[1]  = (packet->payload[18] << 4) & 0xf0;
+    emb_bytes[1] |= (packet->payload[19] >> 4) & 0x0f;
+    dmr_log_trace("emb: bytes: %02x %02x", emb_bytes[0], emb_bytes[1]);
     if (!dmr_qr_16_7_decode(emb_bytes)) {
         dmr_log_debug("emb: qr_16_7 checksum failed");
         return -1;
     }
 
-    emb->color_code = ((emb_bytes[0] >> 0) & 0x0f);
-    emb->pi         = ((emb_bytes[0] >> 4) & 0x01) == 0x01;
-    emb->lcss       = ((emb_bytes[0] >> 5) & 0x03);
+    /* See Table E.6: Transmit bit order for voice burst with embedded signalling fragment 1 */
+    emb->color_code = (emb_bytes[0] >> 4) & 0x0f;
+    emb->pi         = (emb_bytes[0] & 0x08) == 0x08;
+    emb->lcss       = (emb_bytes[0] >> 5) & 0x07;
 
     return 0;
+}
+
+int dmr_emb_bytes_decode(uint8_t bytes[4], dmr_packet_t *packet)
+{
+    if (bytes == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    bytes[0]  = (packet->payload[14] << 4) & 0xf0;
+    bytes[0] |= (packet->payload[15] >> 4) & 0x0f;
+    bytes[1]  = (packet->payload[15] << 4) & 0xf0;
+    bytes[1] |= (packet->payload[16] >> 4) & 0x0f;
+    return 0;
+}
+
+bool dmr_emb_null(uint8_t bytes[4])
+{
+    uint8_t i;
+    for (i = 0; i < 4; i++) {
+        if (bytes[i] != 0x00)
+            return false;
+    }
+    return true;
 }
 
 int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
@@ -163,9 +187,9 @@ int dmr_emb_lcss_fragment_encode(dmr_emb_t *emb, dmr_vbptc_16_11_t *vbptc, uint8
 
     if (vbptc != NULL && dmr_vbptc_16_11_get_fragment(vbptc, bits, offset, 32) != 0) {
        return dmr_error(DMR_LASTERROR);
-    }    
+    }
     dmr_bits_to_bytes(bits, sizeof(bits), lc_bytes, sizeof(lc_bytes));
-    
+
     packet->payload[14] = (packet->payload[14] & 0xf0) | (lc_bytes[0]         >> 4);
     packet->payload[15] = (lc_bytes[0]  << 4)          | (lc_bytes[1]         >> 4);
     packet->payload[16] = (lc_bytes[1]  << 4)          | (lc_bytes[2]         >> 4);

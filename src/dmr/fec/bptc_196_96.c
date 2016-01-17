@@ -46,35 +46,13 @@ static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
 
 static void bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet)
 {
-	dmr_byte_to_bits(packet->payload[ 0], bptc->raw + 0);
-	dmr_byte_to_bits(packet->payload[ 1], bptc->raw + 8);
-	dmr_byte_to_bits(packet->payload[ 2], bptc->raw + 16);
-	dmr_byte_to_bits(packet->payload[ 3], bptc->raw + 24);
-	dmr_byte_to_bits(packet->payload[ 4], bptc->raw + 32);
-	dmr_byte_to_bits(packet->payload[ 5], bptc->raw + 40);
-	dmr_byte_to_bits(packet->payload[ 6], bptc->raw + 48);
-	dmr_byte_to_bits(packet->payload[ 7], bptc->raw + 56);
-	dmr_byte_to_bits(packet->payload[ 8], bptc->raw + 64);
-	dmr_byte_to_bits(packet->payload[ 9], bptc->raw + 72);
-	dmr_byte_to_bits(packet->payload[10], bptc->raw + 80);
-	dmr_byte_to_bits(packet->payload[11], bptc->raw + 88);
-	dmr_byte_to_bits(packet->payload[12], bptc->raw + 96);
-	bool bits[8];
-	dmr_byte_to_bits(packet->payload[20], bits);
-	bptc->raw[98] = bits[6];
-	bptc->raw[99] = bits[7];
-	dmr_byte_to_bits(packet->payload[21], bptc->raw + 100);
-	dmr_byte_to_bits(packet->payload[22], bptc->raw + 108);
-	dmr_byte_to_bits(packet->payload[23], bptc->raw + 116);
-	dmr_byte_to_bits(packet->payload[24], bptc->raw + 124);
-	dmr_byte_to_bits(packet->payload[25], bptc->raw + 132);
-	dmr_byte_to_bits(packet->payload[26], bptc->raw + 140);
-	dmr_byte_to_bits(packet->payload[27], bptc->raw + 148);
-	dmr_byte_to_bits(packet->payload[28], bptc->raw + 156);
-	dmr_byte_to_bits(packet->payload[29], bptc->raw + 164);
-	dmr_byte_to_bits(packet->payload[30], bptc->raw + 172);
-	dmr_byte_to_bits(packet->payload[31], bptc->raw + 180);
-	dmr_byte_to_bits(packet->payload[32], bptc->raw + 188);
+	/* First decode all 33 bytes to 264 bits */
+	bool bits[DMR_PAYLOAD_BITS];
+	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
+	/* First 98 bits */
+	memcpy(bptc->raw +  0, bits +   0, sizeof(bool) * 98);
+	/* Second 98 bits, skipping over slot type (20 bits) and sync (48 bits) */
+	memcpy(bptc->raw + 98, bits + 166, sizeof(bool) * 98);
 }
 
 static void bptc_196_96_deinterleave(dmr_bptc_196_96_t *bptc)
@@ -94,7 +72,7 @@ static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
 	uint8_t attempt = 0, col, row, pos, i;
 	do {
 		retry = false;
-		
+
 		// Run through each of the 15 columns
 		bool cbits[13];
 		for (col = 0; col < 15; col++) {
@@ -195,12 +173,12 @@ static void bptc_196_96_encode_data(dmr_bptc_196_96_t *bptc, uint8_t data[12])
 {
 	bool bits[96];
 	uint8_t i, j = 0;
-	
+
 	// All 12 bytes
 	for (i = 0; i < 12; i++)
 		dmr_byte_to_bits(*(data + i), bits + (i << 3));
 
-	// Store deinterleaved bits	
+	// Store deinterleaved bits
 	memset(bptc->deinterleaved_bits, 0, sizeof(bptc->deinterleaved_bits));
 #define C(a, b) do { for (i = a; i < b; i++, j++) bptc->deinterleaved_bits[i] = bits[j]; } while(0)
 	C(  4,  12);
@@ -219,7 +197,7 @@ static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 {
 	bool bits[196] = { 0, }, cbits[13] = { 0, };
 	uint8_t i, col, row, pos = 0;
-	
+
 	// For all 15 columns
 	for (col = 0; col < 15; col++) {
 		pos = col + 1;
@@ -228,7 +206,7 @@ static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 			pos += 15;
 		}
 		dmr_hamming_13_9_3_encode_bits(cbits, cbits + 9);
-		
+
 		pos = col + 1;
 		for (i = 0; i < 13; i++) {
 			bptc->deinterleaved_bits[pos] = cbits[i];
@@ -243,7 +221,8 @@ static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 			bptc->deinterleaved_bits + pos,
 			bptc->deinterleaved_bits + pos + 11);
 	}
-	
+
+	/*
 	for (col = 0; col < 15; col++) {
 		for (row = 0; row < 9; row++) {
 			cbits[row] = bptc->deinterleaved_bits[(row * 15) + 1];
@@ -255,7 +234,6 @@ static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 		bptc->deinterleaved_bits[col + 135 + 1 + 45] = cbits[12];
 	}
 
-	/*
 	for (row = 0; row < 9; row++) {
 		if (row == 0) {
 			for (col = 3; col < 11; col++) {
@@ -280,7 +258,7 @@ static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
 		bits[col + 135 + 1 + 30] = cbits[11];
 		bits[col + 135 + 1 + 45] = cbits[12];
 	}
-	
+
 	memcpy(bptc->deinterleaved_bits, bits, sizeof(bits));
 	*/
 }
@@ -298,36 +276,15 @@ static void bptc_196_96_interleave(dmr_bptc_196_96_t *bptc)
 
 static void bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet)
 {
-	// First 104 bits
-	packet->payload[ 0] = dmr_bits_to_byte(bptc->raw +  0);
-	packet->payload[ 1] = dmr_bits_to_byte(bptc->raw +  8);
-	packet->payload[ 2] = dmr_bits_to_byte(bptc->raw + 16);
-	packet->payload[ 3] = dmr_bits_to_byte(bptc->raw + 24);
-	packet->payload[ 4] = dmr_bits_to_byte(bptc->raw + 32);
-	packet->payload[ 5] = dmr_bits_to_byte(bptc->raw + 40);
-	packet->payload[ 6] = dmr_bits_to_byte(bptc->raw + 48);
-	packet->payload[ 7] = dmr_bits_to_byte(bptc->raw + 56);
-	packet->payload[ 8] = dmr_bits_to_byte(bptc->raw + 64);
-	packet->payload[ 9] = dmr_bits_to_byte(bptc->raw + 72);
-	packet->payload[10] = dmr_bits_to_byte(bptc->raw + 80);
-	packet->payload[11] = dmr_bits_to_byte(bptc->raw + 88);
-	// Last 4 bits of first half and first 4 bits of last half
-	uint8_t byte = dmr_bits_to_byte(bptc->raw + 96);
-	packet->payload[12] = (packet->payload[12] & 0x3f) | ((byte >> 0) & 0xc0);
-	packet->payload[13] = (packet->payload[13] & 0xfc) | ((byte >> 4) & 0x03);
-	// Last 104 bits
-	packet->payload[21] = dmr_bits_to_byte(bptc->raw + 100);
-	packet->payload[22] = dmr_bits_to_byte(bptc->raw + 108);
-	packet->payload[23] = dmr_bits_to_byte(bptc->raw + 116);
-	packet->payload[24] = dmr_bits_to_byte(bptc->raw + 124);
-	packet->payload[25] = dmr_bits_to_byte(bptc->raw + 132);
-	packet->payload[26] = dmr_bits_to_byte(bptc->raw + 140);
-	packet->payload[27] = dmr_bits_to_byte(bptc->raw + 148);
-	packet->payload[28] = dmr_bits_to_byte(bptc->raw + 156);
-	packet->payload[29] = dmr_bits_to_byte(bptc->raw + 164);
-	packet->payload[30] = dmr_bits_to_byte(bptc->raw + 172);
-	packet->payload[31] = dmr_bits_to_byte(bptc->raw + 180);
-	packet->payload[32] = dmr_bits_to_byte(bptc->raw + 188);
+	/* First decode all 33 bytes to 264 bits */
+	bool bits[DMR_PAYLOAD_BITS];
+	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
+	/* First 98 bits */
+	memcpy(bits +   0, bptc->raw +  0, sizeof(bool) * 98);
+	/* Second 98 bits, skipping over slot type (20 bits) and sync (48 bits) */
+	memcpy(bits + 166, bptc->raw + 98, sizeof(bool) * 98);
+	/* Convert back to bytes */
+	dmr_bits_to_bytes(bits, DMR_PAYLOAD_BITS, packet->payload, DMR_PAYLOAD_BYTES);
 }
 
 int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12])

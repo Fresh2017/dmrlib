@@ -16,7 +16,7 @@ bool test_all(void)
 }
 
 static test_t tests[] = {
-    {"Quadratic Residue (16,7,6) encode & decode", test_all},
+    {"Quadratic Residue(16,7,6) encode & decode", test_all},
     {NULL, NULL} /* sentinel */
 };
 

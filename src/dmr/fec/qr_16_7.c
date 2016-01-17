@@ -26,7 +26,7 @@ void dmr_qr_16_7_encode(uint8_t buf[2])
     /* See Table E.6: Transmit bit order for voice burst with embedded signalling fragment 1 */
     uint16_t dv = (buf[0] >> 1) & 0x7f;
     uint16_t qr = qr_16_7_encoder_map[dv];
-    dmr_log_trace("qr_16_7: encode %02x, qr = %04x", dv, qr);
+    dmr_log_trace("QR(16,7): encode %02x, qr = %04x", dv, qr);
     buf[0] = qr >> 8;
     buf[1] = qr & 0xff;
 }
@@ -35,6 +35,6 @@ bool dmr_qr_16_7_decode(uint8_t buf[2])
 {
     uint8_t dv = buf[0] >> 1;
     uint16_t parity = (buf[0] & 0x01) << 8 | buf[1];
-    dmr_log_trace("qr_16_7: dv=%02x, parity=%04x", dv, parity);
+    dmr_log_trace("QR(16,7): dv=%02x, parity=%04x", dv, parity);
     return (qr_16_7_encoder_map[dv] & 0x1ff) == parity;
 }

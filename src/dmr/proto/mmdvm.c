@@ -267,7 +267,7 @@ static char *dmr_mmdvm_command_name(uint8_t command)
 FILE *dump;
 #endif
 
-dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes)
+dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag)
 {
     dmr_mmdvm_t *modem = dmr_malloc_zero(dmr_mmdvm_t);
     if (modem == NULL)

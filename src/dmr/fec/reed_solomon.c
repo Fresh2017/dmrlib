@@ -78,12 +78,12 @@ dmr_rs_t *dmr_rs_new(unsigned int generator_polinomial, int mm, unsigned char tt
     if (rs == NULL)
         return NULL;
 
-    rs->alpha_to = dmr_malloc_child_size(rs, mm);
+    rs->alpha_to = dmr_malloc_child_size(rs, 512);
     if (rs->alpha_to == NULL) {
         dmr_free(rs);
         return NULL;
     }
-    rs->index_of = dmr_malloc_child_size(rs, mm);
+    rs->index_of = dmr_malloc_child_size(rs, 512);
     if (rs->index_of == NULL) {
         dmr_free(rs);
         return NULL;
@@ -114,7 +114,7 @@ dmr_rs_t *dmr_rs_new(unsigned int generator_polinomial, int mm, unsigned char tt
 
     rs->gg[0] = 2; /* primitive element alpha = 2  for GF(2**mm)  */
     rs->gg[1] = 1; /* g(x) = (X+alpha) initially */
-    for (i = 2; i <= rs->n; i++) {
+    for (i = 2; i <= (int)rs->n; i++) {
         rs->gg[i] = 1;
         for (j = i - 1; j > 0; j--)
             if (rs->gg[j] != 0)
@@ -125,7 +125,7 @@ dmr_rs_t *dmr_rs_new(unsigned int generator_polinomial, int mm, unsigned char tt
     }
 
     /* convert gg[] to index form for quicker encoding */
-    for (i = 0; i <= rs->n; i++)
+    for (i = 0; i <= (int)rs->n; i++)
         rs->gg[i] = rs->index_of[rs->gg[i]];
 
     return rs;
@@ -142,7 +142,7 @@ void dmr_rs_encode(dmr_rs_t *rs, const unsigned char *data, unsigned char *bb)
     register int i, j, k = (rs->nn - rs->n);
     int feedback;
 
-    for (i = 0; i < rs->n; i++)
+    for (i = 0; i < (int)rs->n; i++)
         bb[i] = 0;
     for (i = k - 1; i >= 0; i--) {
         feedback = rs->index_of[data[i] ^ bb[rs->n - 1]];
@@ -189,7 +189,7 @@ int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd)
        recd[i] = rs->index_of[input[i]]; /* put recd[i] into index form (ie as powers of alpha) */
 
     /* first form the syndromes */
-    for (i = 1; i <= rs->n; i++) {
+    for (i = 1; i <= (int)rs->n; i++) {
         s[i] = 0;
         for (j = 0; j < rs->nn; j++)
             s[i] ^= rs->alpha_to[(unsigned int)(recd[j] + i * j) % rs->nn]; /* recd[j] in index form */
@@ -214,7 +214,7 @@ int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd)
         d[1] = s[1]; /* index form */
         elp[0][0] = 0; /* index form */
         elp[1][0] = 1; /* polynomial form */
-        for (i = 1; i < rs->n; i++) {
+        for (i = 1; i < (int)rs->n; i++) {
             elp[0][i] = -1; /* index form */
             elp[1][i] = 0; /* polynomial form */
         }
@@ -250,13 +250,13 @@ int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd)
 
                 /* have now found q such that d[u]!=0 and u_lu[q] is maximum */
                 /* store degree of new elp polynomial */
-                if (l[u] > l[q] + u - q)
+                if (l[u] > l[q] + (int)(u - q))
                     l[u + 1] = l[u];
                 else
                     l[u + 1] = l[q] + u - q;
 
                 /* form new elp(x) */
-                for (i = 0; i < rs->n; i++)
+                for (i = 0; i < (int)rs->n; i++)
                     elp[u + 1][i] = 0;
                 for (i = 0; i <= l[q]; i++)
                     if (elp[q][i] != -1)
@@ -280,7 +280,7 @@ int dmr_rs_decode(dmr_rs_t *rs, unsigned char *input, unsigned char *recd)
                         d[u + 1] ^= rs->alpha_to[(unsigned int)(s[u + 1 - i] + rs->index_of[elp[u + 1][i]]) % rs->nn];
                 d[u + 1] = rs->index_of[d[u + 1]]; /* put d[u+1] into index form */
             }
-        } while ((u < rs->n) && (l[u + 1] <= rs->tt));
+        } while ((u < (int)rs->n) && (l[u + 1] <= rs->tt));
 
         u++;
         if (l[u] <= rs->tt) /* can correct error */
@@ -385,14 +385,6 @@ int dmr_rs_init(void)
         if (rs8 == NULL) {
             return dmr_error(DMR_ENOMEM);
         }
-        //rs8->n--; /* shortened form */
-#if defined(DMR_DEBUG)
-        uint8_t i;
-        dmr_log_debug("Reed-Solomon(12,9,4): exponential table:");
-        dmr_dump_hex(rs8->index_of, rs8->nn);
-        dmr_log_debug("Reed-Solomon(12,9,4): log table:");
-        dmr_dump_hex(rs8->alpha_to, rs8->nn);
-#endif
     }
     return 0;
 }
@@ -428,7 +420,6 @@ int dmr_rs_12_9_4_decode_and_repair(uint8_t bytes[12], uint8_t crc_mask)
 
     dmr_log_trace("Reed-Solomon(12,9,4): encode using crc mask %#02x, parities %#02x%02x%02x",
         crc_mask, bytes[9] ^ crc_mask, bytes[10] ^ crc_mask, bytes[11] ^ crc_mask);
-    unsigned int error;
     uint8_t input[rs8->nn], output[rs8->nn];
     memset(input, 0, rs8->nn);
     memset(output, 0, rs8->nn);

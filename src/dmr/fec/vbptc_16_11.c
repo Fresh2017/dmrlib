@@ -90,13 +90,13 @@ bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
             errors++;
             error = dmr_vbptc_16_11_error_position(&error_vector);
             if (error < 0) {
-                dmr_log_error("vbptc_16_11: Hamming(16, 11) error, can't repair row #%u", row);
+                dmr_log_error("VBPTC(16,11): Hamming(16,11) error, can't repair row #%u", row);
                 res = false;
             } else {
-                dmr_log_debug("vbptc_16_11: Hamming(16, 11) error, fixing bit %u in row #%u", row, error);
+                dmr_log_debug("VBPTC(16,11): Hamming(16,11) error, fixing bit %u in row #%u", row, error);
                 vbptc->matrix[row * 16 + error] = !vbptc->matrix[row * 16 + error];
                 if (!dmr_vbptc_16_11_check_row(vbptc->matrix + row * 16, &error_vector)) {
-                    dmr_log_error("vbptc_16_11: Hamming(16, 11) error, repair failed on row #%u", row);
+                    dmr_log_error("VBPTC(16,11): Hamming(16,11) error, repair failed on row #%u", row);
                     res = false;
                 }
             }
@@ -109,17 +109,17 @@ bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
             parity = (parity + vbptc->matrix[row * 16 + col]) % 2;
 
         if (parity != vbptc->matrix[(vbptc->rows - 1) * 16 + col]) {
-            dmr_log_error("vbptc_16_11: parity check error in col #%u", col);
+            dmr_log_error("VBPTC(16,11): parity check error in col #%u", col);
             return false;
         }
     }
 
     if (res && !errors) {
-        dmr_log_debug("vbptc_16_11: received data has no errors");
+        dmr_log_debug("VBPTC(16,11): received data has no errors");
     } else if (res && errors) {
-        dmr_log_debug("vbptc_16_11: received data has %d recoverable errors", errors);
+        dmr_log_debug("VBPTC(16,11): received data has %d recoverable errors", errors);
     } else if (!res) {
-        dmr_log_error("vbptc_16_11: received data has errors that can't be corrected");
+        dmr_log_error("VBPTC(16,11): received data has errors that can't be corrected");
     }
 
     return res;
@@ -127,14 +127,14 @@ bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
 
 dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
 {
-    dmr_log_trace("vbptc_16_11: new with parent %p", parent);
+    dmr_log_trace("VBPTC(16,11): new with parent %p", parent);
     dmr_vbptc_16_11_t *vbptc = talloc_zero(parent, dmr_vbptc_16_11_t);
     if (vbptc == NULL)
         return NULL;
 
     vbptc->matrix = (bool *)talloc_size(vbptc, sizeof(bool) * rows * 16);
     if (vbptc->matrix == NULL) {
-        dmr_log_error("vbptc_16_11: error allocating space for matrix");
+        dmr_log_error("VBPTC(16,11): error allocating space for matrix");
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
@@ -144,7 +144,7 @@ dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
 
 void dmr_vbptc_16_11_free(dmr_vbptc_16_11_t *vbptc)
 {
-    dmr_log_trace("vbptc_16_11: free %p", vbptc);
+    dmr_log_trace("VBPTC(16,11): free %p", vbptc);
     if (vbptc == NULL)
         return;
 
@@ -177,7 +177,7 @@ int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
 
     size_t space = dmr_vbptc_16_11_matrix_free(vbptc);
     if (space == 0) {
-        dmr_log_error("vbptc_16_11: can't add burst, no free space in matrix");
+        dmr_log_error("VBPTC(16,11): can't add burst, no free space in matrix");
         return -1;
     }
 

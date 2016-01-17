@@ -11,7 +11,7 @@ static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
 {
 	uint8_t row, col;
 
-	printf("bptc_196_96: matrix:\n");
+	printf("BPTC(196,96): matrix:\n");
 	for (row = 0; row < 13; row++) {
 		if (row == 0) {
 			printf("    | ");
@@ -81,9 +81,9 @@ static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
 			pos = dmr_hamming_parity_position(parity, 4);
 			if (pos == 0xff) {
 				ok = false;
-				dmr_log_debug("bptc_196_96: Hamming (13,9,3) error, unrepairable error in col #%u", col);
+				dmr_log_debug("BPTC(196,96): Hamming (13,9,3) error, unrepairable error in col #%u", col);
 			} else {
-				dmr_log_trace("bptc_196_96: Hamming (13,9,3) error, fixing bit #%u in col #%u", pos, col);
+				dmr_log_trace("BPTC(196,96): Hamming (13,9,3) error, fixing bit #%u in col #%u", pos, col);
 				bptc->deinterleaved_bits[(pos * 15) + col + 1] = !bptc->deinterleaved_bits[(pos * 15) + col + 1];
 				for (row = 0; row < 13; row++) {
 					// +1 because the first bit is R(3) and it's not used so we can ignore that.
@@ -91,7 +91,7 @@ static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
 				}
 				if (!dmr_hamming_13_9_3_verify_bits(cbits, parity)) {
 					ok = false;
-					dmr_log_debug("bptc_196_96: Hamming (13,9,3) error, repair failed in col #%u", col);
+					dmr_log_debug("BPTC(196,96): Hamming (13,9,3) error, repair failed in col #%u", col);
 				}
 			}
 		}
@@ -103,24 +103,24 @@ static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
 			pos = dmr_hamming_parity_position(parity, 4);
 			if (pos == 0xff) {
 				ok = false;
-				dmr_log_debug("bptc_196_96: Hamming (15,11,3) error, unrepairable error in row #%u", row);
+				dmr_log_debug("BPTC(196,96): Hamming (15,11,3) error, unrepairable error in row #%u", row);
 			} else {
-				dmr_log_trace("bptc_196_96: Hamming (15,11,3) error, fixing bit #%u in row #%u", pos, row);
+				dmr_log_trace("BPTC(196,96): Hamming (15,11,3) error, fixing bit #%u in row #%u", pos, row);
 				bptc->deinterleaved_bits[(row * 15) + pos + 1] = !bptc->deinterleaved_bits[(row * 15) + pos + 1];
 				if (!dmr_hamming_15_11_3_verify_bits(bptc->deinterleaved_bits + (row * 15) + 1, parity)) {
 					ok = false;
-					dmr_log_debug("bptc_196_96: Hamming (15,11,3) error, repair failed in row #%u", row);
+					dmr_log_debug("BPTC(196,96): Hamming (15,11,3) error, repair failed in row #%u", row);
 				}
 			}
 		}
 	}
 
 	if (ok && err == 0) {
-		dmr_log_debug("bptc_196_96: no errors found");
+		dmr_log_debug("BPTC(196,96): no errors found");
 	} else if (ok) {
-		dmr_log_debug("bptc_196_96: %u errors corrected", err);
+		dmr_log_debug("BPTC(196,96): %u errors corrected", err);
 	} else {
-		dmr_log_error("bptc_196_96: unrecoverable errors");
+		dmr_log_error("BPTC(196,96): unrecoverable errors");
 	}
 
 	return ok;
@@ -159,7 +159,7 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	if (bptc == NULL || packet == NULL || data == NULL)
 		return dmr_error(DMR_EINVAL);
 
-	dmr_log_trace("bptc_196_96: decode");
+	dmr_log_trace("BPTC(196,96): decode");
 
 	// Convert to bits
 	bptc_196_96_decode(bptc, packet);
@@ -174,7 +174,7 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	// Decode and check parity
 	if (!bptc_196_96_decode_parity(bptc)) {
 		memset(data, 0, sizeof(uint8_t) * 12);
-		return dmr_error_set("bptc_196_96: parity check failed");
+		return dmr_error_set("BPTC(196,96): parity check failed");
 	}
 
 	// Convert deinterleaved bits to output data (12 bytes / 96 bits)
@@ -253,7 +253,7 @@ int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	if (bptc == NULL || packet == NULL || data == NULL)
 		return dmr_error(DMR_EINVAL);
 
-	dmr_log_trace("bptc_196_96: encode");
+	dmr_log_trace("BPTC(196,96): encode");
 
 	// Convert input data (12 bytes / 96 bits) to deinterleaved bits
 	dmr_bytes_to_bits(data, 12, bptc->deinterleaved_bits, 96);

@@ -64,10 +64,10 @@ bool test_hamming_17_12_3(void)
 }
 
 static test_t tests[] = {
-    {"Hamming (13,9,3) encode & verify",  test_hamming_13_9_3 },
-    {"Hamming (15,11,3) encode & verify", test_hamming_15_11_3},
-    {"Hamming (16,11,4) encode & verify", test_hamming_16_11_4},
-    {"Hamming (17,12,3) encode & verify", test_hamming_17_12_3},
+    {"Hamming(13,9,3) encode & verify",  test_hamming_13_9_3 },
+    {"Hamming(15,11,3) encode & verify", test_hamming_15_11_3},
+    {"Hamming(16,11,4) encode & verify", test_hamming_16_11_4},
+    {"Hamming(17,12,3) encode & verify", test_hamming_17_12_3},
     {NULL, NULL} /* sentinel */
 };
 

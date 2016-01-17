@@ -67,7 +67,7 @@ bool init_repeater()
 
         uint16_t flag = DMR_MMDVM_FLAG_FIXUP_VOICE |
                         DMR_MMDVM_FLAG_FIXUP_VOICE_LC;
-        config->mmdvm = dmr_mmdvm_open(config->mmdvm_port, config->mmdvm_rate, flag, 1000UL);
+        config->mmdvm = dmr_mmdvm_open(config->mmdvm_port, config->mmdvm_rate, flag);
         if (config->mmdvm == NULL) {
             exit(1);
             break;

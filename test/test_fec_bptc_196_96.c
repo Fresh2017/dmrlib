@@ -71,7 +71,7 @@ bool test_noise(void)
 }
 
 static test_t tests[] = {
-    {"BPTC (196,96) encode & verify", test_all},
+    {"BPTC(196,96) encode & verify", test_all},
     /* {"BPTC (196,96) encode & verify with noise", test_noise}, */
     {NULL, NULL} /* sentinel */
 };

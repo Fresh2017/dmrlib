@@ -156,7 +156,7 @@ typedef struct {
     dmr_ts_t last_dmr_ts;
 } dmr_mmdvm_t;
 
-extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag, size_t buffer_sizes);
+extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag);
 extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
 extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries);

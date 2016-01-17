@@ -1,4 +1,4 @@
-char *basename(char *prog)
+char *_basename(char *prog)
 {
     uint8_t pos = 0, sep = 0;
     while (prog[pos] != 0) {
@@ -13,7 +13,7 @@ char *basename(char *prog)
 int main(int argc, char **argv)
 {
     DMR_UNUSED(argc);
-    prog = basename(argv[0]);
+    prog = _basename(argv[0]);
 
     srand(time(NULL));
     dmr_error_clear();

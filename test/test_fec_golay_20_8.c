@@ -18,7 +18,7 @@ bool test_all(void)
 
 
 static test_t tests[] = {
-    {"Golay (20,8) encode & decode", test_all},
+    {"Golay(20,8) encode & decode", test_all},
     {NULL, NULL} /* sentinel */
 };
 

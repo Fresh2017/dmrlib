@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 
 from SCons.Script.SConscript import SConsEnvironment
 
@@ -14,6 +15,11 @@ testenv.Append(
         '#build/libdmr',
     ],
 )
+
+if sys.platform in ('linux', 'linux2'):
+    testenv.AppendENVPath(
+        'LD_LIBRARY_PATH', 'dist',
+    )
 
 tests = {}
 alias = {}

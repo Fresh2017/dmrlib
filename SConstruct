@@ -248,4 +248,4 @@ if sys.platform == 'win32':
         env.Install(dst, Glob(os.path.join('#support', 'windows', src)))
 
 #Default(None)
-#print("DEFAULT_TARGETS is now", map(str, DEFAULT_TARGETS))
+print("DEFAULT_TARGETS is now", map(str, DEFAULT_TARGETS))

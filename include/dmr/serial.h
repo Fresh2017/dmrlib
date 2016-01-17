@@ -1,6 +1,10 @@
 #ifndef _DMR_SERIAL_H
 #define _DMR_SERIAL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <dmr/platform.h>
 
 #if defined(DMR_PLATFORM_WINDOWS)
@@ -26,5 +30,9 @@ extern int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len, struct timeva
 extern int dmr_serial_close(dmr_serial_t fd);
 extern int dmr_serial_error(void);
 extern const char *dmr_serial_error_message(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_SERIAL_H

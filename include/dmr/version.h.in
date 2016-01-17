@@ -1,6 +1,10 @@
 #ifndef _DMR_VERSION_H
 #define _DMR_VERSION_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define DMRLIB_VERSION_MAJOR    @DMRLIB_VERSION_MAJOR@
 #define DMRLIB_VERSION_MINOR    @DMRLIB_VERSION_MINOR@
 #define DMRLIB_VERSION_PATCH    @DMRLIB_VERSION_PATCH@
@@ -12,5 +16,9 @@
 #define DMRLIB_VERSION          __DMR_XSTR(DMRLIB_VERSION_MAJOR) "." __DMR_XSTR(DMRLIB_VERSION_MINOR) "." __DMR_XSTR(DMRLIB_VERSION_PATCH)
 #define DMRLIB_SOFTWARE_ID      "dmrlib-" DMRLIB_VERSION
 #define DMRLIB_PACKAGE_ID       DMRLIB_VERSION_TAG ":dmrlib-" DMRLIB_VERSION
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_VERSION_H

@@ -1,6 +1,10 @@
 #ifndef _DMR_FEC_HAMMING_H
 #define _DMR_FEC_HAMMING_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 #include <stdbool.h>
 
@@ -13,5 +17,9 @@ extern bool dmr_hamming_16_11_4_verify_bits(bool bits[16], bool parity[5]);
 extern void dmr_hamming_17_12_3_encode_bits(bool bits[12], bool parity[5]);
 extern bool dmr_hamming_17_12_3_verify_bits(bool bits[17], bool parity[5]);
 extern uint8_t dmr_hamming_parity_position(bool *bits, uint8_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_FEC_HAMMING_H

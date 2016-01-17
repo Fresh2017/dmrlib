@@ -1,6 +1,10 @@
 #ifndef _DMR_FEC_VBPTC_16_11_H
 #define _DMR_FEC_VBPTC_16_11_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 #include <stdbool.h>
 
@@ -19,5 +23,9 @@ extern int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t le
 extern int dmr_vbptc_16_11_get_fragment(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t offset, uint16_t len);
 extern int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len);
 extern int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_FEC_VBPTC_16_11_H

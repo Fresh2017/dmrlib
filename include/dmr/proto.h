@@ -4,6 +4,10 @@
 #ifndef _DMR_PROTO_H
 #define _DMR_PROTO_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -102,5 +106,9 @@ extern void dmr_proto_rx_cb_run(dmr_proto_t *proto, dmr_packet_t *packet);
 extern bool dmr_proto_rx_cb_add(dmr_proto_t *proto, dmr_proto_io_cb_func_t cb, void *userdata);
 extern bool dmr_proto_rx_cb_del(dmr_proto_t *proto, dmr_proto_io_cb_func_t cb);
 extern void dmr_proto_tx(dmr_proto_t *proto, void *userdata, dmr_packet_t *packet);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_PROTO_H

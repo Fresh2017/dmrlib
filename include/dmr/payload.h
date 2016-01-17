@@ -4,6 +4,10 @@
 #ifndef _DMR_PAYLOAD_H
 #define _DMR_PAYLOAD_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/type.h>
@@ -29,5 +33,9 @@ typedef union {
 typedef struct {
 	uint8_t bytes[sizeof(dmr_payload_voice_bits_t)/8];
 } dmr_payload_voice_bytes_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_PAYLOAD_H

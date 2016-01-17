@@ -4,6 +4,10 @@
 #ifndef _DMRLIB_PACKET_H
 #define _DMRLIB_PACKET_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/type.h>
@@ -90,5 +94,9 @@ extern char *dmr_data_type_name_short(dmr_data_type_t data_type);
 extern int dmr_payload_bits(dmr_packet_t *packet, void *bits);
 extern int dmr_slot_type_decode(dmr_packet_t *packet);
 extern int dmr_slot_type_encode(dmr_packet_t *packet);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMRLIB_PACKET_H

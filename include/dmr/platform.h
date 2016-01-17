@@ -1,6 +1,10 @@
 #ifndef _DMR_PLATFORM_H
 #define _DMR_PLATFORM_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -49,5 +53,9 @@ typedef int32_t speed_t;
 #define dmr_usleep(s)     usleep(s)
 
 #endif // DMR_PLATFORM_UNIX
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_PLATFORM_H

@@ -18,6 +18,10 @@
 #ifndef _MBELIB_CONST_H
 #define _MBELIB_CONST_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Speech Synthesis Window 8k version
  */
@@ -367,5 +371,9 @@ const float Ws48k[1926] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -4,6 +4,10 @@
 #ifndef __ROTATE_DEFS_H
 #define __ROTATE_DEFS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _MSC_VER
 
 #include <stdlib.h>
@@ -15,6 +19,10 @@
 #define rotl_fixed(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 #define rotr_fixed(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

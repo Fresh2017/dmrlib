@@ -5,6 +5,10 @@
 #ifndef _DMR_PAYLOAD_CSBK_H
 #define _DMR_PAYLOAD_CSBK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <dmr/type.h>
 #include <dmr/fec/bptc_196_96.h>
 
@@ -44,5 +48,9 @@ typedef struct {
 
 extern int dmr_csbk_decode(dmr_csbk_t *csbk, dmr_packet_t *packet);
 extern char *dmr_csbk_opcode_name(dmr_csbk_opcode_t opcode);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_PAYLOAD_CSBK_H

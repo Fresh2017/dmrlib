@@ -1,6 +1,10 @@
 #ifndef _DMR_H
 #define _DMR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
 * @file
 * @mainpage dmrlib API Reference
@@ -24,5 +28,9 @@
 #include <dmr/payload/emb.h>
 #include <dmr/payload/lc.h>
 #include <dmr/payload/sync.h>
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _DMR_H

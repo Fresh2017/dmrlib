@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <dmr/error.h>
 #include <dmr/log.h>
 #include <dmr/malloc.h>

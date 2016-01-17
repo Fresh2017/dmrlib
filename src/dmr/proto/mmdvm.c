@@ -402,7 +402,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 modem->buffer[2] - DMR_MMDVM_DMR_DATA1,
                 modem->buffer[3],
                 modem->buffer[3]);
-            dump_hex(modem->buffer, len);
+            dmr_dump_hex(modem->buffer, len);
 
             dmr_packet_t *packet = dmr_packet_decode(&modem->buffer[4], len - 4);
             if (packet == NULL) {
@@ -578,7 +578,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             dmr_log_warn("mmdvm: modem sent unhandled response %d (%s), length %d\n",
                 modem->buffer[2], dmr_mmdvm_command_name(modem->buffer[2]),
                 modem->buffer[1]);
-            dump_hex(&modem->buffer[3], length - 2);
+            dmr_dump_hex(&modem->buffer[3], length - 2);
             break;
         }
 
@@ -613,7 +613,7 @@ int dmr_mmdvm_sync(dmr_mmdvm_t *modem)
             goto mmdvm_sync_retry;
         }
         dmr_log_debug("mmdvm: %d bytes of response", len);
-        dump_hex(modem->buffer, len);
+        dmr_dump_hex(modem->buffer, len);
         if (res == dmr_mmdvm_ok && modem->buffer[2] == DMR_MMDVM_GET_VERSION) {
             dmr_log_info("mmdvm: protocol %d, %.*s",
                 modem->buffer[3], len - 4, &modem->buffer[4]);

@@ -89,6 +89,10 @@ required_libs_with_header = (
     (1, 'talloc', 'talloc.h', 'c'),
 )
 
+if GetOption('with_tests') and not GetOption('with_debug'):
+    print('Cant run --with-tests without --with-debug')
+    Exit(1)
+
 if GetOption('with_debug'):
     env.Append(
         CCFLAGS=[

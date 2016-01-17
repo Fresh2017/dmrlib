@@ -482,7 +482,7 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
                 return;
             }
             if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-                dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
+                dmr_dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
             }
             dmr_dump_packet(packet);
             homebrew->proto.rx(homebrew, packet);
@@ -742,7 +742,7 @@ dmr_homebrew_frame_type_t dmr_homebrew_dump(uint8_t *buf, ssize_t len)
 
         break;
     default:
-        dump_hex(buf, len);
+        dmr_dump_hex(buf, len);
     }
 
     return frame_type;

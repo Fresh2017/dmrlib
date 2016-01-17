@@ -86,7 +86,7 @@ int main(int argc, char **argv)
             break;
         }
         dmr_log_debug("sending %d bytes:\n", n);
-        dump_hex(buf, n);
+        dmr_dump_hex(buf, n);
         start = gettime_ms();
         if (dmr_serial_write(modem->fd, buf, n) != n) {
             dmr_log_error("mmdvm: failed writing %d bytes", n);

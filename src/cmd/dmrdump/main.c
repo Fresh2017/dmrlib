@@ -232,6 +232,7 @@ void dump_homebrew(struct ip *ip_hdr, struct udphdr *udp, const uint8_t *bytes, 
 
     switch (frame_type) {
     case DMR_HOMEBREW_DMR_DATA_FRAME:
+    {
         printf("DMR data frame\n");
         packet = dmr_homebrew_parse_packet(bytes, len);
         if (packet == NULL) {
@@ -240,16 +241,19 @@ void dump_homebrew(struct ip *ip_hdr, struct udphdr *udp, const uint8_t *bytes, 
         }
 
         dump_dmr_packet(packet);
+        if (packet != NULL)
+            talloc_free(packet);
         break;
-
+    }
     case DMR_HOMEBREW_INVALID:
+    {
         printf("\x1b[1;31mnot a homebrew frame frame:\x1b[0m\n");
-        dump_hex((void *)bytes, len);
+        dmr_dump_hex((void *)bytes, len);
         break;
-
+    }
     default:
         printf("\x1b[1;31munknown frame:\x1b[0m\n");
-        dump_hex((void *)bytes, len);
+        dmr_dump_hex((void *)bytes, len);
         break;
     }
     printf("\n");

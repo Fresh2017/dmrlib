@@ -45,6 +45,6 @@ extern void dmr_byte_to_bits(uint8_t byte, bool bits[8]);
 extern void dmr_bytes_to_bits(uint8_t *bytes, size_t bytes_length, bool *bits, size_t bits_length);
 void _dmr_dump_hex(void *mem, size_t len, const char *func, size_t line);
 
-#define dump_hex(mem, len)      _dmr_dump_hex(mem, len, __FILE__, __LINE__)
+#define dmr_dump_hex(mem, len)      _dmr_dump_hex(mem, len, __FILE__, __LINE__)
 
 #endif // _DMR_BITS_H

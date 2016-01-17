@@ -62,7 +62,7 @@ int dmr_serial_write(dmr_serial_t fd, void *buf, size_t len)
 {
     dmr_log_trace("serial: write %d", len);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
-        dump_hex(buf, len);
+        dmr_dump_hex(buf, len);
     DWORD n;
     if (!WriteFile(fd, buf, len, &n, NULL))
         return -1;
@@ -179,7 +179,7 @@ int dmr_serial_write(dmr_serial_t fd, void *buf, size_t len)
 {
     dmr_log_trace("serial: write %d", len);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG)
-        dump_hex(buf, len);
+        dmr_dump_hex(buf, len);
 
     if (len == 0)
         return 0;

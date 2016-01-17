@@ -75,7 +75,7 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type
     bytes[8]  = lc->src_id >>  0;
 
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dump_hex(bytes, DMR_RS_12_9_DATASIZE);
+        dmr_dump_hex(bytes, DMR_RS_12_9_DATASIZE);
     }
 
     // Calculate RS(12, 9) checksum
@@ -83,7 +83,7 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type
     uint8_t crc[DMR_RS_12_9_CHECKSUMSIZE];
     dmr_rs_12_9_encode(bytes, crc);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dump_hex(crc, sizeof(crc));
+        dmr_dump_hex(crc, sizeof(crc));
     }
 
     // Store checksum with CRC mask applied. See DMR AI. spec. page 143.
@@ -133,7 +133,7 @@ int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         return dmr_error(DMR_LASTERROR);
 
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
+        dmr_dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
     }
 
     return 0;

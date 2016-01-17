@@ -10,9 +10,9 @@ char *dmr_byte_to_binary(uint8_t byte)
     static char bin[9];
     bin[0] = 0;
     int s;
-    for (s = 128; s > 0; s >>= 1)
+    for (s = 128; s > 0; s >>= 1) {
         strcat(bin, ((byte & s) == s) ? "1" : "0");
-
+    }
     return bin;
 }
 

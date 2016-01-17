@@ -3,6 +3,7 @@ int main(int argc, char **argv)
     DMR_UNUSED(argc);
     DMR_UNUSED(argv);
 
+    srand(time(NULL));
     dmr_error_clear();
     dmr_log_priority_set(DMR_LOG_PRIORITY_TRACE);
 

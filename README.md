@@ -111,17 +111,21 @@ Check out https://github.com/pd0mz/dmrlib
 | CRC-16 (*CCITT*)                   | √              | √              |
 | CRC-32                             | √              | √              |
 
-## Forward Error Correction
+## (Forward) Error Correction
 
 | **Algorithm**                      | **Encoding**   | **Decoding**   |
 |:-----------------------------------|:---------------|:---------------|
 | Block Product Turbo Code (196, 96) | √              | √ <sup>1</sup> |
+| Hamming (7,4,3)                    | √              | √              |
+| Hamming (13,9,3)                   | √              | √              |
+| Hamming (15,11,3)                  | √              | √              |
+| Hamming (16,11,4)                  | √              | √              |
+| Hamming (17,12,3)                  | √              | √              |
 | Golay (20, 8)                      | √              | √              |
 | Quadratic Residue (16, 7, 6)       | √              | √              |
 | Reed-Solomon (12, 9, 4)            | √              | √ <sup>2</sup> |
 | Rate ¾ Trellis                     | ⨉              | ⨉              |
 | Variable length BPTC               | √              | √              |
-
 
 1.  Full Hamming error correction not yet available
 2.  Simplified form, shortened syndrome not implemented

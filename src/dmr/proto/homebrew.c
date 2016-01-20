@@ -486,7 +486,7 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             }
             dmr_dump_packet(packet);
             homebrew->proto.rx(homebrew, packet);
-            free(packet);
+            talloc_free(packet);
 
             break;
 

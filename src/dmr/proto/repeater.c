@@ -163,17 +163,17 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
             repeater->route, proto->name, slot->proto->name);
 
         if (repeater->route != NULL) {
-            if (repeater->route(repeater, proto, slot->proto, packet_in)) {
+            dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
+            if (packet == NULL) {
+                dmr_log_error("repeater: no memory to clone packet!");
+                return;
+            }
+            memcpy(packet, packet_in, sizeof(dmr_packet_t));
+               
+            if (repeater->route(repeater, proto, slot->proto, packet)) {
                 dmr_log_debug("repeater: routing %s packet from %s->%s",
                     dmr_data_type_name(packet_in->data_type),
                     proto->name, slot->proto->name);
-
-                dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
-                if (packet == NULL) {
-                    dmr_log_error("repeater: no memory to clone packet!");
-                    return;
-                }
-                memcpy(packet, packet_in, sizeof(dmr_packet_t));
 
                 uint8_t sequence = packet->meta.sequence;
                 if (strcmp(slot->proto->name, "mmdvm")) {
@@ -183,10 +183,11 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
                     packet->meta.sequence = sequence; // FIXME
                 }
                 dmr_proto_tx(slot->proto, slot->userdata, packet);
-                talloc_free(packet);
             } else {
                 dmr_log_debug("repeater: dropping packet, refused by router");
             }
+
+            talloc_free(packet);
         }
     }
 }
@@ -327,7 +328,6 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
 
 int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 {
-    packet->ts = DMR_TS1;
     dmr_ts_t ts = packet->ts;
     dmr_repeater_timeslot_t rts = repeater->ts[ts];
     dmr_log_trace("repeater[%u]: fixed headers in %s packet",

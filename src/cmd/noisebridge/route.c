@@ -213,7 +213,7 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
 
             dmr_log_trace("noisebridge: evaluating route policy %s", rule->name);
             if (rule->modify) {
-                if (rule->ts != DMR_TS_INVALID && packet->ts != rule->ts) {
+                if (rule->ts != DMR_TS_INVALID) {
                     dmr_log_debug("noisebridge: route[%s]: modify ts %u -> %u", rule->name, packet->ts + 1, rule->ts + 1);
                     packet->ts = rule->ts;
                 } else {

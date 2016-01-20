@@ -8,15 +8,16 @@ extern "C" {
 #include <inttypes.h>
 #include <stdbool.h>
 
-extern void dmr_hamming_13_9_3_encode_bits(bool bits[9], bool parity[4]);
-extern bool dmr_hamming_13_9_3_verify_bits(bool bits[13], bool parity[4]);
-extern void dmr_hamming_15_11_3_encode_bits(bool bits[11], bool parity[4]);
-extern bool dmr_hamming_15_11_3_verify_bits(bool bits[15], bool parity[4]);
-extern void dmr_hamming_16_11_4_encode_bits(bool bits[11], bool parity[5]);
-extern bool dmr_hamming_16_11_4_verify_bits(bool bits[16], bool parity[5]);
-extern void dmr_hamming_17_12_3_encode_bits(bool bits[12], bool parity[5]);
-extern bool dmr_hamming_17_12_3_verify_bits(bool bits[17], bool parity[5]);
-extern uint8_t dmr_hamming_parity_position(bool *bits, uint8_t len);
+extern void dmr_hamming_7_4_3_encode(bool bits[7]);
+extern bool dmr_hamming_7_4_3_decode(bool bits[7]);
+extern void dmr_hamming_13_9_3_encode(bool bits[13]);
+extern bool dmr_hamming_13_9_3_decode(bool bits[13]);
+extern void dmr_hamming_15_11_3_encode(bool bits[15]);
+extern bool dmr_hamming_15_11_3_decode(bool bits[15]);
+extern void dmr_hamming_16_11_4_encode(bool bits[16]);
+extern bool dmr_hamming_16_11_4_decode(bool bits[16]);
+extern void dmr_hamming_17_12_3_encode(bool bits[17]);
+extern bool dmr_hamming_17_12_3_decode(bool bits[17]);
 
 #ifdef __cplusplus
 }

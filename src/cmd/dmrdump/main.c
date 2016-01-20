@@ -298,6 +298,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (dmr_fec_init() != 0) {
+        fprintf(stderr, "FEC init failed\n");
+        return 1;
+    }
+
     if ((handle = pcap_open_offline(source, errbuf)) == NULL) {
         fprintf(stderr, "error opening %s: %s\n", source, errbuf);
         return 1;

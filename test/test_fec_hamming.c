@@ -6,65 +6,52 @@ void fill_random(bool *buf, size_t len)
     uint16_t random = rand();
     size_t i;
     for (i = 0; i < len; i++) {
-        buf[i] = (random & 1) == 1;
+        buf[i] = (random & 1);
         random >>= 1;
     }
 }
 
-bool test_hamming_13_9_3(void)
+#define HAMMING_CODE_DMR_NAME(b,fn) dmr_##b##_##fn
+#define HAMMING_CODE_NAME(b)        test_##b
+#define HAMMING_CODE(b,_s)          bool HAMMING_CODE_NAME(b)(void) { \
+    uint8_t i; \
+    for (i = 0; i < 20; i++) { \
+        bool bits[_s]; \
+        fill_random(bits, sizeof(bits) - 4); \
+        HAMMING_CODE_DMR_NAME(b,encode)(bits); \
+        eq(HAMMING_CODE_DMR_NAME(b,decode)(bits), "decode"); \
+    } \
+    return true; \
+}
+
+/*
+bool test_hamming_13_9_3_parity(void)
 {
-    uint8_t i;
+    uint8_t i, p;
     for (i = 0; i < 20; i++) {
-        bool bits[13], parity[4];
+        uint8_t bits[13];
         fill_random(bits, sizeof(bits) - 4);
-        dmr_hamming_13_9_3_encode_bits(bits, bits + 9);
-        eq(dmr_hamming_13_9_3_verify_bits(bits, parity), "verify");
+        dmr_hamming_13_9_3_encode(bits);
+        p = 1 + rand() % 8;
+        dmr_log_debug("corrupting byte %u", p);
+        bits[p] = !bits[p];
+        eq(dmr_hamming_13_9_3_decode(bits), "decode");
     }
 
     return true;
 }
+*/
 
-bool test_hamming_15_11_3(void)
-{
-    uint8_t i;
-    for (i = 0; i < 20; i++) {
-        bool bits[15], parity[4];
-        fill_random(bits, sizeof(bits) - 4);
-        dmr_hamming_15_11_3_encode_bits(bits, bits + 11);
-        eq(dmr_hamming_15_11_3_verify_bits(bits, parity), "verify");
-    }
 
-    return true;
-}
-
-bool test_hamming_16_11_4(void)
-{
-    uint8_t i;
-    for (i = 0; i < 20; i++) {
-        bool bits[16], parity[5];
-        fill_random(bits, sizeof(bits) - 5);
-        dmr_hamming_16_11_4_encode_bits(bits, bits + 11);
-        eq(dmr_hamming_16_11_4_verify_bits(bits, parity), "verify");
-    }
-
-    return true;
-}
-
-bool test_hamming_17_12_3(void)
-{
-    uint8_t i;
-    for (i = 0; i < 20; i++) {
-        bool bits[16], parity[5];
-        fill_random(bits, sizeof(bits) - 5);
-        dmr_hamming_17_12_3_encode_bits(bits, bits + 12);
-        eq(dmr_hamming_17_12_3_verify_bits(bits, parity), "verify");
-    }
-
-    return true;
-}
+HAMMING_CODE(hamming_7_4_3, 7);
+HAMMING_CODE(hamming_13_9_3, 13);
+HAMMING_CODE(hamming_15_11_3, 15);
+HAMMING_CODE(hamming_16_11_4, 16);
+HAMMING_CODE(hamming_17_12_3, 17);
 
 static test_t tests[] = {
-    {"Hamming(13,9,3) encode & verify",  test_hamming_13_9_3 },
+    {"Hamming(7,4,3) encode & verify", test_hamming_7_4_3},
+    {"Hamming(13,9,3) encode & verify",  test_hamming_13_9_3},
     {"Hamming(15,11,3) encode & verify", test_hamming_15_11_3},
     {"Hamming(16,11,4) encode & verify", test_hamming_16_11_4},
     {"Hamming(17,12,3) encode & verify", test_hamming_17_12_3},

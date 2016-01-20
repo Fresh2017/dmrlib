@@ -208,16 +208,21 @@ static const uint16_t golay_20_8_encoder[] = {
 	0x80CB, 0x3045, 0x6058, 0xD0D6
 };
 
+#define X22             0x00400000   /* vector representation of X^{22} */
+#define X11             0x00000800   /* vector representation of X^{11} */
+#define MASK12          0xfffff800   /* auxiliary vector for testing */
+#define GENPOL          0x00000c75   /* generator polinomial, g(x) */
+
 uint32_t dmr_golay_20_8_syndrome(uint32_t pattern)
 {
-   uint32_t i = 0x00040000;
+   uint32_t i = X22;
 
-    if (pattern >= 0x800) {
-        while (pattern & 0xfffff800) {
+    if (pattern >= X11) {
+        while (pattern & MASK12) {
             while ((i & pattern) == 0)
                 i >>= 1;
 
-            pattern ^= (i / 0x800) * 0xc75;
+            pattern ^= (i / X11) * GENPOL;
         }
     }
 

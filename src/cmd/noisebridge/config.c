@@ -255,6 +255,12 @@ config_t *init_config(const char *filename)
         } else if (!strcmp(k, "mmdvm_rate")) {
             config->mmdvm_rate = atoi(v);
 
+        } else if (!strcmp(k, "mmdvm_rx_freq")) {
+                    config->mmdvm_rx_freq = atoi(v);
+
+        } else if (!strcmp(k, "mmdvm_tx_freq")) {
+                    config->mmdvm_tx_freq = atoi(v);
+
         } else if (!strcmp(k, "audio_device")) {
             config->audio_device = talloc_strdup(config, v);
 

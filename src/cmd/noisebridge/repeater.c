@@ -161,6 +161,12 @@ static int loop_repeater_start_protos(void)
             return ret;
         if ((ret = dmr_proto_call_start(config->mmdvm)) != 0)
             return ret;
+
+        if (config->mmdvm_rx_freq || config->mmdvm_tx_freq) {
+            dmr_msleep(250);
+            dmr_mmdvm_set_rf_config(config->mmdvm,
+                config->mmdvm_rx_freq, config->mmdvm_tx_freq);
+        }
     } else {
         dmr_log_info("noisebridge: mmdvm not enabled");
     }

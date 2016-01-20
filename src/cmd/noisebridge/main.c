@@ -18,11 +18,11 @@ int main(int argc, char **argv)
     config_t *config = NULL;
     int status = 0, ret;
 
-    dmr_log_priority_set(DMR_LOG_PRIORITY_TRACE);
+    dmr_log_priority_set(DMR_LOG_PRIORITY_DEBUG);
     if ((ret = dmr_thread_name_set("main")) != 0) {
         dmr_log_error("noisebridge: can't set thread name: %s", strerror(ret));
     }
-    if (argc != 2) {
+    if (argc < 2) {
         fprintf(stderr, "%s <config>\n", argv[0]);
         status = 1;
         goto bail;

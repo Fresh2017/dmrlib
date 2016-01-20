@@ -27,42 +27,43 @@
 
 #define DMR_MMDVM_BAUD_RATE     115200
 
-#define DMR_MMDVM_FRAME_START   0xE0U
+#define DMR_MMDVM_FRAME_START   0xE0
 
-#define DMR_MMDVM_GET_VERSION   0x00U
-#define DMR_MMDVM_GET_STATUS    0x01U
-#define DMR_MMDVM_SET_CONFIG    0x02U
-#define DMR_MMDVM_SET_MODE      0x03U
+#define DMR_MMDVM_GET_VERSION   0x00
+#define DMR_MMDVM_GET_STATUS    0x01
+#define DMR_MMDVM_SET_CONFIG    0x02
+#define DMR_MMDVM_SET_MODE      0x03
+#define DMR_MMDVM_SET_RF_CONFIG 0x04
 
-#define DMR_MMDVM_DSTAR_HEADER  0x10U
-#define DMR_MMDVM_DSTAR_DATA    0x11U
-#define DMR_MMDVM_DSTAR_LOST    0x12U
-#define DMR_MMDVM_DSTAR_EOT     0x13U
+#define DMR_MMDVM_DSTAR_HEADER  0x10
+#define DMR_MMDVM_DSTAR_DATA    0x11
+#define DMR_MMDVM_DSTAR_LOST    0x12
+#define DMR_MMDVM_DSTAR_EOT     0x13
 
-#define DMR_MMDVM_DMR_DATA1     0x18U
-#define DMR_MMDVM_DMR_LOST1     0x19U
-#define DMR_MMDVM_DMR_DATA2     0x1AU
-#define DMR_MMDVM_DMR_LOST2     0x1BU
-#define DMR_MMDVM_DMR_SHORTLC   0x1CU
-#define DMR_MMDVM_DMR_START     0x1DU
+#define DMR_MMDVM_DMR_DATA1     0x18
+#define DMR_MMDVM_DMR_LOST1     0x19
+#define DMR_MMDVM_DMR_DATA2     0x1a
+#define DMR_MMDVM_DMR_LOST2     0x1b
+#define DMR_MMDVM_DMR_SHORTLC   0x1c
+#define DMR_MMDVM_DMR_START     0x1d
 
-#define DMR_MMDVM_DMR_TS        0x80U
-#define DMR_MMDVM_DMR_DATA_SYNC 0x40U
-#define DMR_MMDVM_DMR_VOICE_SYNC 0x20U
+#define DMR_MMDVM_DMR_TS        0x80
+#define DMR_MMDVM_DMR_DATA_SYNC 0x40
+#define DMR_MMDVM_DMR_VOICE_SYNC 0x20
 
-#define DMR_MMDVM_YSF_DATA      0x20U
-#define DMR_MMDVM_YSF_LOST      0x21U
+#define DMR_MMDVM_YSF_DATA      0x20
+#define DMR_MMDVM_YSF_LOST      0x21
 
-#define DMR_MMDVM_ACK           0x70U
-#define DMR_MMDVM_NAK           0x7FU
+#define DMR_MMDVM_ACK           0x70
+#define DMR_MMDVM_NAK           0x7f
 
-#define DMR_MMDVM_DUMP          0xF0U
-#define DMR_MMDVM_DEBUG1        0xF1U
-#define DMR_MMDVM_DEBUG2        0xF2U
-#define DMR_MMDVM_DEBUG3        0xF3U
-#define DMR_MMDVM_DEBUG4        0xF4U
-#define DMR_MMDVM_DEBUG5        0xF5U
-#define DMR_MMDVM_SAMPLES       0xF8U
+#define DMR_MMDVM_DUMP          0xf0
+#define DMR_MMDVM_DEBUG1        0xf1
+#define DMR_MMDVM_DEBUG2        0xf2
+#define DMR_MMDVM_DEBUG3        0xf3
+#define DMR_MMDVM_DEBUG4        0xf4
+#define DMR_MMDVM_DEBUG5        0xf5
+#define DMR_MMDVM_SAMPLES       0xf8
 
 #define DMR_MMDVM_DELAY_MS      200UL
 #define DMR_MMDVM_DELAY_US      (DMR_MMDVM_DELAY_MS*1000UL)
@@ -160,6 +161,9 @@ extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag);
 extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
 extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries);
+extern bool dmr_mmdvm_set_config(dmr_mmdvm_t *modem);
+extern bool dmr_mmdvm_set_mode(dmr_mmdvm_t *modem, uint8_t mode);
+extern bool dmr_mmdvm_set_rf_config(dmr_mmdvm_t *modem, uint32_t rx_freq, uint32_t tx_freq);
 extern int dmr_mmdvm_free(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_close(dmr_mmdvm_t *modem);
 

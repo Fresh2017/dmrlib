@@ -52,6 +52,8 @@ typedef struct config_s {
     dmr_mmdvm_t           *mmdvm;
     char                  *mmdvm_port;
     int                   mmdvm_rate;
+    uint32_t              mmdvm_rx_freq;
+    uint32_t              mmdvm_tx_freq;
     dmr_mbe_t             *mbe;
     uint8_t               mbe_quality;
     bool                  audio_needed;

@@ -66,7 +66,7 @@ void dmr_dump_packet(dmr_packet_t *packet)
     } else {
         sprintf(buf, "%d", packet->data_type);
     }
-    dmr_log_debug("packet: [%lu->%lu] via %lu, seq 0x%02x, slot %d, flco %s (%d), data type %s (%s), stream id 0x%08lx:",
+    dmr_log_debug("packet: [%lu->%lu] via %lu, seq %#02x, slot %d, flco %s (%d), data type %s (%s), stream id 0x%08lx:",
         packet->src_id,
         packet->dst_id,
         packet->repeater_id,

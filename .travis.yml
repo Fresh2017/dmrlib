@@ -9,7 +9,7 @@ addons:
     packages:
       - libtalloc-dev
       - libpcap-dev
-      - portaudio-dev
+      - python-jinja2
 
 cache: apt
 

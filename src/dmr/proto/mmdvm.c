@@ -431,18 +431,19 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                   packet->data_type                == DMR_DATA_TYPE_VOICE_SYNC) &&
                  (modem->dmr_ts[ts].last_data_type != DMR_DATA_TYPE_VOICE &&
                   modem->dmr_ts[ts].last_data_type != DMR_DATA_TYPE_VOICE_SYNC)) {
-                dmr_log_debug("mmdvm: change in data type %s -> %s on %s, starting new stream",
+                dmr_log_debug("mmdvm: change in data type %s -> %s on %s",
                     dmr_data_type_name(modem->dmr_ts[ts].last_data_type),
                     dmr_data_type_name(packet->data_type),
                     dmr_ts_name(ts));
                 reset = true;
             } else if (delta > 120) {
-                dmr_log_debug("mmdvm: last packet received %ums ago, starting new stream",
+                dmr_log_debug("mmdvm: last packet received %ums ago",
                     delta);
                 reset = true;
             }
 
             if (reset) {
+                dmr_log_debug("mmdvm: starting new voice stream; resetting sequence");
                 modem->dmr_ts[ts].last_sequence = 0;
                 modem->dmr_ts[ts].last_voice_frame = 0;
             }
@@ -481,15 +482,25 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 header->ts = packet->ts;
                 header->flco = packet->flco;
                 header->meta.sequence = packet->meta.sequence;
-                packet->meta.sequence++;
-                dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, header);
-                dmr_log_trace("mmdvm: rx %s (prepended)", dmr_data_type_name(header->data_type));
-                dmr_proto_rx_cb_run(&modem->proto, header);
+
+                uint8_t i = 0;
+                for (i = 0; i < 4; i++) {
+                    header->meta.sequence++;
+                    dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, header);
+                    dmr_log_debug("mmdvm: rx %s (prepended), seq %#02x/0xff",
+                        dmr_data_type_name(header->data_type),
+                        header->meta.sequence);
+                    dmr_proto_rx_cb_run(&modem->proto, header);
+                    gettimeofday(&modem->dmr_ts[ts].last_packet_received, NULL);
+                }
 
                 dmr_free(header);
+                packet->meta.sequence = (packet->meta.sequence + i) % 0xff;
             }
 
-            dmr_log_trace("mmdvm: rx %s", dmr_data_type_name(packet->data_type));
+            dmr_log_debug("mmdvm: rx %s, seq %#02x/0xff",
+                dmr_data_type_name(packet->data_type),
+                packet->meta.sequence);
             dmr_proto_rx_cb_run(&modem->proto, packet);
 
             // Book keeping
@@ -751,6 +762,29 @@ bool dmr_mmdvm_set_mode(dmr_mmdvm_t *modem, uint8_t mode)
 
     uint8_t buffer[4] = {DMR_MMDVM_FRAME_START, 4, DMR_MMDVM_SET_MODE, mode};
     return dmr_serial_write(modem->fd, &buffer, 4) == 4;
+}
+
+bool dmr_mmdvm_set_rf_config(dmr_mmdvm_t *modem, uint32_t rx_freq, uint32_t tx_freq)
+{
+    if (modem == NULL || modem->fd == 0)
+        return false;
+
+    dmr_log_info("mmdvm: tuning RF to %u/%u Hz", rx_freq, tx_freq);
+    uint8_t buffer[12] = {
+        DMR_MMDVM_FRAME_START,
+        12,
+        DMR_MMDVM_SET_RF_CONFIG,
+        0x00, /* flags, reserved */
+        rx_freq >> 24,
+        rx_freq >> 16,
+        rx_freq >> 8,
+        rx_freq,
+        tx_freq >> 24,
+        tx_freq >> 16,
+        tx_freq >> 8,
+        tx_freq
+    };
+    return dmr_serial_write(modem->fd, &buffer, 12) == 12;
 }
 
 bool dmr_mmdvm_dmr_start(dmr_mmdvm_t *modem, bool tx)

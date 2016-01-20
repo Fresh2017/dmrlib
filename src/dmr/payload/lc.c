@@ -3,7 +3,7 @@
 #include "dmr/malloc.h"
 #include "dmr/payload/lc.h"
 #include "dmr/packet.h"
-#include "dmr/fec/reed_solomon.h"
+#include "dmr/fec/rs_12_9.h"
 #include "dmr/fec/bptc_196_96.h"
 
 static uint8_t lc_crc_mask[] = {
@@ -39,7 +39,7 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         return dmr_error(DMR_LASTERROR);
 
     dmr_log_trace("lc: performing Reed-Solomon(12, 9, 4) check on data");
-    if (dmr_rs_12_9_4_decode_and_verify(bytes, lc_crc_mask[packet->data_type]) != 0) {
+    if (dmr_rs_12_9_4_decode(bytes, lc_crc_mask[packet->data_type]) != 0) {
         dmr_log_error("LC: parity check failed");
 #if defined(DMR_DEBUG)
         dmr_log_debug("LC: parities received:");

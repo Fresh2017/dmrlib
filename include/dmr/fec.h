@@ -10,8 +10,9 @@ extern "C" {
 #endif
 
 #include <dmr/fec/bptc_196_96.h>
+#include <dmr/fec/hamming.h>
 #include <dmr/fec/qr_16_7.h>
-#include <dmr/fec/reed_solomon.h>
+#include <dmr/fec/rs_12_9.h>
 
 /** Initialize the Forward Error Correction functions. */
 extern int dmr_fec_init(void);

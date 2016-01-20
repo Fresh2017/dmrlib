@@ -6,8 +6,6 @@
 #include "dmr/fec/bptc_196_96.h"
 #include "dmr/fec/hamming.h"
 
-
-
 #if defined(DMR_DEBUG)
 static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
 {
@@ -59,9 +57,10 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
 	memcpy(bptc->raw +  0, bits +   0, 98);
 	memcpy(bptc->raw + 98, bits + 166, 98);
-	dmr_dump_hex(packet->payload, 96/8);
-	dmr_dump_hex(bptc->raw, 196);
+	//dmr_dump_hex(packet->payload, 96/8);
+	//dmr_dump_hex(bptc->raw, 196);
 
+	// Deinterleaver
 	for (i = 1; i < 197; i++) {
 		bptc->deinterleaved_bits[i - 1] = bptc->raw[(i * 181) % 196];
 	}
@@ -119,304 +118,49 @@ int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 
 	dmr_log_trace("BPTC(196,96): encode");
 	uint8_t row, col, i;
-	bool data_bits[96];
+	bool data_bits[96], bits[DMR_PAYLOAD_BITS], hc[15];
 
 	dmr_bytes_to_bits(data, 12, data_bits, 96);
 	memset(bptc->deinterleaved_bits, 0, sizeof(bptc->deinterleaved_bits));
 
-	for (col = 3, i = 0; col < 11; col++, i++) {
-		bptc->deinterleaved_bits[(0 * 15) + col] = data_bits[i];
-	}
-	for (row = 1; row < 9; row++) {
-		for (col = 0; col < 11; col++, i++) {
-			dmr_log_trace("copy bit %u to (%u,%u)", i, col, row);
-			bptc->deinterleaved_bits[(row * 15) + col] = data_bits[i];
-		}
-	}
-
+	i = 0;
 	for (row = 0; row < 9; row++) {
-		bool data[15];
-		for (col = 0; col < 15; col++) {
-			data[col] = bptc->deinterleaved_bits[(row * 15) + col];
-		}
-		dmr_hamming_15_11_3_encode(data);
-		for (col = 0; col < 15; col++) {
-			bptc->deinterleaved_bits[(row * 15) + col] = data[col];
-		}
-	}
-
-	bptc_196_96_dump(bptc);
-
-	return 0;
-}
-
-static void bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet)
-{
-	/* First decode all 33 bytes to 264 bits */
-	bool bits[DMR_PAYLOAD_BITS];
-	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
-	/* First 98 bits */
-	memcpy(bptc->raw +  0, bits +   0, sizeof(bool) * 98);
-	/* Second 98 bits, skipping over slot type (20 bits) and sync (48 bits) */
-	memcpy(bptc->raw + 98, bits + 166, sizeof(bool) * 98);
-
-	/* alternate method (takes less memory)
-	dmr_byte_to_bits(packet->payload[ 0], bptc->raw +   0);
-	dmr_byte_to_bits(packet->payload[ 1], bptc->raw +   8);
-	dmr_byte_to_bits(packet->payload[ 2], bptc->raw +  16);
-	dmr_byte_to_bits(packet->payload[ 3], bptc->raw +  24);
-	dmr_byte_to_bits(packet->payload[ 4], bptc->raw +  32);
-	dmr_byte_to_bits(packet->payload[ 5], bptc->raw +  40);
-	dmr_byte_to_bits(packet->payload[ 6], bptc->raw +  48);
-	dmr_byte_to_bits(packet->payload[ 7], bptc->raw +  56);
-	dmr_byte_to_bits(packet->payload[ 8], bptc->raw +  64);
-	dmr_byte_to_bits(packet->payload[ 9], bptc->raw +  72);
-	dmr_byte_to_bits(packet->payload[10], bptc->raw +  80);
-	dmr_byte_to_bits(packet->payload[11], bptc->raw +  88);
-	dmr_byte_to_bits(packet->payload[12], bptc->raw +  96);
-	dmr_byte_to_bits(packet->payload[21], bptc->raw + 100);
-	dmr_byte_to_bits(packet->payload[22], bptc->raw + 108);
-	dmr_byte_to_bits(packet->payload[23], bptc->raw + 116);
-	dmr_byte_to_bits(packet->payload[24], bptc->raw + 124);
-	dmr_byte_to_bits(packet->payload[25], bptc->raw + 132);
-	dmr_byte_to_bits(packet->payload[26], bptc->raw + 140);
-	dmr_byte_to_bits(packet->payload[27], bptc->raw + 148);
-	dmr_byte_to_bits(packet->payload[28], bptc->raw + 156);
-	dmr_byte_to_bits(packet->payload[29], bptc->raw + 164);
-	dmr_byte_to_bits(packet->payload[30], bptc->raw + 172);
-	dmr_byte_to_bits(packet->payload[31], bptc->raw + 180);
-	dmr_byte_to_bits(packet->payload[32], bptc->raw + 188);
-	bool bits[8];
-	dmr_byte_to_bits(packet->payload[20], bits);
-	bptc->raw[98] = bits[6];
-	bptc->raw[99] = bits[7];
-	*/
-}
-
-static void bptc_196_96_deinterleave(dmr_bptc_196_96_t *bptc)
-{
-	uint16_t i;
-	memset(bptc->deinterleaved_bits, 0, sizeof(bptc->deinterleaved_bits));
-
-	for (i = 1; i < 197; i++) {
-		bptc->deinterleaved_bits[i - 1] = bptc->raw[(i * 181) % 196];
-	}
-}
-
-/*
-static bool bptc_196_96_decode_parity(dmr_bptc_196_96_t *bptc)
-{
-	uint8_t col, row, pos, err = 0;
-	bool parity[4], cbits[13], ok = true;
-
-	for (col = 0; col < 15; col++) {
-		for (row = 0; row < 13; row++) {
-			// +1 because the first bit is R(3) and it's not used so we can ignore that.
-			cbits[row] = bptc->deinterleaved_bits[(row * 15) + col + 1];
-		}
-		if (!dmr_hamming_13_9_3_verify_bits(cbits, parity)) {
-			err++;
-			pos = dmr_hamming_parity_position(parity, 4);
-			if (pos == 0xff) {
-				ok = false;
-				dmr_log_debug("BPTC(196,96): Hamming (13,9,3) error, unrepairable error in col #%u", col);
-			} else {
-				dmr_log_trace("BPTC(196,96): Hamming (13,9,3) error, fixing bit #%u in col #%u", pos, col);
-				bptc->deinterleaved_bits[(pos * 15) + col + 1] = !bptc->deinterleaved_bits[(pos * 15) + col + 1];
-				for (row = 0; row < 13; row++) {
-					// +1 because the first bit is R(3) and it's not used so we can ignore that.
-					cbits[row] = bptc->deinterleaved_bits[(row * 15) + col + 1];
-				}
-				if (!dmr_hamming_13_9_3_verify_bits(cbits, parity)) {
-					ok = false;
-					dmr_log_debug("BPTC(196,96): Hamming (13,9,3) error, repair failed in col #%u", col);
-				}
-			}
-		}
-	}
-
-	for (row = 0; row < 9; row++) {
-		if (!dmr_hamming_15_11_3_verify_bits(bptc->deinterleaved_bits + (row * 15) + 1, parity)) {
-			err++;
-			pos = dmr_hamming_parity_position(parity, 4);
-			if (pos == 0xff) {
-				ok = false;
-				dmr_log_debug("BPTC(196,96): Hamming (15,11,3) error, unrepairable error in row #%u", row);
-			} else {
-				dmr_log_trace("BPTC(196,96): Hamming (15,11,3) error, fixing bit #%u in row #%u", pos, row);
-				bptc->deinterleaved_bits[(row * 15) + pos + 1] = !bptc->deinterleaved_bits[(row * 15) + pos + 1];
-				if (!dmr_hamming_15_11_3_verify_bits(bptc->deinterleaved_bits + (row * 15) + 1, parity)) {
-					ok = false;
-					dmr_log_debug("BPTC(196,96): Hamming (15,11,3) error, repair failed in row #%u", row);
-				}
-			}
-		}
-	}
-
-	if (ok && err == 0) {
-		dmr_log_debug("BPTC(196,96): no errors found");
-	} else if (ok) {
-		dmr_log_debug("BPTC(196,96): %u errors corrected", err);
-	} else {
-		dmr_log_error("BPTC(196,96): unrecoverable errors");
-	}
-
-	return ok;
-}
-*/
-
-static void bptc_196_96_decode_data(dmr_bptc_196_96_t *bptc, uint8_t data[12])
-{
-	bool bits[96];
-	memset(bits, 0, sizeof(bits));
-
-	uint8_t i, j = 0;
-	for (i = 4; i < 12; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 16; i < 27; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 31; i < 42; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 46; i < 57; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 61; i < 72; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 76; i < 87; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 91; i < 102; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 106; i < 117; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-	for (i = 121; i < 132; i++, j++)
-		bits[j] = bptc->deinterleaved_bits[i];
-
-	dmr_bits_to_bytes(bits, 96, data, 12);
-}
-
-/*
-int dmr_bptc_196_96_decodex(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12])
-{
-	if (bptc == NULL || packet == NULL || data == NULL)
-		return dmr_error(DMR_EINVAL);
-
-	dmr_log_trace("BPTC(196,96): decode");
-
-	// Convert to bits
-	bptc_196_96_decode(bptc, packet);
-
-	// Deinterleave bits
-	bptc_196_96_deinterleave(bptc);
-
-#if defined(DMR_DEBUG)
-	//bptc_196_96_dump(bptc);
-#endif
-
-	// Decode and check parity
-	if (!bptc_196_96_decode_parity(bptc)) {
-		memset(data, 0, sizeof(uint8_t) * 12);
-		return dmr_error_set("BPTC(196,96): parity check failed");
-	}
-
-	// Convert deinterleaved bits to output data (12 bytes / 96 bits)
-	bptc_196_96_decode_data(bptc, data);
-
-	dmr_dump_hex(bptc->deinterleaved_bits, 196);
-	dmr_dump_hex(data, 12);
-
-	return 0;
-}
-*/
-
-/*
-static void bptc_196_96_encode_parity(dmr_bptc_196_96_t *bptc)
-{
-	bool parity[4], cbits[13];
-	uint8_t col, row, pos = 0;
-
-	for (row = 0; row < 9; row++) {
+		memset(hc, 0, 15);
 		if (row == 0) {
 			for (col = 3; col < 11; col++) {
-				// +1 because the first bit is R(3) and it's not used so we can ignore that.
-				bptc->raw[col + 1] = bptc->deinterleaved_bits[pos++];
+				hc[col] = bptc->deinterleaved_bits[col] = data_bits[i++];
 			}
 		} else {
 			for (col = 0; col < 11; col++) {
-				// +1 because the first bit is R(3) and it's not used so we can ignore that.
-				bptc->raw[col + (row * 15) + 1] = bptc->deinterleaved_bits[pos++];
+				hc[col] = bptc->deinterleaved_bits[(row * 15) + col] = data_bits[i++];
 			}
 		}
-
-		// +1 because the first bit is R(3) and it's not used so we can ignore that.
-		dmr_hamming_15_11_3_encode_bits(bptc->raw + (row * 15) + 1, parity);
-		bptc->raw[(row * 15) + 11 + 1] = parity[0];
-		bptc->raw[(row * 15) + 12 + 1] = parity[1];
-		bptc->raw[(row * 15) + 13 + 1] = parity[2];
-		bptc->raw[(row * 15) + 14 + 1] = parity[3];
+		dmr_hamming_15_11_3_encode(hc);
+		for (col = 11; col < 15; col++) {
+			bptc->deinterleaved_bits[(row * 15) + col] = hc[col];
+		}
 	}
-
 	for (col = 0; col < 15; col++) {
 		for (row = 0; row < 9; row++) {
-			cbits[row] = bptc->raw[col+(row * 15)+1];
+			hc[row] = bptc->deinterleaved_bits[(row * 15) + col];
 		}
-
-		dmr_hamming_13_9_3_encode_bits(cbits, parity);
-		bptc->raw[col + 135      + 1] = parity[0];
-		bptc->raw[col + 135 + 15 + 1] = parity[1];
-		bptc->raw[col + 135 + 30 + 1] = parity[2];
-		bptc->raw[col + 135 + 45 + 1] = parity[3];
+		dmr_hamming_13_9_3_encode(hc);
+		bptc->deinterleaved_bits[col + 135] = hc[9];
+		bptc->deinterleaved_bits[col + 135 + 15] = hc[10];
+		bptc->deinterleaved_bits[col + 135 + 30] = hc[11];
+		bptc->deinterleaved_bits[col + 135 + 45] = hc[12];
 	}
 
-	memcpy(bptc->deinterleaved_bits, bptc->raw, 196);
-}
-*/
+	bptc_196_96_dump(bptc);
 
-static void bptc_196_96_interleave(dmr_bptc_196_96_t *bptc)
-{
-	uint16_t i;
-	memset(bptc->raw, 0, sizeof(bptc->raw));
-
+	// Interleaver
 	for (i = 1; i < 197; i++) {
 		bptc->raw[(i * 181) % 196] = bptc->deinterleaved_bits[i - 1];
 	}
-}
 
-static void bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet)
-{
-	/* First decode all 33 bytes to 264 bits */
-	bool bits[DMR_PAYLOAD_BITS];
-	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
-	/* First 98 bits */
-	memcpy(bits +   0, bptc->raw +  0, sizeof(bool) * 98);
-	/* Second 98 bits, skipping over slot type (20 bits) and sync (48 bits) */
-	memcpy(bits + 166, bptc->raw + 98, sizeof(bool) * 98);
-	/* Convert back to bytes */
+	memcpy(bits +   0, bptc->raw +  0, 98);
+	memcpy(bits + 166, bptc->raw + 98, 98);
 	dmr_bits_to_bytes(bits, DMR_PAYLOAD_BITS, packet->payload, DMR_PAYLOAD_BYTES);
-}
-
-/*
-int dmr_bptc_196_96_encodex(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12])
-{
-	if (bptc == NULL || packet == NULL || data == NULL)
-		return dmr_error(DMR_EINVAL);
-
-	dmr_log_trace("BPTC(196,96): encode");
-
-	// Convert input data (12 bytes / 96 bits) to deinterleaved bits
-	dmr_bytes_to_bits(data, 12, bptc->deinterleaved_bits, 96);
-
-#if defined(DMR_DEBUG)
-	bptc_196_96_dump(bptc);
-#endif
-
-	// Add Hamming parity
-	bptc_196_96_encode_parity(bptc);
-
-	// Interleave
-	bptc_196_96_interleave(bptc);
-
-	// Convert back to bytes
-	bptc_196_96_encode(bptc, packet);
 
 	return 0;
 }
-*/

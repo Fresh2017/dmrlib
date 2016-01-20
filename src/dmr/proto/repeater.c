@@ -139,11 +139,11 @@ static int repeater_proto_wait(void *repeaterptr)
     return 0;
 }
 
-static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_t *packet)
+static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_t *packet_in)
 {
     dmr_log_trace("repeater: rx callback %p", userdata);
     dmr_repeater_t *repeater = (dmr_repeater_t *)userdata;
-    if (proto == NULL || repeater == NULL || packet == NULL)
+    if (proto == NULL || repeater == NULL || packet_in == NULL)
         return;
 
     dmr_log_debug("repeater: rx callback from %s", proto->name);
@@ -163,16 +163,25 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
             repeater->route, proto->name, slot->proto->name);
 
         if (repeater->route != NULL) {
-            if (repeater->route(repeater, proto, slot->proto, packet)) {
+            if (repeater->route(repeater, proto, slot->proto, packet_in)) {
                 dmr_log_debug("repeater: routing %s packet from %s->%s",
-                    dmr_data_type_name(packet->data_type),
+                    dmr_data_type_name(packet_in->data_type),
                     proto->name, slot->proto->name);
+
+                dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
+                if (packet == NULL) {
+                    dmr_log_error("repeater: no memory to clone packet!");
+                    return;
+                }
+                memcpy(packet, packet_in, sizeof(dmr_packet_t));
+
                 uint8_t sequence = packet->meta.sequence;
                 dmr_repeater_fix_headers(repeater, packet);
                 dmr_log_debug("repeater: updated sequence %u->%u",
                     sequence, packet->meta.sequence);
                 packet->meta.sequence = sequence; // FIXME
                 dmr_proto_tx(slot->proto, slot->userdata, packet);
+                talloc_free(packet);
             } else {
                 dmr_log_debug("repeater: dropping packet, refused by router");
             }

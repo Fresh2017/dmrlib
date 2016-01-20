@@ -176,10 +176,12 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
                 memcpy(packet, packet_in, sizeof(dmr_packet_t));
 
                 uint8_t sequence = packet->meta.sequence;
-                dmr_repeater_fix_headers(repeater, packet);
-                dmr_log_debug("repeater: updated sequence %u->%u",
-                    sequence, packet->meta.sequence);
-                packet->meta.sequence = sequence; // FIXME
+                if (strcmp(slot->proto->name, "mmdvm")) {
+                    dmr_repeater_fix_headers(repeater, packet);
+                    dmr_log_debug("repeater: updated sequence %u->%u",
+                        sequence, packet->meta.sequence);
+                    packet->meta.sequence = sequence; // FIXME
+                }
                 dmr_proto_tx(slot->proto, slot->userdata, packet);
                 talloc_free(packet);
             } else {

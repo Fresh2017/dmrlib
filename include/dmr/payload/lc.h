@@ -41,7 +41,7 @@ typedef struct {
 } dmr_full_lc_t;
 
 extern int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet);
-extern int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type_t data_type);
+extern int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12]);
 /** Insert Link Control message with Reed-Solomon check data */
 extern int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet);
 extern char *dmr_flco_pdu_name(dmr_flco_pdu_t flco_pdu);

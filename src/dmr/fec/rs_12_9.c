@@ -91,7 +91,7 @@ static void encode(uint8_t bytes[9], uint8_t parity[NPAR])
     }
 }
 
-int dmr_rs_12_9_4_decode(uint8_t bytes[12], uint8_t crc_mask)
+int dmr_rs_12_9_4_decode(uint8_t bytes[12])
 {
     if (bytes == NULL)
         return dmr_error(DMR_EINVAL);
@@ -99,9 +99,9 @@ int dmr_rs_12_9_4_decode(uint8_t bytes[12], uint8_t crc_mask)
     uint8_t parity[NPAR];
     encode(bytes, parity);
 
-    if ((bytes[9]  ^ crc_mask) != parity[2] ||
-        (bytes[10] ^ crc_mask) != parity[1] ||
-        (bytes[11] ^ crc_mask) != parity[0]) {
+    if (bytes[9]  ^ parity[2] ||
+        bytes[10] ^ parity[1] ||
+        bytes[11] ^ parity[0]) {
         dmr_log_error("Reed-Solomon(12,9): parity check failed");
         return -1;
     }
@@ -109,7 +109,7 @@ int dmr_rs_12_9_4_decode(uint8_t bytes[12], uint8_t crc_mask)
     return 0;
 }
 
-int dmr_rs_12_9_4_encode(uint8_t bytes[12], uint8_t crc_mask)
+int dmr_rs_12_9_4_encode(uint8_t bytes[12])
 {
     if (bytes == NULL)
         return dmr_error(DMR_EINVAL);
@@ -118,7 +118,7 @@ int dmr_rs_12_9_4_encode(uint8_t bytes[12], uint8_t crc_mask)
     uint8_t i;
     encode(bytes, parity);
     for (i = 0; i < NPAR; i++) {
-        bytes[11 - i] = parity[i] ^ crc_mask;
+        bytes[11 - i] = parity[i];
     }
 
     return 0;

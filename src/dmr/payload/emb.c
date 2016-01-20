@@ -136,7 +136,7 @@ int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signall
         return dmr_error(DMR_EINVAL);
 
     uint8_t bytes[12];
-    if (dmr_full_lc_encode_bytes(lc, bytes, data_type) != 0)
+    if (dmr_full_lc_encode_bytes(lc, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
 
     return dmr_emb_encode_signalling_lc_bytes(bytes, emb_bits);

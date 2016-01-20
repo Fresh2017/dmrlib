@@ -57,9 +57,10 @@ extern void dmr_log(const char *fmt, ...);
 #define dmr_log_trace(fmt, ...)
 #endif
 */
+extern void _dmr_log_trace(const char *fmt, ...);
 #define dmr_log_trace(fmt, ...) do { \
-	dmr_log_message(DMR_LOG_PRIORITY_TRACE, "%s[%d]:", __FILE__, __LINE__); \
-	dmr_log_message(DMR_LOG_PRIORITY_TRACE, fmt, ## __VA_ARGS__ ); \
+	_dmr_log_trace("%s[%d]:", __FILE__, __LINE__); \
+	_dmr_log_trace(fmt, ## __VA_ARGS__ ); \
 } while(0)
 extern void dmr_log_debug(const char *fmt, ...);
 extern void dmr_log_info(const char *fmt, ...);

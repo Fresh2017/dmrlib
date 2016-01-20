@@ -12,19 +12,20 @@ extern "C" {
 #include <errno.h>
 #include <stdarg.h>
 
+#include <dmr/config.h>
 #include <dmr/log.h>
 
 #define DMR_ERR_MAX_STRLEN  128
 #define DMR_ERR_MAX_ARGS    5
 
 typedef enum {
-    DMR_ENOMEM,
-    DMR_EINVAL,
-    DMR_EWRITE,
-    DMR_EREAD,
-    DMR_ARG,
-    DMR_UNSUPPORTED,
-    DMR_LASTERROR
+    DMR_ENOMEM      = 0x01,
+    DMR_EINVAL      = 0x02,
+    DMR_EWRITE      = 0x11,
+    DMR_EREAD       = 0x12,
+    DMR_ARG         = 0x21,
+    DMR_UNSUPPORTED = 0x7f,
+    DMR_LASTERROR   = 0xff
 } dmr_errno;
 
 typedef struct {

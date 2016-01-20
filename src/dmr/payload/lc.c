@@ -31,22 +31,37 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     // BPTC(196, 96) decode data
     dmr_bptc_196_96_t *bptc = dmr_malloc(dmr_bptc_196_96_t);
     if (bptc == NULL) {
+        dmr_log_error("lc: BPTC(196,96) init failed: out of memory");
         return dmr_error(DMR_ENOMEM);
     }
 
     dmr_log_trace("lc: decoding BPTC(196, 96)");
-    if (dmr_bptc_196_96_decode(bptc, packet, bytes) != 0)
+    if (dmr_bptc_196_96_decode(bptc, packet, bytes) != 0) {
+        dmr_log_error("lc: BPTC(196,96) decode failed: %s", dmr_error_get());
         return dmr_error(DMR_LASTERROR);
+    }
+
+    dmr_log_trace("LC: apply CRC mask %#02x for data type %s",
+        lc_crc_mask[packet->data_type],
+        dmr_data_type_name(packet->data_type));
+    bytes[9]  ^= lc_crc_mask[packet->data_type];
+    bytes[10] ^= lc_crc_mask[packet->data_type];
+    bytes[11] ^= lc_crc_mask[packet->data_type];
 
     dmr_log_trace("lc: performing Reed-Solomon(12, 9, 4) check on data");
-    if (dmr_rs_12_9_4_decode(bytes, lc_crc_mask[packet->data_type]) != 0) {
+    if (dmr_rs_12_9_4_decode(bytes) != 0) {
         dmr_log_error("LC: parity check failed");
 #if defined(DMR_DEBUG)
         dmr_log_debug("LC: parities received:");
         dmr_dump_hex(bytes, 12);
         memset(bytes + 9, 0, 3);
-        dmr_rs_12_9_4_encode(bytes, lc_crc_mask[packet->data_type]);
+        dmr_rs_12_9_4_encode(bytes);
         dmr_log_debug("LC: parities calculated locally:");
+        dmr_dump_hex(bytes, 12);
+        dmr_log_trace("LC: apply CRC mask %#02x", lc_crc_mask[packet->data_type]);
+        bytes[9]  ^= lc_crc_mask[packet->data_type];
+        bytes[10] ^= lc_crc_mask[packet->data_type];
+        bytes[11] ^= lc_crc_mask[packet->data_type];
         dmr_dump_hex(bytes, 12);
 #endif
         return -1;
@@ -64,9 +79,9 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     return 0;
 }
 
-int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type_t data_type)
+int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12])
 {
-    if (lc == NULL || bytes == NULL || data_type >= DMR_DATA_TYPE_INVALID)
+    if (lc == NULL || bytes == NULL)
         return dmr_error(DMR_EINVAL);
 
     memset(bytes, 0, 12);
@@ -87,7 +102,7 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12], dmr_data_type
 
     // Calculate RS(12, 9) checksum
     dmr_log_trace("lc: calculating Reed-Solomon (12, 9, 4) parities:");
-    dmr_rs_12_9_4_encode(bytes, lc_crc_mask[data_type]);
+    dmr_rs_12_9_4_encode(bytes);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(bytes, 12);
     }
@@ -113,8 +128,13 @@ int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         lc->src_id, lc->dst_id);
 
     uint8_t bytes[12];
-    if (dmr_full_lc_encode_bytes(lc, bytes, packet->data_type) != 0)
+    if (dmr_full_lc_encode_bytes(lc, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
+
+    dmr_log_trace("LC: apply CRC mask %#02x", lc_crc_mask[packet->data_type]);
+    bytes[9]  ^= lc_crc_mask[packet->data_type];
+    bytes[10] ^= lc_crc_mask[packet->data_type];
+    bytes[11] ^= lc_crc_mask[packet->data_type];
 
     // BPTC(196, 96) encode data
     dmr_bptc_196_96_t bptc;

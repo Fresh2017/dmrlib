@@ -13,6 +13,7 @@ typedef struct {
     char           *src_proto;
     char           *dst_proto;
     route_policy_t policy;
+    bool           modify;
     dmr_ts_t       ts;
     dmr_flco_t     flco;
     dmr_id_t       src_id;

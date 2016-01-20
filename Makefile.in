@@ -92,20 +92,25 @@ BUILD   ?= {{ args.builddir }}
 CFLAGS  ?= {{ env.CFLAGS }}
 CFLAGS  += -Wall -Wextra -ffast-math
 CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
-CFLAGS  += -Iinclude
+CFLAGS  += -Iinclude -fPIC
+{% if args.with_debug -%}
+CFLAGS  += -g
+{% else -%}
+CFLAGS  += -O2
+{% endif -%}
 LDFLAGS ?= {{ env.LDFLAGS }}
 
 {% if args.with_mbelib -%}
 MBELIB_SOURCES       = $(wildcard src/mbelib/*.c)
 MBELIB_OBJECTS       = $(patsubst %.c,%.o,$(MBELIB_SOURCES))
-MBELIB_CFLAGS        = $(CFLAGS) -fPIC
+MBELIB_CFLAGS        = $(CFLAGS)
 MBELIB_LDFLAGS 		 = $(LDFLAGS) -shared
 MBELIB_LIBS 		 =
 {%- endif %}
 
 DMRLIB_SOURCES       = $(wildcard src/dmr/**/*.c src/dmr/*.c)
 DMRLIB_OBJECTS       = $(patsubst %.c,%.o,$(DMRLIB_SOURCES))
-DMRLIB_CFLAGS        = $(CFLAGS) -fPIC
+DMRLIB_CFLAGS        = $(CFLAGS)
 DMRLIB_LDFLAGS       = $(LDFLAGS) -shared -Lsrc/mbelib
 DMRLIB_LIBS 		 = {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
 
@@ -259,7 +264,7 @@ clean-noisebridge:
 # tests
 #
 
-test-all: .force $(TEST_PROGRAMS) test-run
+test-all: .force src/dmr/libdmr$(SHLIBEXT) $(TEST_PROGRAMS) test-run
 
 test/%.test: test/%.o
 	$(QLD) $(TEST_LDFLAGS) -o $@ $^ $(TEST_LIBS)

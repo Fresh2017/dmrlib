@@ -12,8 +12,8 @@ extern "C" {
 
 #include <inttypes.h>
 
-extern int dmr_rs_12_9_4_decode(uint8_t bytes[12], uint8_t crc_mask);
-extern int dmr_rs_12_9_4_encode(uint8_t bytes[12], uint8_t crc_mask);
+extern int dmr_rs_12_9_4_decode(uint8_t bytes[12]);
+extern int dmr_rs_12_9_4_encode(uint8_t bytes[12]);
 
 #ifdef __cplusplus
 }

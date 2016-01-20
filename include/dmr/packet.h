@@ -29,8 +29,10 @@ typedef enum {
 } dmr_flco_t;
 
 typedef enum {
-    DMR_FID_ETSI = 0x00,
-    DMR_FID_DMRA = 0x10
+    DMR_FID_ETSI     = 0x00,
+    DMR_FID_DMRA     = 0x0b,
+    DMR_FID_HYTERA   = 0x08,
+    DMR_FID_MOTOROLA = 0x10
 } dmr_fid_t;
 
 typedef enum {

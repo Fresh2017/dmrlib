@@ -20,9 +20,28 @@ static struct {
     dmr_fid_t fid;
     char      *name;
 } fid_name[] = {
-    { DMR_FID_ETSI, "ETSI"            },
-    { DMR_FID_DMRA, "DMR Association" },
-    { 0,            NULL              }
+    { DMR_FID_ETSI, "ETSI"                                      },
+    { 0x01,         "RESERVED"                                  },
+    { 0x02,         "RESERVED"                                  },
+    { 0x03,         "RESERVED"                                  },
+    { 0x04,         "Flyde Micro Ltd."                          },
+    { 0x05,         "PROD-EL SPA"                               },
+    { 0x06,         "Trident Datacom DBA Trident Micro Systems" },
+    { 0x07,         "RADIODATA GmbH"                            },
+    { 0x08,         "HYT science tech"                          },
+    { 0x09,         "ASELSAN Elektronik Sanayi ve Ticaret A.S." },
+    { 0x0a,         "Kirisun Communications Co. Ltd"            },
+    { 0x0b,         "DMR Association Ltd."                      },
+    { 0x10,         "Motorola Ltd."                             },
+    { 0x13,         "EMC S.p.A. (Electronic Marketing Company)" },
+    { 0x1c,         "EMC S.p.A. (Electronic Marketing Company)" },
+    { 0x20,         "JVCKENWOOD Corporation"                    },
+    { 0x33,         "Radio Activity Srl"                        },
+    { 0x3c,         "Radio Activity Srl"                        },
+    { 0x58,         "Tait Electronics Ltd",                     },
+    { 0x68,         "HYT science tech"                          },
+    { 0x77,         "Vertex Standard"                           },
+    { 0,            NULL                                        }
 };
 
 static char *ts_name[] = {

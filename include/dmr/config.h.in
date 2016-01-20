@@ -1,22 +1,31 @@
 #ifndef _DMR_CONFIG_H
 #define _DMR_CONFIG_H
 
-#if @WITH_DEBUG@
+{% if args.with_debug %}
 #define DMR_DEBUG
 #include <assert.h>
-#endif
+{% else -%}
+#undef DMR_DEBUG
+{% endif %}
 
-#if @HAVE_PTHREAD@
+{% if env.have_pthread -%}
 #define DMR_HAVE_PTHREAD
-#endif
+{% else -%}
+#undef DMR_HAVE_PTHREAD
+{% endif %}
 
-#if @WITH_DMALLOC@
+{% if args.with_dmalloc -%}
+#define WITH_DMALLOC
 #include <string.h>
 #include <dmalloc.h>
-#endif
+{% else -%}
+#undef WITH_DMALLOC
+{% endif %}
 
-#if @ENABLE_PROTO_MBE@
-#define DMR_ENABLE_PROTO_MBE
-#endif
+{% if args.with_mbelib -%}
+#define WITH_MBELIB
+{% else -%}
+#undef WITH_MBELIB
+{% endif %}
 
 #endif // _DMR_CONFIG_H

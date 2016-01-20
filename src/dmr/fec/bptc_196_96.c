@@ -151,7 +151,9 @@ int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 		bptc->deinterleaved_bits[col + 135 + 45] = hc[12];
 	}
 
+#if defined(DMR_DEBUG)
 	bptc_196_96_dump(bptc);
+#endif
 
 	// Interleaver
 	for (i = 1; i < 197; i++) {

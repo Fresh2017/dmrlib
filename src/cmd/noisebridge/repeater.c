@@ -40,7 +40,7 @@ bool init_repeater()
 
     switch (config->modem) {
     case PEER_MBE:
-#if !defined(DMR_ENABLE_PROTO_MBE)
+#if !defined(WITH_MBELIB)
         dmr_log_critical("noisebridge: libdmr not compiled with MBE support");
         valid = false;
 #else

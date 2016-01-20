@@ -22,6 +22,9 @@ __pycache__
 # Debug files
 *.dSYM/
 
+# Dependancy files
+*.d
+
 # Scons
 .sconf_temp/
 .sconsign.dblite
@@ -33,4 +36,5 @@ doc/Doxyfile
 include/dmr/config.h
 include/dmr/version.h
 src/cmd/noisebridge/version.h
+Makefile
 config.log

@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "dmr/config.h"
+
+#if defined(WITH_MBELIB)
+
 #include "dmr/log.h"
 #include "dmr/platform.h"
 #include "dmr/proto.h"
@@ -198,3 +202,4 @@ void dmr_mbe_free(dmr_mbe_t *mbe)
 }
 
 #endif // DMR_PLATFORM_WINDOWS
+#endif // WITH_MBELIB

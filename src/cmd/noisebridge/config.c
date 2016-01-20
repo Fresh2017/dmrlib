@@ -277,7 +277,7 @@ void kill_config(void)
     if (config->homebrew != NULL) {
         dmr_homebrew_free(config->homebrew);
     }
-#if defined(DMR_ENABLE_PROTO_MBE)
+#if defined(WITH_MBELIB)
     if (config->mbe != NULL) {
         dmr_mbe_free(config->mbe);
     }

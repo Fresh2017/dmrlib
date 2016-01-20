@@ -357,22 +357,13 @@ int dmr_slot_type_encode(dmr_packet_t *packet)
 
     uint8_t bytes[3];
     memset(bytes, 0, sizeof(bytes));
-    bytes[0]  = (packet->color_code << 4) & 0xf0;
-    bytes[0] |= (packet->data_type  << 0) & 0x0f;
-
+    bytes[0] = (packet->color_code << 4) | (packet->data_type & 0x0f);
     dmr_golay_20_8_encode(bytes);
 
-    packet->payload[12] |=                   B11000000;
-    packet->payload[12] |= (bytes[0] >> 2) & B00111111;
-    packet->payload[13] |=                   B00001111;
-    packet->payload[13] |= (bytes[0] << 6) & B11000000;
-    packet->payload[13] |= (bytes[1] >> 2) & B00110000;
-
-    packet->payload[19] |=                   B11110000;
-    packet->payload[19] |= (bytes[1] >> 2) & B00001111;
-    packet->payload[20] |=                   B00000011;
-    packet->payload[20] |= (bytes[1] << 6) & B11000000;
-    packet->payload[20] |= (bytes[2] >> 2) & B00111100;
+    packet->payload[12] = (packet->payload[12] & 0xc0) | ((bytes[0] >> 2) & 0x3f);
+    packet->payload[13] = (packet->payload[13] & 0x0f) | ((bytes[0] << 6) & 0xc0) | ((bytes[1] >> 2) & 0x30);
+    packet->payload[19] = (packet->payload[19] & 0xf0) | ((bytes[1] >> 2) & 0x0f);
+    packet->payload[20] = (packet->payload[20] & 0x03) | ((bytes[1] << 6) & 0xc0) | ((bytes[2] >> 2) & 0x3c);
 
     return 0;
 }

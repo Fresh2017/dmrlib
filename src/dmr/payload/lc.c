@@ -51,7 +51,7 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     dmr_log_trace("lc: performing Reed-Solomon(12, 9, 4) check on data");
     if (dmr_rs_12_9_4_decode(bytes) != 0) {
         dmr_log_error("LC: parity check failed");
-#if defined(DMR_DEBUG)
+#if defined(DMR_DEBUG_LC)
         dmr_log_debug("LC: parities received:");
         dmr_dump_hex(bytes, 12);
         memset(bytes + 9, 0, 3);
@@ -75,6 +75,11 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     lc->dst_id   = (bytes[3] << 16) | (bytes[4] << 8) | (bytes[5]);
     lc->src_id   = (bytes[6] << 16) | (bytes[7] << 8) | (bytes[8]);
     memcpy(lc->crc, bytes + 9, 3);
+
+    if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
+        dmr_log_debug("LC: bytes (with parity):");
+        dmr_dump_hex(bytes, 12);
+    }
 
     return 0;
 }
@@ -101,7 +106,7 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12])
     }
 
     // Calculate RS(12, 9) checksum
-    dmr_log_trace("lc: calculating Reed-Solomon (12, 9, 4) parities:");
+    dmr_log_trace("LC: calculating Reed-Solomon (12, 9, 4) parities:");
     dmr_rs_12_9_4_encode(bytes);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(bytes, 12);

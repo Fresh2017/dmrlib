@@ -209,7 +209,7 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
         if ((rule->src_proto == NULL || !strcmp(rule->src_proto, src_proto->name)) &&
             (rule->dst_proto == NULL || !strcmp(rule->dst_proto, dst_proto->name))) {
 
-            rule->flco = DMR_FLCO_PRIVATE;
+            //rule->flco = DMR_FLCO_PRIVATE;
 
             dmr_log_trace("noisebridge: evaluating route policy %s", rule->name);
             if (rule->modify) {
@@ -219,19 +219,19 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
                 } else {
                     dmr_log_trace("noisebridge: route[%s]: retain ts %u", rule->name, packet->ts + 1);
                 }
-                if (rule->src_id && packet->src_id != rule->src_id) {
+                if (rule->src_id) {
                     dmr_log_debug("noisebridge: route[%s]: modify src_id %lu -> %lu", rule->name, packet->src_id, rule->src_id);
                     packet->src_id = rule->src_id;
                 } else {
                     dmr_log_trace("noisebridge: route[%s]: retain src_id %lu", rule->name, packet->src_id);
                 }
-                if (rule->dst_id && packet->dst_id != rule->dst_id) {
+                if (rule->dst_id) {
                     dmr_log_debug("noisebridge: route[%s]: modify dst_id %lu -> %lu", rule->name, packet->dst_id, rule->dst_id);
                     packet->dst_id = rule->dst_id;
                 } else {
                     dmr_log_trace("noisebridge: route[%s]: retain dst_id %lu", rule->name, packet->dst_id);
                 }
-                if (rule->flco != DMR_FLCO_INVALID && packet->flco != rule->flco) {
+                if (rule->flco != DMR_FLCO_INVALID) {
                     dmr_log_debug("noisebridge: route[%s]: modify flco %u -> %u", rule->name, packet->flco, rule->flco);
                     packet->flco = rule->flco;
                 } else {

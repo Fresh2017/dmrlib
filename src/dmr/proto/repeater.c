@@ -146,63 +146,34 @@ static void repeater_proto_rx_cb(dmr_proto_t *proto, void *userdata, dmr_packet_
     if (proto == NULL || repeater == NULL || packet_in == NULL)
         return;
 
-    dmr_log_debug("repeater: rx callback from %s", proto->name);
-    if (repeater->slots == 0) {
-        dmr_log_error("repeater: no slots!?");
+    if (dmr_repeater_queue(repeater, proto, packet_in) != 0) {
+        dmr_log_error("repeater: failed to add packet to queue");
         return;
-    }
-
-    size_t i = 0;
-    for (; i < repeater->slots; i++) {
-        dmr_repeater_slot_t *slot = &repeater->slot[i];
-        if (slot->proto == proto) {
-            dmr_log_trace("repeater: skipped same-proto %s", slot->proto->name);
-            continue;
-        }
-        dmr_log_debug("repeater: call route callback %p for %s->%s",
-            repeater->route, proto->name, slot->proto->name);
-
-        if (repeater->route != NULL) {
-            dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
-            if (packet == NULL) {
-                dmr_log_error("repeater: no memory to clone packet!");
-                return;
-            }
-            memcpy(packet, packet_in, sizeof(dmr_packet_t));
-               
-            if (repeater->route(repeater, proto, slot->proto, packet)) {
-                dmr_log_debug("repeater: routing %s packet from %s->%s",
-                    dmr_data_type_name(packet_in->data_type),
-                    proto->name, slot->proto->name);
-
-                uint8_t sequence = packet->meta.sequence;
-                if (strcmp(slot->proto->name, "mmdvm")) {
-                    dmr_repeater_fix_headers(repeater, packet);
-                    dmr_log_debug("repeater: updated sequence %u->%u",
-                        sequence, packet->meta.sequence);
-                    packet->meta.sequence = sequence; // FIXME
-                }
-                dmr_proto_tx(slot->proto, slot->userdata, packet);
-            } else {
-                dmr_log_debug("repeater: dropping packet, refused by router");
-            }
-
-            talloc_free(packet);
-        }
     }
 }
 
 dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
 {
-    dmr_repeater_t *repeater = malloc(sizeof(dmr_repeater_t));
+    dmr_repeater_t *repeater = talloc_zero(NULL, dmr_repeater_t); // malloc(sizeof(dmr_repeater_t));
     if (repeater == NULL)
         return NULL;
-    memset(repeater, 0, sizeof(dmr_repeater_t));
+    //memset(repeater, 0, sizeof(dmr_repeater_t));
     repeater->color_code = 1;
     repeater->route = route;
-
     if (repeater->route == NULL) {
         dmr_log_warn("repeater: got a NULL router, hope that's okay...");
+    }
+
+    // Setup receiving queue
+    repeater->queue_size = 32;
+    repeater->queue_used = 0;
+    repeater->queue_lock = talloc_zero(repeater, dmr_mutex_t);
+    repeater->queue = talloc_size(repeater, sizeof(dmr_repeater_item_t) * repeater->queue_size);
+
+    if (repeater->queue == NULL) {
+        dmr_log_critical("repeater: out of memory");
+        talloc_free(repeater);
+        return NULL;
     }
 
     // Setup repeater protocol
@@ -223,11 +194,112 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
     return repeater;
 }
 
+int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_t *packet)
+{
+    if (repeater == NULL || proto == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
+    
+    dmr_mutex_lock(repeater->queue_lock);
+    int ret = 0;
+    if (repeater->queue_used + 1 < repeater->queue_size) {
+        dmr_repeater_item_t *item = talloc_zero(repeater, dmr_repeater_item_t);
+        if (item == NULL) {
+            dmr_log_critical("repeater: out of memory");
+            return dmr_error(DMR_ENOMEM);
+        }
+        item->proto = proto;
+        item->packet = packet;
+        repeater->queue[repeater->queue_used++] = item;
+    } else {
+        dmr_log_error("repeater: queue full!");
+        ret = -1;
+    }
+    dmr_mutex_unlock(repeater->queue_lock);
+
+    return ret;
+}
+
+dmr_repeater_item_t *dmr_repeater_queue_shift(dmr_repeater_t *repeater)
+{
+    if (repeater == NULL)
+        return NULL;
+
+    dmr_repeater_item_t *item = NULL;
+    dmr_mutex_lock(repeater->queue_lock);
+    if (repeater->queue_used) {
+        item = repeater->queue[0];
+        repeater->queue_used--;
+        size_t i;
+        for (i = 1; i < repeater->queue_used; i++) {
+            repeater->queue[i - 1] = repeater->queue[i];
+        }
+    }
+    dmr_mutex_unlock(repeater->queue_lock);
+
+    return item;
+}
+
 void dmr_repeater_loop(dmr_repeater_t *repeater)
 {
     // Run callbacks
     while (repeater_proto_active(repeater)) {
-        dmr_msleep(25);
+        dmr_repeater_item_t *item = dmr_repeater_queue_shift(repeater);
+        if (item != NULL) {
+            dmr_proto_t *proto = item->proto;
+            dmr_packet_t *packet_in = item->packet;
+
+            dmr_log_debug("repeater: handle packet from %s", proto->name);
+            if (repeater->slots == 0) {
+                dmr_log_error("repeater: no slots!?");
+                goto next;
+            }
+
+            size_t i = 0;
+            for (; i < repeater->slots; i++) {
+                dmr_repeater_slot_t *slot = &repeater->slot[i];
+                if (slot->proto == proto) {
+                    dmr_log_trace("repeater: skipped same-proto %s", slot->proto->name);
+                    continue;
+                }
+                dmr_log_debug("repeater: call route callback %p for %s->%s",
+                    repeater->route, proto->name, slot->proto->name);
+
+                if (repeater->route != NULL) {
+                    dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
+                    if (packet == NULL) {
+                        dmr_log_error("repeater: no memory to clone packet!");
+                        return;
+                    }
+                    memcpy(packet, packet_in, sizeof(dmr_packet_t));
+                       
+                    if (repeater->route(repeater, proto, slot->proto, packet)) {
+                        dmr_log_debug("repeater: routing %s packet from %s->%s",
+                            dmr_data_type_name(packet_in->data_type),
+                            proto->name, slot->proto->name);
+
+                        uint8_t sequence = packet->meta.sequence;
+                        if (strcmp(slot->proto->name, "mmdvm")) {
+                            dmr_repeater_fix_headers(repeater, packet);
+                            dmr_log_debug("repeater: updated sequence %u->%u",
+                                sequence, packet->meta.sequence);
+                            packet->meta.sequence = sequence; // FIXME
+                        }
+                        dmr_proto_tx(slot->proto, slot->userdata, packet);
+                    } else {
+                        dmr_log_debug("repeater: dropping packet, refused by router");
+                    }
+
+                    talloc_free(packet);
+                }
+            }
+        }
+
+        // If we reach here, we want to return to processing the queue ASAP
+        continue;
+    
+next:
+        // If we reach here, there was a serious error, so we back off a bit
+        dmr_msleep(5);
     }
 }
 
@@ -352,13 +424,13 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
         dmr_log_trace("repeater[%u]: constructing Full Link Control", ts);
 
         // Regenerate full LC
-        dmr_full_lc_t *full_lc = talloc(NULL, dmr_full_lc_t);
+        dmr_full_lc_t *full_lc = talloc_zero(NULL, dmr_full_lc_t);
         if (full_lc == NULL) {
              dmr_log_error("repeater[%u]: out of memory", ts);
              return -1;
         }
-        memset(full_lc, 0, sizeof(full_lc));
         full_lc->flco_pdu = (packet->flco == DMR_FLCO_PRIVATE) ? DMR_FLCO_PDU_PRIVATE : DMR_FLCO_PDU_GROUP;
+        full_lc->fid = 0;
         full_lc->privacy = (packet->flco == DMR_FLCO_PRIVATE);
         full_lc->src_id = packet->src_id;
         full_lc->dst_id = packet->dst_id;
@@ -375,19 +447,24 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 
 
         dmr_log_trace("repeater[%u]: constructing sync pattern for voice LC", ts);
-        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet);
+        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_MS_SOURCED_DATA, packet);
 
-        /*
+        dmr_log_debug("XXX BEFORE SLOT TYPE ENCODED:");
+        dmr_dump_packet(packet);
+
         dmr_log_trace("repeater[%u]: setting slot type to voice LC", ts);
         dmr_slot_type_encode(packet);
-        */
+
+        dmr_log_debug("XXX AFTER  SLOT TYPE ENCODED:");
+        dmr_dump_packet(packet);
+
 
         // Override sequence
         packet->meta.sequence = (rts.sequence++) & 0xff;
         break;
 
     case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet);
+        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_MS_SOURCED_DATA, packet);
         if (dmr_repeater_voice_call_end(repeater, packet) != 0) {
             dmr_log_error("repeater[%u]: failed to end voice call: %s", ts, dmr_error_get());
             return -1;
@@ -419,7 +496,7 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             }
             */
             dmr_log_trace("repeater[%u]: constructing sync pattern for voice SYNC in frame A", ts);
-            ret = dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_VOICE, packet);
+            ret = dmr_sync_pattern_encode(DMR_SYNC_PATTERN_MS_SOURCED_VOICE, packet);
             break;
 
         case 'B':
@@ -493,5 +570,5 @@ void dmr_repeater_free(dmr_repeater_t *repeater)
     if (repeater == NULL)
         return;
 
-    free(repeater);
+    talloc_free(repeater);
 }

@@ -28,6 +28,11 @@ typedef struct dmr_repeater_slot_s {
     dmr_proto_t *proto;
 } dmr_repeater_slot_t;
 
+typedef struct dmr_repeater_item_s {
+    dmr_proto_t  *proto;
+    dmr_packet_t *packet;
+} dmr_repeater_item_t;
+
 typedef struct dmr_repeater_timeslot_s {
     dmr_data_type_t   last_data_type;
     dmr_id_t          src_id, dst_id;
@@ -46,6 +51,10 @@ struct dmr_repeater_s {
     size_t                  slots;
     dmr_repeater_timeslot_t ts[2];
     dmr_color_code_t        color_code;
+    dmr_repeater_item_t     **queue;
+    size_t                  queue_size;
+    size_t                  queue_used;
+    dmr_mutex_t             *queue_lock;
 };
 
 /** Create a new repeater. */
@@ -69,5 +78,8 @@ extern void dmr_repeater_free(dmr_repeater_t *repeater);
 extern int dmr_repeater_protos(dmr_repeater_t *repeater);
 /** Fix the EMB/LC headers in voice frames */
 extern int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet);
+
+/** Add a packet to the processing queue. */
+extern int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_t *packet);
 
 #endif // _DMR_PROTO_REPEATER_H

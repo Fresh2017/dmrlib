@@ -154,7 +154,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
             DMR_LOG_BOOL(full_lc.privacy),
             dmr_fid_name(full_lc.fid), full_lc.fid,
             full_lc.src_id, full_lc.dst_id);
-
+        dmr_dump_hex(&full_lc, sizeof(dmr_full_lc_t));
         dmr_packet_t debug;
         memcpy(&debug, packet, sizeof(dmr_packet_t));
         if (dmr_full_lc_encode(&full_lc, &debug) != 0) {

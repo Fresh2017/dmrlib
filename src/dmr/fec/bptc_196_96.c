@@ -6,7 +6,7 @@
 #include "dmr/fec/bptc_196_96.h"
 #include "dmr/fec/hamming.h"
 
-#if defined(DMR_DEBUG)
+#if defined(DMR_DEBUG_BPTC)
 static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
 {
 	uint8_t row, col;
@@ -65,9 +65,7 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 		bptc->deinterleaved_bits[i - 1] = bptc->raw[(i * 181) % 196];
 	}
 
-	dmr_dump_hex(bptc->deinterleaved_bits, 196);
-
-#if defined(DMR_DEBUG)
+#if defined(DMR_DEBUG_BPTC)
 	bptc_196_96_dump(bptc);
 #endif
 
@@ -151,7 +149,7 @@ int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 		bptc->deinterleaved_bits[col + 135 + 45] = hc[12];
 	}
 
-#if defined(DMR_DEBUG)
+#if defined(DMR_DEBUG_BPTC)
 	bptc_196_96_dump(bptc);
 #endif
 

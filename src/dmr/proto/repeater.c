@@ -327,6 +327,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
 
 int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 {
+    packet->ts = DMR_TS1;
     dmr_ts_t ts = packet->ts;
     dmr_repeater_timeslot_t rts = repeater->ts[ts];
     dmr_log_trace("repeater[%u]: fixed headers in %s packet",
@@ -367,16 +368,19 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             return -1;
         }
 
-        dmr_log_trace("repeater[%u]: constructing sync pattern for voice LC", ts);
-        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_VOICE, packet);
-
-        dmr_log_trace("repeater[%u]: setting slot type to voice LC", ts);
-        dmr_slot_type_encode(packet);
-
         if (dmr_full_lc_encode(full_lc, packet) != 0) {
             dmr_log_error("repeater[%u]: can't fix headers, full LC failed: ", ts, dmr_error_get());
             return -1;
         }
+
+
+        dmr_log_trace("repeater[%u]: constructing sync pattern for voice LC", ts);
+        dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet);
+
+        /*
+        dmr_log_trace("repeater[%u]: setting slot type to voice LC", ts);
+        dmr_slot_type_encode(packet);
+        */
 
         // Override sequence
         packet->meta.sequence = (rts.sequence++) & 0xff;

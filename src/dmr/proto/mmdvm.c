@@ -446,10 +446,12 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 dmr_log_debug("mmdvm: starting new voice stream; resetting sequence");
                 modem->dmr_ts[ts].last_sequence = 0;
                 modem->dmr_ts[ts].last_voice_frame = 0;
+                modem->dmr_ts[ts].stream_id = rand();
             }
 
             packet->flco = DMR_FLCO_GROUP;
             packet->meta.sequence = modem->dmr_ts[ts].last_sequence++ % 0xff;
+            packet->meta.stream_id = modem->dmr_ts[ts].stream_id;
             switch (packet->data_type) {
             case DMR_DATA_TYPE_VOICE:
             case DMR_DATA_TYPE_VOICE_SYNC:
@@ -482,19 +484,21 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 header->ts = packet->ts;
                 header->flco = packet->flco;
                 header->meta.sequence = packet->meta.sequence;
+                header->meta.stream_id = modem->dmr_ts[ts].stream_id;
 
                 uint8_t i = 0;
                 for (i = 0; i < 4; i++) {
-                    header->meta.sequence++;
                     dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, header);
                     dmr_log_debug("mmdvm: rx %s (prepended), seq %#02x/0xff",
                         dmr_data_type_name(header->data_type),
                         header->meta.sequence);
                     dmr_proto_rx_cb_run(&modem->proto, header);
                     gettimeofday(&modem->dmr_ts[ts].last_packet_received, NULL);
+                    header->meta.sequence++;
                 }
 
                 dmr_free(header);
+                //i++;
                 packet->meta.sequence = (packet->meta.sequence + i) % 0xff;
                 modem->dmr_ts[ts].last_sequence = (modem->dmr_ts[ts].last_sequence + i) % 0xff;
             }

@@ -153,6 +153,7 @@ typedef struct {
         struct timeval  last_packet_received;
         uint32_t        last_sequence;
         uint8_t         last_voice_frame;
+        uint32_t        stream_id;
     } dmr_ts[3];
     dmr_ts_t last_dmr_ts;
 } dmr_mmdvm_t;

@@ -47,7 +47,7 @@ dmr_sync_pattern_t dmr_sync_pattern_decode(dmr_packet_t *packet)
 {
     const uint8_t *buf = (const uint8_t *)(packet->payload + 13);
 
-    if (dmr_bit_diff(packet->payload + 13, dmr_sync_pattern_bs_sourced_voice) < dmr_sync_delta_max)
+    if (dmr_bit_diff(buf, dmr_sync_pattern_bs_sourced_voice) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_BS_SOURCED_VOICE;
     if (dmr_bit_diff(buf, dmr_sync_pattern_bs_sourced_data) < dmr_sync_delta_max)
         return DMR_SYNC_PATTERN_BS_SOURCED_DATA;

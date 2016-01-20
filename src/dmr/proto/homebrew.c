@@ -536,9 +536,9 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     buf[5]   = packet->src_id >> 16;
     buf[6]   = packet->src_id >> 8;
     buf[7]   = packet->src_id >> 0;
-    buf[8]   = packet->src_id >> 16;
-    buf[9]   = packet->src_id >> 8;
-    buf[10]  = packet->src_id >> 0;
+    buf[8]   = packet->dst_id >> 16;
+    buf[9]   = packet->dst_id >> 8;
+    buf[10]  = packet->dst_id >> 0;
     buf[11]  = packet->repeater_id >> 24;
     buf[12]  = packet->repeater_id >> 16;
     buf[13]  = packet->repeater_id >> 8;
@@ -708,11 +708,12 @@ dmr_homebrew_frame_type_t dmr_homebrew_dump(uint8_t *buf, ssize_t len)
 
     dmr_homebrew_frame_type_t frame_type = dmr_homebrew_frame_type(buf, len);
     dmr_log_debug("homebrew: %zu bytes of %s:", len, dmr_homebrew_frame_type_name(frame_type));
+    dmr_dump_hex(buf, len);
     switch (frame_type) {
     case DMR_HOMEBREW_DMR_DATA_FRAME:
         if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-            dmr_log_debug("homebrew: sequence: %d (0x%02x)", buf[4], buf[4]);
-            dmr_log_debug("homebrew: src->dst: %d->%d",
+            dmr_log_debug("homebrew: sequence: %u (0x%02x)", buf[4], buf[4]);
+            dmr_log_debug("homebrew: src->dst: %u->%u",
                 (buf[5] << 16) | (buf[6] << 8) | buf[7],
                 (buf[8] << 16) | (buf[9] << 8) | buf[10]);
             uint32_t repeater_id = (buf[11] << 24) | (buf[12] << 16) | (buf[13] << 8) | (buf[14] << 0);
@@ -742,7 +743,7 @@ dmr_homebrew_frame_type_t dmr_homebrew_dump(uint8_t *buf, ssize_t len)
 
         break;
     default:
-        dmr_dump_hex(buf, len);
+        break;
     }
 
     return frame_type;

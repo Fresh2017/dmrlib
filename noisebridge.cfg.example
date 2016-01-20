@@ -24,8 +24,7 @@ repeater_color_code=1
 #
 #                                policy  proto     proto     mod ts flco, src_id   dst_id 
 repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  1, 2,    1234567, 9990   }
-repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  ..ccncjfbilveunijdfdtrrlgjgjftftkvvfjcghncetbk
- }
+repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  .. }
 
 # Our upstream peer
 upstream_type=homebrew

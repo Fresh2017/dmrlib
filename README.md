@@ -106,26 +106,26 @@ Check out https://github.com/pd0mz/dmrlib
 
 | **Algorithm**                      | **Encoding**   | **Decoding**   |
 |:-----------------------------------|:---------------|:---------------|
-| CRC-5                              | ⨉              | ⨉              |
-| CRC-9                              | √              | √              |
-| CRC-16 (*CCITT*)                   | √              | √              |
-| CRC-32                             | √              | √              |
+| CRC-5                              | :x:            | :x:            |
+| CRC-9                              | :thumbsup:     | :thumbsup:     |
+| CRC-16 (*CCITT*)                   | :thumbsup:     | :thumbsup:     |
+| CRC-32                             | :thumbsup:     | :thumbsup:     |
 
 ## (Forward) Error Correction
 
-| **Algorithm**                      | **Encoding**   | **Decoding**   |
-|:-----------------------------------|:---------------|:---------------|
-| Block Product Turbo Code (196, 96) | √              | √ <sup>1</sup> |
-| Hamming (7,4,3)                    | √              | √              |
-| Hamming (13,9,3)                   | √              | √              |
-| Hamming (15,11,3)                  | √              | √              |
-| Hamming (16,11,4)                  | √              | √              |
-| Hamming (17,12,3)                  | √              | √              |
-| Golay (20, 8)                      | √              | √              |
-| Quadratic Residue (16, 7, 6)       | √              | √              |
-| Reed-Solomon (12, 9, 4)            | √              | √ <sup>2</sup> |
-| Rate ¾ Trellis                     | ⨉              | ⨉              |
-| Variable length BPTC               | √              | √              |
+| **Algorithm**                        | **Encoding**   | **Decoding**   |
+|:-------------------------------------|:---------------|:---------------|
+| Block Product Turbo Code (196, 96)   | :thumbsup:     | :thumbsup:     |
+| Hamming (7,4,3)                      | :thumbsup:     | :thumbsup:     |
+| Hamming (13,9,3)                     | :thumbsup:     | :thumbsup:     |
+| Hamming (15,11,3)                    | :thumbsup:     | :thumbsup:     |
+| Hamming (16,11,4)                    | :thumbsup:     | :thumbsup:     |
+| Hamming (17,12,3)                    | :thumbsup:     | :thumbsup:     |
+| Golay (20, 8)                        | :thumbsup:     | :thumbsup:     |
+| Quadratic Residue (16, 7, 6)         | :thumbsup:     | :thumbsup:     |
+| Reed-Solomon (12, 9, 4) <sup>2</sup> | :thumbsup:     | :thumbsup:     |
+| Rate ¾ Trellis                       | :x:            | :x:            |
+| Variable length BPTC                 | :thumbsup:     | :thumbsup:     |
 
 1.  Full Hamming error correction not yet available
 2.  Simplified form, shortened syndrome not implemented
@@ -134,19 +134,18 @@ Check out https://github.com/pd0mz/dmrlib
 
 | **Data Type**                      | **Encoding**   | **Decoding**   |
 |:-----------------------------------|:---------------|:---------------|
-| Privacy Indicator                  | ⨉              | ⨉              |
-| Voice Link Control                 | √              | √              |
-| Terminator with Link Control       | ⨉              | ⨉              |
-| Control Signaling Block            | ⨉              | ⨉              |
-| Multiple Block Control             | ⨉              | ⨉              |
-| Data Header                        | ⨉              | ⨉              |
-| Rate                               | ⨉              | ⨉              |
-| Rate ¾ Data                        | ⨉              | ⨉              |
-| Idle                               | ⨉              | ⨉              |
-| Voice                              | √ <sup>1</sup> | √ <sup>2</sup> |
+| Privacy Indicator                  | :x:            | :x:            |
+| Voice Link Control                 | :thumbsup:     | :thumbsup:     |
+| Terminator with Link Control       | :x:            | :x:            |
+| Control Signaling Block            | :x:            | :x:            |
+| Multiple Block Control             | :x:            | :x:            |
+| Data Header                        | :x:            | :x:            |
+| Rate                               | :x:            | :x:            |
+| Rate ¾ Data                        | :x:            | :x:            |
+| Idle                               | :x:            | :x:            |
+| Voice <sup>1</sup>                 | :thumbsup:     | :thumbsup:     |
 
-1.  Depends on the availability of compatible hardware
-2.  Depends on the availability of compatible hardware or *mbelib*
+1.  Depends on the availability of compatible hardware and/or software
 
 # Acknowledgements
 

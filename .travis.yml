@@ -13,4 +13,4 @@ addons:
 
 cache: apt
 
-script: scons --with-debug CC=$CC || (cat config.log && false)
+script: export CC=$CC ./configure && make && make test || (cat config.log && false)

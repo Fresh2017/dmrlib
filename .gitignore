@@ -5,6 +5,7 @@
 *.elf
 *.pyc
 *.pyo
+*.dylib
 __pycache__
 
 # Precompiled Headers
@@ -18,6 +19,8 @@ __pycache__
 *.i*86
 *.x86_64
 *.hex
+src/cmd/dmrdump/dmrdump
+src/cmd/noisebridge/noisebridge
 
 # Debug files
 *.dSYM/

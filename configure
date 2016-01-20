@@ -262,7 +262,6 @@ def run():
         if kind == 'bool':
             parser.add_argument(
                 '--{0}'.format(key),
-                dest=key,
                 default=default,
                 action='store_false' if default else 'store_true',
                 help=desc + ' (default: {0})'.format(['no', 'yes'][int(default)]),
@@ -270,7 +269,6 @@ def run():
         else:
             parser.add_argument(
                 '--{0}'.format(key),
-                dest=key,
                 default=default,
                 metavar=kind,
                 help=desc + ' (default: {0})'.format(default),

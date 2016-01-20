@@ -207,7 +207,7 @@ build-cmd: build-dmrlib build-dmrdump build-noisebridge
 
 install-cmd: install-dmrdump install-noisebridge
 
-clean-cmd: clean-dmrdump
+clean-cmd: clean-dmrdump clean-noisebridge
 
 #
 # bin/dmrdump

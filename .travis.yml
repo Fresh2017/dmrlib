@@ -9,6 +9,7 @@ addons:
     packages:
       - libtalloc-dev
       - libpcap-dev
+      - libbsd-dev
       - python-jinja2
 
 cache: apt

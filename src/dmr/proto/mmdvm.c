@@ -496,6 +496,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
 
                 dmr_free(header);
                 packet->meta.sequence = (packet->meta.sequence + i) % 0xff;
+                modem->dmr_ts[ts].last_sequence = (modem->dmr_ts[ts].last_sequence + i) % 0xff;
             }
 
             dmr_log_debug("mmdvm: rx %s, seq %#02x/0xff",

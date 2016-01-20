@@ -24,7 +24,8 @@ repeater_color_code=1
 #
 #                                policy  proto     proto     mod ts flco, src_id   dst_id 
 repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  1, 2,    1234567, 9990   }
-repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  .. }
+repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  ..ccncjfbilveunijdfdtrrlgjgjftftkvvfjcghncetbk
+ }
 
 # Our upstream peer
 upstream_type=homebrew
@@ -43,6 +44,8 @@ homebrew_longitude=7.8901
 # Our "LF" side
 modem_type=mmdvm
 mmdvm_rate=115200
+mmdvm_rx_freq=433787500
+mmdvm_tx_freq=438787500
 # Linux:
 mmdvm_port=/dev/ttyACM0
 #mmdvm_port=/dev/ttyUSB0

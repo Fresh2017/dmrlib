@@ -238,7 +238,7 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
                     dmr_log_trace("noisebridge: route[%s]: retain flco %u", rule->name, packet->flco);
                 }
             } else {
-                dmr_log_debug("noisebrige: route[%s]: do not modify", rule->name);
+                dmr_log_debug("noisebridge: route[%s]: do not modify", rule->name);
             }
             if (rule->policy == ROUTE_REJECT) {
                 dmr_log_debug("noisebridge: route[%s]: rejected by policy", rule->name);

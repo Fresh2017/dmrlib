@@ -143,7 +143,7 @@ void _dmr_log_trace(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    dmr_log_messagev(DMR_LOG_PRIORITY_DEBUG, fmt, ap);
+    dmr_log_messagev(DMR_LOG_PRIORITY_TRACE, fmt, ap);
     va_end(ap);
 }
 

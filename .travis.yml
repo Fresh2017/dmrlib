@@ -13,4 +13,6 @@ addons:
 
 cache: apt
 
-script: export CC=$CC ./configure && make && make test || (cat config.log && false)
+script:
+  - export CC=$CC
+  - ./configure && make && make test || (cat config.log && false)

@@ -351,20 +351,19 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
         dmr_log_trace("repeater[%u]: constructing Full Link Control", ts);
 
         // Regenerate full LC
-        dmr_full_lc_t full_lc;
-        memset(&full_lc, 0, sizeof(full_lc));
-        full_lc.flco_pdu = (packet->flco == DMR_FLCO_PRIVATE) ? DMR_FLCO_PDU_PRIVATE : DMR_FLCO_PDU_GROUP;
-        full_lc.privacy = (packet->flco == DMR_FLCO_PRIVATE);
-        full_lc.src_id = packet->src_id;
-        full_lc.dst_id = packet->dst_id;
-
-        if (dmr_repeater_voice_call_start(repeater, packet, &full_lc) != 0) {
-            dmr_log_error("repeater[%u]: failed to start voice call: %s", ts, dmr_error_get());
-            return -1;
+        dmr_full_lc_t *full_lc = talloc(NULL, dmr_full_lc_t);
+        if (full_lc == NULL) {
+             dmr_log_error("repeater[%u]: out of memory", ts);
+             return -1;
         }
+        memset(full_lc, 0, sizeof(full_lc));
+        full_lc->flco_pdu = (packet->flco == DMR_FLCO_PRIVATE) ? DMR_FLCO_PDU_PRIVATE : DMR_FLCO_PDU_GROUP;
+        full_lc->privacy = (packet->flco == DMR_FLCO_PRIVATE);
+        full_lc->src_id = packet->src_id;
+        full_lc->dst_id = packet->dst_id;
 
-        if (dmr_full_lc_encode(&full_lc, packet) != 0) {
-            dmr_log_error("repeater[%u]: can't fix headers, full LC failed: ", ts, dmr_error_get());
+        if (dmr_repeater_voice_call_start(repeater, packet, full_lc) != 0) {
+            dmr_log_error("repeater[%u]: failed to start voice call: %s", ts, dmr_error_get());
             return -1;
         }
 
@@ -373,6 +372,11 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 
         dmr_log_trace("repeater[%u]: setting slot type to voice LC", ts);
         dmr_slot_type_encode(packet);
+
+        if (dmr_full_lc_encode(full_lc, packet) != 0) {
+            dmr_log_error("repeater[%u]: can't fix headers, full LC failed: ", ts, dmr_error_get());
+            return -1;
+        }
 
         // Override sequence
         packet->meta.sequence = (rts.sequence++) & 0xff;

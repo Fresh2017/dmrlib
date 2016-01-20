@@ -1,24 +1,30 @@
 # Logging
 #log_level=0
 
+# Modules
+#load=dist/module/mod_python.so,noisebridge.py
+
 # Our repeater
 repeater_color_code=1
 # Route rules: <name>:{<policy>,<proto>,<proto>,<ts>,<src_id>,<dst_id>}
 # policy = reject,permit
 # proto  = homebrew,mmdvm,mbe,repeater
+# modify = 0: do not modify
+# 		   1: modify
 # ts     = 0: do not modify
 #          1: time slot 1
 #          2: time slot 2
+# pi     = 0: do not modify
+# 		   1: off (group call)
+# 		   2: on (unit to unit call)
 # src_id = 0: do not modify
 #          n: rewrite src_id
 # dst_id = 0: do not modify
 #          n: rewrite dst_id
 #
-#                                policy  proto     proto     ts src_id   dst_id
-repeater_route=loop_mmdvm_block:{reject, mmdvm,    mmdvm,    0, 0,       0      }
-repeater_route=loop_hbrew_block:{reject, homebrew, homebrew, 0, 0,       0      }
-repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1, 1234567, 9990   }
-repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0, 0,       0      }
+#                                policy  proto     proto     mod ts flco, src_id   dst_id 
+repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  1, 2,    1234567, 9990   }
+repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  .. }
 
 # Our upstream peer
 upstream_type=homebrew
@@ -32,7 +38,7 @@ homebrew_tx_freq=438787500
 homebrew_tx_power=99
 homebrew_height=999
 homebrew_latitude=12.3456
-homebrew_longitude=4.2345
+homebrew_longitude=7.8901
 
 # Our "LF" side
 modem_type=mmdvm

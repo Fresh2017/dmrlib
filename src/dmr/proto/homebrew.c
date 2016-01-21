@@ -231,8 +231,16 @@ dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer)
         return NULL;
     }
 
-    setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int));
-    setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEPORT, (const void *)&optval, sizeof(int));
+#if defined(SO_REUSEADDR)
+    if (setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(int)) != 0) {
+        dmr_log_error("homebrew: failed to set socket option SO_REUSEADDR: %s", strerror(errno));
+    }
+#endif
+#if defined(SO_REUSEPORT)
+    if (setsockopt(homebrew->fd, SOL_SOCKET, SO_REUSEPORT, (const void *)&optval, sizeof(int)) != 0) {
+        dmr_log_error("homebrew: failed to set socket option SO_REUSEPORT: %s", strerror(errno));
+    }
+#endif
 
     homebrew->server.sin_family = AF_INET;
     homebrew->server.sin_addr.s_addr = INADDR_ANY;

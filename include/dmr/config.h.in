@@ -8,14 +8,10 @@
 #undef DMR_DEBUG
 {% endif %}
 
-{% if env.have_pthread -%}
-#define DMR_HAVE_PTHREAD
-{% else -%}
-#undef DMR_HAVE_PTHREAD
-{% endif %}
-
 {% if args.with_dmalloc -%}
+#ifndef WITH_DMALLOC
 #define WITH_DMALLOC
+#endif
 #include <string.h>
 #include <dmalloc.h>
 {% else -%}
@@ -23,9 +19,21 @@
 {% endif %}
 
 {% if args.with_mbelib -%}
+#ifndef WITH_MBELIB
 #define WITH_MBELIB
+#endif
 {% else -%}
 #undef WITH_MBELIB
 {% endif %}
+
+{% for key, value in env.items()|sort %}{% if key.startswith('HAVE_') and value == '1' -%}
+#ifndef {{ key }}
+#define {{ key }}
+#endif
+
+{% endif %}{% endfor %}
+#ifdef HAVE_LIBPTHREAD
+#define DMR_HAVE_PTHREAD
+#endif
 
 #endif // _DMR_CONFIG_H

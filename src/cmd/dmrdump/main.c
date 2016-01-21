@@ -1,3 +1,7 @@
+#ifndef __FAVOR_BSD
+#define __FAVOR_BSD
+#endif
+
 #include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -22,7 +26,7 @@
 
 #define ETHER_TYPE_IP (0x0800)
 
-#if defined(DMR_PLATFORM_WINDOWS)
+#if !defined(HAVE_NETINET_UDP_H)
 #include <sys/param.h>
 /* Internet address.  */
 typedef uint32_t in_addr_t;

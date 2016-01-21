@@ -28,6 +28,7 @@ env_defaults = {
 }
 
 required_headers = (
+    'ctype.h',
     'errno.h',
     'inttypes.h',
     'signal.h',
@@ -38,9 +39,14 @@ required_headers = (
     'stdlib.h',
     'string.h',
     'time.h',
+    'sys/param.h',
 )
 optional_headers = (
     'libgen.h',
+    'arpa/inet.h',
+    'net/ethernet.h',
+    'netinet/ip.h',
+    'netinet/udp.h',
 )
 
 required_libraries = (
@@ -211,11 +217,13 @@ def check_header(header, optional=False):
             temp.name + '.o',
             temp.name,
         ] + shlex.split(os.environ.get('CFLAGS', ''))
+
+        name = header.upper().replace('.', '_').replace('/', '_')
         if _test_call(args):
-            os.environ['HAVE_{0}'.format(header.upper().replace('.', '_'))] = '1'
+            os.environ['HAVE_{0}'.format(name)] = '1'
             return True
 
-        os.environ['HAVE_{0}'.format(header.upper().replace('.', '_'))] = '0'
+        os.environ['HAVE_{0}'.format(name)] = '0'
         return optional
 
 

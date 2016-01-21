@@ -205,7 +205,7 @@ static int http_start_client_thread(void *clientptr)
 
     char buf[HTTP_BUFFER_SIZE];
     memset(buf, 0, sizeof(buf));
-    if (fread(buf, sizeof(buf), 1, fp) < 0) {
+    if (fread(buf, sizeof(buf), 1, fp) < 18) { /* Minial HTTP/1.1 GET request size */
         dmr_log_error("http: fread(%s): %s", path, strerror(errno));
         out = http_respond(client, HTTP_ERROR, NULL, "Error reading file (see log).");
         goto stop;
@@ -218,7 +218,7 @@ stop:
         dmr_log_info("http: %s: GET %s %d %d", inet_ntoa(client->addr.sin_addr), request_path, client->status, out);
         free(path);
     }
-    
+
     if (fp != NULL)
         fclose(fp);
 

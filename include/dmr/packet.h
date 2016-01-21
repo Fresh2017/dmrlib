@@ -53,6 +53,8 @@ typedef enum {
     DMR_DATA_TYPE_VOICE      = 0xf1
 } dmr_data_type_t;
 
+#define DMR_DATA_TYPE_COUNT DMR_DATA_TYPE_INVALID
+
 typedef struct {
     dmr_ts_t         ts;
     dmr_flco_t       flco;

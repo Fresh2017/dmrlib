@@ -40,6 +40,8 @@ typedef struct {
     uint8_t        crc[3];
 } dmr_full_lc_t;
 
+extern uint8_t dmr_crc_mask_lc[DMR_DATA_TYPE_COUNT];
+
 extern int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet);
 extern int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12]);
 /** Insert Link Control message with Reed-Solomon check data */

@@ -19,6 +19,9 @@
 #if defined(HAVE_GETAUXVAL)
 #include <sys/auxv.h>
 #endif
+#if defined(HAVE_LIBPROC)
+#include <libproc.h>
+#endif
 
 const char *software_id = NOISEBRIDGE_SOFTWARE_ID;
 
@@ -31,9 +34,16 @@ const char *progname(void)
     if ((name = (const char *)getauxval(AT_EXECFN)) != NULL)
         return name;
 #endif
+#if defined(HAVE_LIBPROC)
+    if ((name = malloc(PROC_PIDPATHINFO_MAXSIZE)) != NULL) {
+        if (proc_pidpath(getpid(), (void *)name, PROC_PIDPATHINFO_MAXSIZE) > 0)
+            return name;
+    }
+#endif
     return NULL;
 }
 
+#if 0
 plugin_t *load_plugin(char *filename, int argv, char **argc)
 {
 #if defined(HAVE_DL)
@@ -68,6 +78,7 @@ plugin_t *load_plugin(char *filename, int argv, char **argc)
     return NULL;
 #endif
 }
+#endif
 
 config_t *load_config(void)
 {
@@ -141,6 +152,7 @@ config_t *init_config(const char *filename)
             dmr_log_trace("noisebridge: config %s = %d", k, config->log_level);
             dmr_log_priority_set(config->log_level);
 
+        /*
         } else if (!strcmp(k, "load")) {
             if (config->plugins >= NOISEBRIDGE_MAX_PLUGINS) {
                 dmr_log_critical("noisebridge: %s[%zu]: max number of plugins reached", filename, lineno);
@@ -157,6 +169,7 @@ config_t *init_config(const char *filename)
                 valid = false;
                 break;
             }
+        */
 
         } else if (!strcmp(k, "http_addr")) {
             config->http_addr = strdup(v);

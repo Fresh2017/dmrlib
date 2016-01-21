@@ -132,7 +132,7 @@ static int dmr_emb_encode_signalling_lc_bytes(uint8_t *bytes, dmr_emb_signalling
 
 int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signalling_lc_bits_t *emb_bits, dmr_data_type_t data_type)
 {
-    if (emb_bits == NULL || lc == NULL)
+    if (emb_bits == NULL || lc == NULL || data_type >= DMR_DATA_TYPE_INVALID)
         return dmr_error(DMR_EINVAL);
 
     uint8_t bytes[12];

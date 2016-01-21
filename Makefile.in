@@ -116,7 +116,7 @@ DMRLIB_LIBS 		 = {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
 
 DMRDUMP_SOURCES      = $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      = $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))
-DMRDUMP_CFLAGS       = $(CFLAGS)
+DMRDUMP_CFLAGS       = $(CFLAGS) -D_BSD_SOURCE
 DMRDUMP_LDFLAGS      = $(LDFLAGS) -Lsrc/dmr
 DMRDUMP_LIBS 		 = -lpcap -lpthread -ltalloc -ldmr
 

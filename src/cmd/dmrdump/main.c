@@ -1,7 +1,3 @@
-#ifndef __FAVOR_BSD
-#define __FAVOR_BSD
-#endif
-
 #include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>

@@ -194,11 +194,15 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
     return repeater;
 }
 
+/** Add a packet coming from proto the the processing queue.
+ * This function allocates for the item, as well as copies for the proto and
+ * packet
+ */
 int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_t *packet)
 {
     if (repeater == NULL || proto == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
-    
+
     dmr_mutex_lock(repeater->queue_lock);
     int ret = 0;
     if (repeater->queue_used + 1 < repeater->queue_size) {
@@ -207,8 +211,15 @@ int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_
             dmr_log_critical("repeater: out of memory");
             return dmr_error(DMR_ENOMEM);
         }
+        // Link the proto instance, but create a copy of the packet so the
+        // caller can free()/recycle it after passing it to us.
         item->proto = proto;
-        item->packet = packet;
+        item->packet = talloc_zero(item, dmr_packet_t);
+        if (item->packet == NULL) {
+            dmr_log_critical("repeater: out of memory");
+            return dmr_error(DMR_ENOMEM);
+        }
+        memcpy(item->packet, packet, sizeof(dmr_packet_t));
         repeater->queue[repeater->queue_used++] = item;
     } else {
         dmr_log_error("repeater: queue full!");
@@ -245,6 +256,7 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
     while (repeater_proto_active(repeater)) {
         dmr_repeater_item_t *item = dmr_repeater_queue_shift(repeater);
         if (item != NULL) {
+            // Just for convenience.
             dmr_proto_t *proto = item->proto;
             dmr_packet_t *packet_in = item->packet;
 
@@ -265,13 +277,18 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                     repeater->route, proto->name, slot->proto->name);
 
                 if (repeater->route != NULL) {
+                    // We work with another copy of the packet, because the
+                    // router may alter the packet and we want to give each
+                    // router a copy of the original packet.
                     dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
                     if (packet == NULL) {
                         dmr_log_error("repeater: no memory to clone packet!");
                         return;
                     }
                     memcpy(packet, packet_in, sizeof(dmr_packet_t));
-                       
+
+                    // Call out to the router, which may (or may not) alter the
+                    // packet that has been passed.
                     if (repeater->route(repeater, proto, slot->proto, packet)) {
                         dmr_log_debug("repeater: routing %s packet from %s->%s",
                             dmr_data_type_name(packet_in->data_type),
@@ -289,16 +306,25 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                         dmr_log_debug("repeater: dropping packet, refused by router");
                     }
 
+                    // This cleans up our *cloned* packet.
                     talloc_free(packet);
                 }
             }
         }
 
         // If we reach here, we want to return to processing the queue ASAP
+        if (item != NULL) {
+            talloc_free(item);
+            item = NULL;
+        }
         continue;
-    
+
 next:
         // If we reach here, there was a serious error, so we back off a bit
+        if (item != NULL) {
+            talloc_free(item);
+            item = NULL;
+        }
         dmr_msleep(5);
     }
 }
@@ -360,7 +386,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
 
     if (rts.voice_call_active) {
         return dmr_repeater_voice_call_end(repeater, packet);
-    }    
+    }
 
     dmr_log_trace("repeater: voice call start on %s", dmr_ts_name(ts));
     rts.voice_call_active = true;
@@ -469,7 +495,7 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             dmr_log_error("repeater[%u]: failed to end voice call: %s", ts, dmr_error_get());
             return -1;
         }
-        
+
         // Override sequence
         packet->meta.sequence = (rts.sequence++) & 0xff;
         break;

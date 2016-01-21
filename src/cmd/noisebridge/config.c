@@ -22,22 +22,31 @@
 #if defined(HAVE_LIBPROC)
 #include <libproc.h>
 #endif
+#if defined(HAVE_LIBGEN_H)
+#include <libgen.h>
+#endif
 
 const char *software_id = NOISEBRIDGE_SOFTWARE_ID;
 
 static config_t *config = NULL;
 
-const char *progname(void)
+char *progname(void)
 {
-    const char *name = NULL;
+    char *name = NULL;
 #if defined(HAVE_GETAUXVAL)
-    if ((name = (const char *)getauxval(AT_EXECFN)) != NULL)
+    if ((name = getauxval(AT_EXECFN)) != NULL)
         return name;
 #endif
 #if defined(HAVE_LIBPROC)
     if ((name = malloc(PROC_PIDPATHINFO_MAXSIZE)) != NULL) {
         if (proc_pidpath(getpid(), (void *)name, PROC_PIDPATHINFO_MAXSIZE) > 0)
             return name;
+    }
+#endif
+#if defined(HAVE_LIBGEN_H)
+    if ((name = malloc(PATH_MAX)) != NULL) {
+        getcwd(name, PATH_MAX);
+        return dirname(name);
     }
 #endif
     return NULL;

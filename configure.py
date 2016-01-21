@@ -39,13 +39,15 @@ required_headers = (
     'string.h',
     'time.h',
 )
+optional_headers = (
+    'libgen.h',
+)
 
 required_libraries = (
     ('m',      'math.h'),
     ('talloc', 'talloc.h'),
     ('pcap',   'pcap.h'),
 )
-
 optional_libraries = (
     ('proc',   'libproc.h'),
 )
@@ -196,19 +198,25 @@ def check_define(define, headers=[], libs=[]):
         return False
 
 
-def check_header(header):
+def check_header(header, optional=False):
     echo('checking header {0}... '.format(header))
     with tempfile.NamedTemporaryFile(suffix='check-header.c') as temp:
         temp.write('#include <{0}>\n'.format(header))
         temp.write('int main(int argc, char **argv) { return 0; }')
         temp.seek(0)
         log('test program:\n{0}\n'.format(temp.read()))
-        return _test_call([
+        args = [
             os.environ['CC'],
             '-o',
             temp.name + '.o',
             temp.name,
-        ] + shlex.split(os.environ.get('CFLAGS', '')))
+        ] + shlex.split(os.environ.get('CFLAGS', ''))
+        if _test_call(args):
+            os.environ['HAVE_{0}'.format(header.upper().replace('.', '_'))] = '1'
+            return True
+
+        os.environ['HAVE_{0}'.format(header.upper().replace('.', '_'))] = '0'
+        return optional
 
 
 def check_library(name, headers):
@@ -295,6 +303,8 @@ def configure(args):
     for header in required_headers:
         if not check_header(header):
             return False
+    for header in optional_headers:
+        check_header(header, optional=True)
 
     for define, headers, libraries in optional_defines:
         headers = headers or []

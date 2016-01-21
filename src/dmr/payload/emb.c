@@ -152,8 +152,12 @@ int dmr_emb_encode_signalling_lc(dmr_emb_signalling_lc_bits_t *emb_bits, dmr_pac
     if (packet->flco == DMR_FLCO_PRIVATE) {
         bytes[0] = 3;
     }
-    DMR_UINT32_BE_PACK3(bytes + 3, packet->dst_id);
-    DMR_UINT32_BE_PACK3(bytes + 6, packet->src_id);
+    bytes[3] = packet->dst_id >> 16;
+    bytes[4] = packet->dst_id >> 8;
+    bytes[5] = packet->dst_id;
+    bytes[6] = packet->src_id >> 16;
+    bytes[7] = packet->src_id >> 8;
+    bytes[8] = packet->src_id;
 
     return dmr_emb_encode_signalling_lc_bytes(bytes, emb_bits);
 }

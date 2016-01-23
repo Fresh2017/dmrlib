@@ -11,8 +11,8 @@ bool test_simple(void)
         for (j = 0; j < 9; j++) {
             bytes[j] = rand();
         }
-        dmr_rs_12_9_4_encode(bytes, DMR_CRC8_MASK_VOICE_LC);
-        go(dmr_rs_12_9_4_decode(bytes, DMR_CRC8_MASK_VOICE_LC), "decode and verify");
+        dmr_rs_12_9_4_encode(bytes);
+        go(dmr_rs_12_9_4_decode(bytes), "decode and verify");
     }
     return true;
 }

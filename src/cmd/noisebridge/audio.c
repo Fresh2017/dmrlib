@@ -1,12 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
-#include <portaudio.h>
 #include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/payload/voice.h>
 #include "audio.h"
 
 #if defined(WITH_MBELIB) && defined(HAVE_LIBPORTAUDIO)
+#include <portaudio.h>
 
 static PaStream *stream;
 static unsigned long stream_pos, stream_write_pos = 0;

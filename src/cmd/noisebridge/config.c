@@ -45,7 +45,9 @@ char *progname(void)
 #endif
 #if defined(HAVE_LIBGEN_H)
     if ((name = malloc(PATH_MAX)) != NULL) {
-        getcwd(name, PATH_MAX);
+        if (getcwd(name, PATH_MAX) == NULL) {
+            return NULL;
+        }
         return dirname(name);
     }
 #endif

@@ -6,7 +6,6 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <portaudio.h>
 
 #include "config.h"
 #include "audio.h"
@@ -54,7 +53,7 @@ int main(int argc, char **argv)
 
     if (!boot_http()) {
         status = 1;
-        goto bail;   
+        goto bail;
     }
 
     if (!init_repeater()) {

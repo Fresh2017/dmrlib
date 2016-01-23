@@ -51,13 +51,14 @@ struct ip {
   	struct in_addr ip_src, ip_dst;      /* source and dest address */
   	u_int	op_pad;			  // Option + Padding
 };
-struct udphdr {
+#endif
+
+struct udpheader {
 	u_short uh_sport;			// Source port
 	u_short uh_dport;			// Destination port
 	u_short uh_len;			// Datagram length
 	u_short uh_crc;			// Checksum
 };
-#endif
 
 static struct option long_options[] = {
     {"source", required_argument, NULL, 'r'},
@@ -220,7 +221,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
     }
 }
 
-void dump_homebrew(struct ip *ip_hdr, struct udphdr *udp, const uint8_t *bytes, unsigned int len)
+void dump_homebrew(struct ip *ip_hdr, struct udpheader *udp, const uint8_t *bytes, unsigned int len)
 {
     dmr_packet_t *packet;
     dmr_homebrew_frame_type_t frame_type = dmr_homebrew_dump((uint8_t *)bytes, len);
@@ -339,12 +340,12 @@ int main(int argc, char **argv)
 
         pkt_ptr += ip_headerlen;
         caplen -= ip_headerlen;
-        if (caplen < sizeof(struct udphdr))
+        if (caplen < sizeof(struct udpheader))
             continue;
 
-        struct udphdr *udp = (struct udphdr *)pkt_ptr;
-        pkt_ptr += sizeof(struct udphdr);
-        caplen -= sizeof(struct udphdr);
+        struct udpheader *udp = (struct udpheader *)pkt_ptr;
+        pkt_ptr += sizeof(struct udpheader);
+        caplen -= sizeof(struct udpheader);
         if (ntohs(udp->uh_sport) == 62030 || ntohs(udp->uh_dport) == 62030) {
             dump_homebrew(ip_hdr, udp, pkt_ptr, caplen);
         }

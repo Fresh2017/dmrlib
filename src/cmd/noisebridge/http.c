@@ -69,8 +69,16 @@ bool init_http(void)
     }
 
     int enable = 1;
-    setsockopt(server.fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-    setsockopt(server.fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+#if defined(SO_REUSEADDR)
+    if (setsockopt(server.fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) != 0) {
+        dmr_log_warn("http: failed to set SO_REUSEADDR: %s", strerror(errno));
+    }
+#endif
+#if defined(SO_REUSEPORT)
+    if (setsockopt(server.fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable)) != 0) {
+        dmr_log_warn("http: failed to set SO_REUSEPORT: %s", strerror(errno));
+    }
+#endif
 
     if (bind(server.fd, (struct sockaddr *)&server.bind, sizeof(struct sockaddr_in)) != 0) {
         dmr_log_critical("http: failed to bind %s:%d: %s",

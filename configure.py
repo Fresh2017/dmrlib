@@ -55,7 +55,8 @@ required_libraries = (
     ('pcap',   'pcap.h'),
 )
 optional_libraries = (
-    ('proc',   'libproc.h'),
+    ('portaudio', 'portaudio.h'),
+    ('proc',      'libproc.h'),
 )
 
 optional_defines = (

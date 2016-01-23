@@ -6,7 +6,7 @@
 #include <dmr/payload/voice.h>
 #include "audio.h"
 
-#if defined(WITH_MBELIB)
+#if defined(WITH_MBELIB) && defined(HAVE_LIBPORTAUDIO)
 
 static PaStream *stream;
 static unsigned long stream_pos, stream_write_pos = 0;
@@ -124,7 +124,7 @@ bool init_audio(void)
     return true;
 }
 
-#else // WITH_MBELIB
+#else // WITH_MBELIB && HAVE_LIBPORTAUDIO
 
 bool init_audio(void)
 {
@@ -146,4 +146,4 @@ void stream_audio(float *samples, size_t len)
     DMR_UNUSED(len);
 }
 
-#endif // WITH_MBELIB
+#endif // WITH_MBELIB && HAVE_LIBPORTAUDIO

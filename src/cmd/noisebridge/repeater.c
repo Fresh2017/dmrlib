@@ -43,6 +43,9 @@ bool init_repeater()
 #if !defined(WITH_MBELIB)
         dmr_log_critical("noisebridge: libdmr not compiled with MBE support");
         valid = false;
+#elif !defined(HAVE_LIBPORTAUDIO)
+        dmr_log_critical("noisebridge: libdmr not compiled with portaudio support");
+        valid = false;
 #else
         dmr_log_info("noisebridge: MBE decoder with quality %d", config->mbe_quality);
         config->mbe = dmr_mbe_new(config->mbe_quality, stream_audio);

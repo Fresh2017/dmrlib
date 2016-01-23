@@ -113,6 +113,9 @@ DMRLIB_OBJECTS       = $(patsubst %.c,%.o,$(DMRLIB_SOURCES))
 DMRLIB_CFLAGS        = $(CFLAGS)
 DMRLIB_LDFLAGS       = $(LDFLAGS) -shared -Lsrc/mbelib
 DMRLIB_LIBS 		 = {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
+ifeq ($(UNAME),Linux)
+DMRLIB_LIBS         += -lrt
+endif
 
 DMRDUMP_SOURCES      = $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      = $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))

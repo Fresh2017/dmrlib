@@ -131,7 +131,6 @@ NOISEBRIDGE_LIBS     = -ldmr -lpcap -lpthread -ltalloc
 
 TEST_SOURCES 		 = $(wildcard test/test_*.c)
 TEST_PROGRAMS 		 = $(patsubst %.c,%.test,$(TEST_SOURCES))
-TEST_PRE 			 =
 TEST_CFLAGS 		 = $(CFLAGS)
 TEST_LDFLAGS  		 = $(LDFLAGS) -Lsrc/dmr
 TEST_LIBS     		 = -ldmr -lpthread -ltalloc
@@ -140,10 +139,6 @@ UNAME := $(shell uname -s)
 
 ifeq ($(UNAME),Linux)
 NOISEBRIDGE_LIBS    += -lbsd
-TEST_PRE 			 = LD_LIBRARY_PATH=src/dmrlib
-endif
-ifeq ($(UNAME),Darwin)
-TEST_PRE 			 = DYLD_FALLBACK_LIBRARY_PATH=src/dmrlib
 endif
 
 all: build
@@ -287,7 +282,7 @@ test/%.d: test/%.c
 	$(QMM) -MM $(DEPFLAGS) $(TEST_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
 test-run: .force $(TEST_PROGRAMS)
-	@for test in $(TEST_PROGRAMS); do printf "[\033[1;37m TEST \033[0m] %s\n" "$$test"; $(TEST_PRE) $$test; done
+	@for test in $(TEST_PROGRAMS); do printf "[\033[1;37m TEST \033[0m] %s\n" "$$test"; $$test; done
 
 clean-test:
 	$(QRM) $(TEST_PROGRAMS) || true

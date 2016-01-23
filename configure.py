@@ -260,12 +260,17 @@ def check_versions(name):
     tag = ''
     patch_git = None
     if os.path.isdir('.git'):
-        GIT_VERSION = subprocess.check_output([
-            'git', 'describe', '--long',
-        ]).strip().split('-')
+        try:
+            GIT_VERSION = subprocess.check_output([
+                'git', 'describe', '--long',
+            ]).strip().split('-')
 
-        tag = 'git'
-        patch_git = '-'.join(GIT_VERSION[-2:])
+            tag = 'git'
+            patch_git = '-'.join(GIT_VERSION[-2:])
+            
+        except subprocess.CalledProcessError:
+            tag = 'git'
+            pass
 
     with open(name) as fp:
         for line in fp.readlines():

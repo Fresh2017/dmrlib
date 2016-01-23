@@ -16,4 +16,7 @@ cache: apt
 
 script:
   - export CC=$CC
-  - ./configure && make && make test || (cat config.log && false)
+  - ./configure --with-debug || (cat config.log && false)
+  - make
+  - make install PREFIX=./dist
+  - LD_LIBRARY_PATH=dist/lib make test

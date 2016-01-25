@@ -8,6 +8,7 @@
 #include "dmr/payload/emb.h"
 #include "dmr/payload/lc.h"
 #include "dmr/payload/sync.h"
+#include "dmr/time.h"
 
 const char *dmr_repeater_proto_name = "dmrlib repeater";
 
@@ -41,7 +42,7 @@ static int repeater_proto_start_thread(void *repeaterptr)
     if (repeater == NULL)
         return dmr_thread_error;
 
-    dmr_thread_name_set("repeater proto");
+    dmr_thread_name_set("repeater");
     dmr_log_mutex("repeater: mutex lock");
     dmr_mutex_lock(repeater->proto.mutex);
     repeater->proto.is_active = true;
@@ -68,7 +69,7 @@ static int repeater_proto_start(void *repeaterptr)
     dmr_mutex_lock(repeater->proto.mutex);
     repeater->proto.is_active = false;
     dmr_mutex_unlock(repeater->proto.mutex);
-    repeater->proto.thread = malloc(sizeof(dmr_thread_t));
+    repeater->proto.thread = talloc_zero(repeater, dmr_thread_t);
     if (repeater->proto.thread == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
@@ -117,7 +118,7 @@ static int repeater_proto_stop(void *repeaterptr)
     }
 
     dmr_thread_exit(dmr_thread_success);
-    free(repeater->proto.thread);
+    TALLOC_FREE(repeater->proto.thread);
     repeater->proto.thread = NULL;
     return 0;
 }
@@ -164,6 +165,37 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
         dmr_log_warn("repeater: got a NULL router, hope that's okay...");
     }
 
+    // Setup timeslots
+    repeater->ts = talloc_size(repeater, sizeof(dmr_repeater_timeslot_t) * 2);
+    if (repeater->ts == NULL) {
+        dmr_log_critical("repeater: out of memory");
+        TALLOC_FREE(repeater);
+        return NULL;
+    }
+
+    dmr_ts_t ts;
+    for (ts = DMR_TS1; ts < DMR_TS_INVALID; ts++) {
+        if ((repeater->ts[ts].lock = talloc_zero(repeater, dmr_mutex_t)) == NULL) {
+            dmr_log_critical("repeater[%u]: out of memory", ts);
+            TALLOC_FREE(repeater);
+            return NULL;
+        }
+        if ((repeater->ts[ts].last_voice_frame_received = talloc_zero(repeater, struct timeval)) == NULL) {
+            dmr_log_critical("repeater[%u]: out of memory", ts);
+            TALLOC_FREE(repeater);
+            return NULL;
+        }
+        if ((repeater->ts[ts].last_data_frame_received = talloc_zero(repeater, struct timeval)) == NULL) {
+            dmr_log_critical("repeater[%u]: out of memory", ts);
+            TALLOC_FREE(repeater);
+            return NULL;
+        }
+        repeater->ts[ts].stream_id = 1;
+        repeater->ts[ts].sequence = 0;
+        repeater->ts[ts].voice_call_active = false;
+        repeater->ts[ts].data_call_active = false;
+    }
+
     // Setup receiving queue
     repeater->queue_size = 32;
     repeater->queue_used = 0;
@@ -172,7 +204,7 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
 
     if (repeater->queue == NULL) {
         dmr_log_critical("repeater: out of memory");
-        talloc_free(repeater);
+        TALLOC_FREE(repeater);
         return NULL;
     }
 
@@ -203,10 +235,10 @@ int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_
     if (repeater == NULL || proto == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-    dmr_mutex_lock(repeater->queue_lock);
+    //dmr_mutex_lock(repeater->queue_lock);
     int ret = 0;
     if (repeater->queue_used + 1 < repeater->queue_size) {
-        dmr_repeater_item_t *item = talloc_zero(repeater, dmr_repeater_item_t);
+        dmr_repeater_item_t *item = talloc_zero(NULL, dmr_repeater_item_t);
         if (item == NULL) {
             dmr_log_critical("repeater: out of memory");
             return dmr_error(DMR_ENOMEM);
@@ -225,7 +257,7 @@ int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_
         dmr_log_error("repeater: queue full!");
         ret = -1;
     }
-    dmr_mutex_unlock(repeater->queue_lock);
+    //dmr_mutex_unlock(repeater->queue_lock);
 
     return ret;
 }
@@ -236,7 +268,7 @@ dmr_repeater_item_t *dmr_repeater_queue_shift(dmr_repeater_t *repeater)
         return NULL;
 
     dmr_repeater_item_t *item = NULL;
-    dmr_mutex_lock(repeater->queue_lock);
+    //dmr_mutex_lock(repeater->queue_lock);
     if (repeater->queue_used) {
         item = repeater->queue[0];
         repeater->queue_used--;
@@ -245,15 +277,121 @@ dmr_repeater_item_t *dmr_repeater_queue_shift(dmr_repeater_t *repeater)
             repeater->queue[i - 1] = repeater->queue[i];
         }
     }
-    dmr_mutex_unlock(repeater->queue_lock);
+   // dmr_mutex_unlock(repeater->queue_lock);
 
     return item;
+}
+
+static bool dmr_repeater_voice_call_active(dmr_repeater_t *repeater, dmr_ts_t ts)
+{
+    bool active;
+    dmr_mutex_lock(repeater->ts[ts].lock);
+    active = repeater->ts[ts].voice_call_active;
+    dmr_mutex_unlock(repeater->ts[ts].lock);
+    return active;
+}
+
+static void dmr_repeater_voice_call_set_active(dmr_repeater_t *repeater, dmr_ts_t ts, bool active)
+{
+    dmr_mutex_lock(repeater->ts[ts].lock);
+    repeater->ts[ts].voice_call_active = active;
+    dmr_mutex_unlock(repeater->ts[ts].lock);
+}
+
+static int dmr_repeater_voice_call_end(dmr_repeater_t *repeater, dmr_packet_t *packet)
+{
+    if (repeater == NULL || packet == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    dmr_ts_t ts = packet->ts;
+    dmr_repeater_timeslot_t rts = repeater->ts[ts];
+
+    if (!dmr_repeater_voice_call_active(repeater, ts)) {
+        dmr_log_debug("repeater[%u]: not stopping inactive voice call", ts);
+        return 0;
+    }
+
+    dmr_log_trace("repeater: voice call end on %s", dmr_ts_name(ts));
+    if (rts.vbptc_emb_lc != NULL) {
+        dmr_vbptc_16_11_free(rts.vbptc_emb_lc);
+    }
+    dmr_repeater_voice_call_set_active(repeater, ts, false);
+    return 0;
+}
+
+static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t *packet, dmr_full_lc_t *full_lc)
+{
+    if (repeater == NULL || packet == NULL) {
+        dmr_log_error("repeater: can't start voice call, received NULL");
+        return dmr_error(DMR_EINVAL);
+    }
+
+    dmr_ts_t ts = packet->ts;
+    dmr_repeater_timeslot_t rts = repeater->ts[ts];
+
+    if (dmr_repeater_voice_call_active(repeater, ts)) {
+        dmr_log_debug("repeater[%u]: terminating ready-active voice call", ts);
+        return dmr_repeater_voice_call_end(repeater, packet);
+    }
+
+    dmr_log_info("repeater[%u]: voice call start", ts);
+    dmr_repeater_voice_call_set_active(repeater, ts, true);
+
+    rts.voice_frame = 0;
+
+    if (full_lc != NULL) {
+        dmr_log_trace("repeater: constructing emb LC");
+        if ((rts.vbptc_emb_lc = dmr_vbptc_16_11_new(8, NULL)) == NULL) {
+            return dmr_error(DMR_ENOMEM);
+        }
+
+        dmr_emb_signalling_lc_bits_t *ebits = talloc(NULL, dmr_emb_signalling_lc_bits_t);
+        dmr_emb_signalling_lc_bits_t *ibits;
+        if (ebits == NULL)
+            return dmr_error(DMR_ENOMEM);
+
+        if (dmr_emb_encode_signalling_lc_from_full_lc(full_lc, ebits, packet->data_type) != 0) {
+            TALLOC_FREE(ebits);
+            return dmr_error(DMR_LASTERROR);
+        }
+        if ((ibits = dmr_emb_signalling_lc_interlave(ebits)) == NULL) {
+            TALLOC_FREE(ebits);
+            return dmr_error(DMR_ENOMEM);
+        }
+        if (dmr_vbptc_16_11_encode(rts.vbptc_emb_lc, ibits->bits, sizeof(dmr_emb_signalling_lc_bits_t)) != 0) {
+            TALLOC_FREE(ebits);
+            return dmr_error(DMR_LASTERROR);
+        }
+        TALLOC_FREE(ebits);
+    }
+
+    return 0;
+}
+
+static void dmr_repeater_expire(dmr_repeater_t *repeater)
+{
+    dmr_ts_t ts;
+    for (ts = DMR_TS1; ts < DMR_TS_INVALID; ts++) {
+        dmr_repeater_timeslot_t rts = repeater->ts[ts];
+        if (dmr_repeater_voice_call_active(repeater, ts)) {
+            uint32_t delta = dmr_time_ms_since(*rts.last_voice_frame_received);
+            //dmr_log_debug("repeater[%u]: active, delta=%lums (expire)", ts, delta);
+            if (delta > 180) {
+                dmr_log_info("repeater[%u]: voice call expired after %lums", ts, delta);
+                dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
+                packet->ts = ts;
+                packet->data_type = DMR_DATA_TYPE_TERMINATOR_WITH_LC;
+                dmr_repeater_voice_call_end(repeater, packet);
+            }
+        }
+    }
 }
 
 void dmr_repeater_loop(dmr_repeater_t *repeater)
 {
     // Run callbacks
     while (repeater_proto_active(repeater)) {
+        dmr_repeater_expire(repeater);
         dmr_repeater_item_t *item = dmr_repeater_queue_shift(repeater);
         if (item != NULL) {
             // Just for convenience.
@@ -276,53 +414,109 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                 dmr_log_debug("repeater: call route callback %p for %s->%s",
                     repeater->route, proto->name, slot->proto->name);
 
-                if (repeater->route != NULL) {
-                    // We work with another copy of the packet, because the
-                    // router may alter the packet and we want to give each
-                    // router a copy of the original packet.
-                    dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
-                    if (packet == NULL) {
-                        dmr_log_error("repeater: no memory to clone packet!");
-                        return;
-                    }
-                    memcpy(packet, packet_in, sizeof(dmr_packet_t));
-
-                    // Call out to the router, which may (or may not) alter the
-                    // packet that has been passed.
-                    if (repeater->route(repeater, proto, slot->proto, packet)) {
-                        dmr_log_debug("repeater: routing %s packet from %s->%s",
-                            dmr_data_type_name(packet_in->data_type),
-                            proto->name, slot->proto->name);
-
-                        uint8_t sequence = packet->meta.sequence;
-                        if (strcmp(slot->proto->name, "mmdvm")) {
-                            dmr_repeater_fix_headers(repeater, packet);
-                            dmr_log_debug("repeater: updated sequence %u->%u",
-                                sequence, packet->meta.sequence);
-                            packet->meta.sequence = sequence; // FIXME
-                        }
-                        dmr_proto_tx(slot->proto, slot->userdata, packet);
-                    } else {
-                        dmr_log_debug("repeater: dropping packet, refused by router");
-                    }
-
-                    // This cleans up our *cloned* packet.
-                    talloc_free(packet);
+                // We work with another copy of the packet, because the
+                // router may alter the packet and we want to give each
+                // router a copy of the original packet.
+                dmr_packet_t *packet = talloc(NULL, dmr_packet_t);
+                if (packet == NULL) {
+                    dmr_log_error("repeater: no memory to clone packet!");
+                    return;
                 }
+                memcpy(packet, packet_in, sizeof(dmr_packet_t));
+
+                dmr_route_t policy = DMR_ROUTE_PERMIT;
+                if (repeater->route != NULL && (policy = repeater->route(repeater, proto, slot->proto, packet)) == DMR_ROUTE_REJECT) {
+                    dmr_log_debug("repeater: dropping packet, refused by router");
+                    /* Clean up our *cloned* packet. */
+                    TALLOC_FREE(packet);
+                    continue;
+                }
+
+                dmr_log_debug("repeater: routing %s packet from %s->%s",
+                    dmr_data_type_name(packet->data_type),
+                    proto->name, slot->proto->name);
+
+                if (policy == DMR_ROUTE_PERMIT) {
+                    dmr_ts_t ts = packet->ts;
+                    dmr_repeater_timeslot_t rts = repeater->ts[ts];
+
+                    switch (packet->data_type) {
+                    case DMR_DATA_TYPE_VOICE_SYNC:
+                    case DMR_DATA_TYPE_VOICE:
+                        /* Book keeping */
+                        gettimeofday(rts.last_voice_frame_received, NULL);
+
+                        /* Handle late entry. */
+                        if (!dmr_repeater_voice_call_active(repeater, ts)) {
+                            dmr_log_trace("repeater[%u]: no voice call active, starting", ts);
+                            if (dmr_repeater_voice_call_start(repeater, packet, NULL) != 0) {
+                                dmr_log_error("repeater[%u]: failed to start voice call: %s", ts, dmr_error_get());
+                                continue;
+                            }
+
+                            // Prepend voice LC headers, we've apparently missed one before.
+                            dmr_log_debug("repeater[%u]: prepend voice LC", ts);
+                            dmr_packet_t *header = talloc_zero(packet, dmr_packet_t);
+                            if (header == NULL) {
+                                dmr_log_error("repeater[%u]: could not prepend header, out of memory", ts);
+                                TALLOC_FREE(packet);
+                                return;
+                            }
+                            uint8_t i;
+                            for (i = 0; i < 4; i++) {
+                                memcpy(header, packet, sizeof(dmr_packet_t));
+                                header->data_type = DMR_DATA_TYPE_VOICE_LC;
+                                dmr_repeater_fix_headers(repeater, header);
+                                dmr_proto_tx(slot->proto, slot->userdata, header);
+                            }
+                            TALLOC_FREE(header);
+                        }
+
+                        // Update voice frame
+                        packet->meta.voice_frame = (rts.voice_frame++) % 6;
+                        break;
+
+                    case DMR_DATA_TYPE_VOICE_LC:
+                        /* Book keeping */
+                        gettimeofday(rts.last_voice_frame_received, NULL);
+
+                        if (dmr_repeater_voice_call_start(repeater, packet, NULL) != 0) {
+                            dmr_log_error("repeater[%u]: failed to start voice call: %s", ts, dmr_error_get());
+                            continue;
+                        }
+                        break;
+
+                    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
+                        /* Book keeping */
+                        gettimeofday(rts.last_voice_frame_received, NULL);
+
+                        if (dmr_repeater_voice_call_end(repeater, packet) != 0) {
+                            dmr_log_error("repeater[%u]: failed to end voice call: %s", ts, dmr_error_get());
+                            continue;
+                        }
+                        break;                            
+
+                    default:
+                        break;
+                    }
+
+                    dmr_repeater_fix_headers(repeater, packet);
+                }
+                dmr_proto_tx(slot->proto, slot->userdata, packet);
+           
+                /* Clean up our *cloned* packet. */
+                TALLOC_FREE(packet);
             }
         }
 
         // If we reach here, we want to return to processing the queue ASAP
-        if (item != NULL) {
-            talloc_free(item);
-            item = NULL;
-        }
+        //TALLOC_FREE(item);
         continue;
 
 next:
         // If we reach here, there was a serious error, so we back off a bit
         if (item != NULL) {
-            talloc_free(item);
+            TALLOC_FREE(item);
             item = NULL;
         }
         dmr_msleep(5);
@@ -355,75 +549,6 @@ int dmr_repeater_add(dmr_repeater_t *repeater, void *userdata, dmr_proto_t *prot
     return 0;
 }
 
-static int dmr_repeater_voice_call_end(dmr_repeater_t *repeater, dmr_packet_t *packet)
-{
-    if (repeater == NULL || packet == NULL)
-        return dmr_error(DMR_EINVAL);
-
-    dmr_ts_t ts = packet->ts;
-    dmr_repeater_timeslot_t rts = repeater->ts[ts];
-
-    if (!rts.voice_call_active)
-        return 0;
-
-    dmr_log_trace("repeater: voice call end on %s", dmr_ts_name(ts));
-    rts.voice_call_active = false;
-
-    if (rts.vbptc_emb_lc != NULL) {
-        dmr_vbptc_16_11_free(rts.vbptc_emb_lc);
-    }
-
-    return 0;
-}
-
-static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t *packet, dmr_full_lc_t *full_lc)
-{
-    if (repeater == NULL || packet == NULL)
-        return dmr_error(DMR_EINVAL);
-
-    dmr_ts_t ts = packet->ts;
-    dmr_repeater_timeslot_t rts = repeater->ts[ts];
-
-    if (rts.voice_call_active) {
-        return dmr_repeater_voice_call_end(repeater, packet);
-    }
-
-    dmr_log_trace("repeater: voice call start on %s", dmr_ts_name(ts));
-    rts.voice_call_active = true;
-    rts.stream_id = packet->meta.stream_id;
-
-    if (full_lc != NULL) {
-        dmr_log_trace("repeater: constructing emb LC");
-        if ((rts.vbptc_emb_lc = dmr_vbptc_16_11_new(8, NULL)) == NULL) {
-            return dmr_error(DMR_ENOMEM);
-        }
-
-        dmr_emb_signalling_lc_bits_t *ebits = talloc(NULL, dmr_emb_signalling_lc_bits_t);
-        dmr_emb_signalling_lc_bits_t *ibits;
-        if (ebits == NULL)
-            return dmr_error(DMR_ENOMEM);
-
-        if (dmr_emb_encode_signalling_lc_from_full_lc(full_lc, ebits, packet->data_type) != 0) {
-            talloc_free(ebits);
-            return dmr_error(DMR_LASTERROR);
-        }
-        if ((ibits = dmr_emb_signalling_lc_interlave(ebits)) == NULL) {
-            talloc_free(ebits);
-            return dmr_error(DMR_ENOMEM);
-        }
-        if (dmr_vbptc_16_11_encode(rts.vbptc_emb_lc, ibits->bits, sizeof(dmr_emb_signalling_lc_bits_t)) != 0) {
-            talloc_free(ebits);
-            return dmr_error(DMR_LASTERROR);
-        }
-        talloc_free(ebits);
-    }
-
-    dmr_log_trace("repeater: reset sequence on %s", dmr_ts_name(ts));
-    rts.sequence = 0;
-
-    return 0;
-}
-
 int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 {
     dmr_ts_t ts = packet->ts;
@@ -433,11 +558,6 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 
     if (repeater == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
-
-    if ((rts.voice_call_active || rts.data_call_active) && packet->meta.stream_id != rts.stream_id) {
-        dmr_log_debug("repeater[%u]: ignored stream id 0x%08x: call in progress", ts, packet->meta.stream_id);
-        return 0;
-    }
 
     if (packet->color_code != repeater->color_code) {
         dmr_log_debug("repeater[%u]: setting color code %u->%u",
@@ -457,36 +577,19 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
         }
         full_lc->flco_pdu = (packet->flco == DMR_FLCO_PRIVATE) ? DMR_FLCO_PDU_PRIVATE : DMR_FLCO_PDU_GROUP;
         full_lc->fid = 0;
-        full_lc->privacy = (packet->flco == DMR_FLCO_PRIVATE);
+        full_lc->pf = 0; // (packet->flco == DMR_FLCO_PRIVATE);
         full_lc->src_id = packet->src_id;
         full_lc->dst_id = packet->dst_id;
-
-        if (dmr_repeater_voice_call_start(repeater, packet, full_lc) != 0) {
-            dmr_log_error("repeater[%u]: failed to start voice call: %s", ts, dmr_error_get());
-            return -1;
-        }
 
         if (dmr_full_lc_encode(full_lc, packet) != 0) {
             dmr_log_error("repeater[%u]: can't fix headers, full LC failed: ", ts, dmr_error_get());
             return -1;
         }
 
-
         dmr_log_trace("repeater[%u]: constructing sync pattern for voice LC", ts);
         dmr_sync_pattern_encode(DMR_SYNC_PATTERN_MS_SOURCED_DATA, packet);
-
-        dmr_log_debug("XXX BEFORE SLOT TYPE ENCODED:");
-        dmr_dump_packet(packet);
-
         dmr_log_trace("repeater[%u]: setting slot type to voice LC", ts);
         dmr_slot_type_encode(packet);
-
-        dmr_log_debug("XXX AFTER  SLOT TYPE ENCODED:");
-        dmr_dump_packet(packet);
-
-
-        // Override sequence
-        packet->meta.sequence = (rts.sequence++) & 0xff;
         break;
 
     case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
@@ -495,9 +598,6 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             dmr_log_error("repeater[%u]: failed to end voice call: %s", ts, dmr_error_get());
             return -1;
         }
-
-        // Override sequence
-        packet->meta.sequence = (rts.sequence++) & 0xff;
         break;
 
     case DMR_DATA_TYPE_VOICE_SYNC:
@@ -515,12 +615,6 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
 
         switch (packet->meta.voice_frame + 'A') {
         case 'A':
-            /*
-            // It may be late entry
-            if (!rts.voice_call_active) {
-                dmr_repeater_voice_call_start(repeater, packet, NULL);
-            }
-            */
             dmr_log_trace("repeater[%u]: constructing sync pattern for voice SYNC in frame A", ts);
             ret = dmr_sync_pattern_encode(DMR_SYNC_PATTERN_MS_SOURCED_VOICE, packet);
             break;
@@ -579,8 +673,6 @@ int dmr_repeater_fix_headers(dmr_repeater_t *repeater, dmr_packet_t *packet)
             return ret;
         }
 
-        // Override sequence
-        packet->meta.sequence = (rts.sequence++) & 0xff;
         break;
 
     default:
@@ -596,5 +688,5 @@ void dmr_repeater_free(dmr_repeater_t *repeater)
     if (repeater == NULL)
         return;
 
-    talloc_free(repeater);
+    TALLOC_FREE(repeater);
 }

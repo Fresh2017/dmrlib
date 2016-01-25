@@ -16,12 +16,18 @@
 struct dmr_repeater_s;
 typedef struct dmr_repeater_s dmr_repeater_t;
 
+typedef enum {
+    DMR_ROUTE_REJECT = 0x00,
+    DMR_ROUTE_PERMIT,
+    DMR_ROUTE_UNMODIFIED 
+} dmr_route_t;
+
 /**
  * Repeater router callback function.
  * @param repeater Repeater instance pointer.
  * @param route    Route instance pointer.
  */
-typedef bool (*dmr_repeater_route_t)(dmr_repeater_t *, dmr_proto_t *, dmr_proto_t *, dmr_packet_t *);
+typedef dmr_route_t (*dmr_repeater_route_t)(dmr_repeater_t *, dmr_proto_t *, dmr_proto_t *, dmr_packet_t *);
 
 typedef struct dmr_repeater_slot_s {
     void        *userdata;
@@ -39,9 +45,12 @@ typedef struct dmr_repeater_timeslot_s {
     uint32_t          stream_id;
     bool              voice_call_active;
     uint8_t           voice_frame;
+    struct timeval    *last_voice_frame_received;
     bool              data_call_active;
+    struct timeval    *last_data_frame_received;
     dmr_vbptc_16_11_t *vbptc_emb_lc;
     uint16_t          sequence;
+    dmr_mutex_t       *lock;
 } dmr_repeater_timeslot_t;
 
 struct dmr_repeater_s {
@@ -49,7 +58,7 @@ struct dmr_repeater_s {
     dmr_repeater_route_t    route;
     dmr_repeater_slot_t     slot[DMR_REPEATER_MAX_SLOTS];
     size_t                  slots;
-    dmr_repeater_timeslot_t ts[2];
+    dmr_repeater_timeslot_t *ts;
     dmr_color_code_t        color_code;
     dmr_repeater_item_t     **queue;
     size_t                  queue_size;

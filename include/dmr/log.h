@@ -22,7 +22,7 @@ extern "C" {
 #define DMR_LOG_TIME_FORMAT "%F %T"
 #endif // DMR_PLATFORM_WINDOWS
 
-#define DMR_LOG_BOOL(x) (x ? "true" : "false")
+#define DMR_LOG_BOOL(x) ((x) ? "true" : "false")
 
 typedef enum {
     DMR_LOG_PRIORITY_TRACE = 1,

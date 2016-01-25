@@ -21,6 +21,6 @@ typedef struct {
 } route_rule_t;
 
 route_rule_t *route_rule_parse(char *line);
-bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_proto_t *dst_proto, dmr_packet_t *packet);
+dmr_route_t route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_proto_t *dst_proto, dmr_packet_t *packet);
 
 #endif // _NOISETERM_ROUTE_H

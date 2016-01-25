@@ -71,7 +71,7 @@ int dmr_serial_write(dmr_serial_t fd, void *buf, size_t len)
 
 int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len)
 {
-    dmr_log_trace("serial: read %d", len);
+    //dmr_log_trace("serial: read %d", len);
     DWORD n;
     if (!ReadFile(fd, buf, len, &n, NULL))
         return -1;
@@ -198,11 +198,13 @@ int dmr_serial_write(dmr_serial_t fd, void *buf, size_t len)
 
 int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len, struct timeval *timeout)
 {
+    /*
     if (timeout == NULL) {
         dmr_log_trace("serial: read %d", len);
     } else {
         dmr_log_trace("serial: read %d in %ld.%06ld", len, timeout->tv_sec, timeout->tv_usec);
     }
+    */
 
     if (len == 0)
         return 0;
@@ -230,7 +232,7 @@ int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len, struct timeval *time
         if (s == 0) {
             if (timeout != NULL) {
                 // Timeouts can be expected here, log trace
-                dmr_log_trace("serial: select timeout");
+                //dmr_log_trace("serial: select timeout");
                 return 0;
             }
             dmr_log_error("serial: select timeout");

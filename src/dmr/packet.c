@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <talloc.h>
 #include "dmr/bits.h"
 #include "dmr/error.h"
 #include "dmr/log.h"
@@ -199,12 +200,11 @@ dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
         return NULL;
     }
 
-    packet = malloc(sizeof(dmr_packet_t));
+    packet = talloc_zero(NULL, dmr_packet_t);
     if (packet == NULL) {
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
-    memset(packet, 0, sizeof(dmr_packet_t));
     memcpy(packet->payload, buf, DMR_PAYLOAD_BYTES);
     return packet;
 }

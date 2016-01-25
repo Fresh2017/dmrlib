@@ -1,4 +1,5 @@
 #include <string.h>
+#include <talloc.h>
 #include "dmr/error.h"
 #include "dmr/malloc.h"
 #include "dmr/payload/lc.h"
@@ -29,7 +30,7 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     memset(bytes, 0, sizeof(bytes));
 
     // BPTC(196, 96) decode data
-    dmr_bptc_196_96_t *bptc = dmr_malloc(dmr_bptc_196_96_t);
+    dmr_bptc_196_96_t *bptc = talloc_zero(NULL, dmr_bptc_196_96_t);
     if (bptc == NULL) {
         dmr_log_error("lc: BPTC(196,96) init failed: out of memory");
         return dmr_error(DMR_ENOMEM);
@@ -67,10 +68,10 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         return -1;
     }
 
-    dmr_free(bptc);
+    TALLOC_FREE(bptc);
 
     lc->flco_pdu = (bytes[0] & 0x3f);
-    lc->privacy  = (bytes[0] & 0x80) == 0x80;
+    lc->pf       = 0; // (bytes[0] & 0x80) == 0x80;
     lc->fid      = (bytes[1]);
     lc->dst_id   = (bytes[3] << 16) | (bytes[4] << 8) | (bytes[5]);
     lc->src_id   = (bytes[6] << 16) | (bytes[7] << 8) | (bytes[8]);

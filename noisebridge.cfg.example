@@ -1,5 +1,5 @@
 # Logging
-#log_level=0
+log_level=2
 
 # Modules
 #load=dist/module/mod_python.so,noisebridge.py
@@ -23,7 +23,11 @@ repeater_color_code=1
 #          n: rewrite dst_id
 #
 #                                policy  proto     proto     mod ts flco, src_id   dst_id 
-repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  1, 2,    1234567, 9990   }
+repeater_route=from_homebrew_up:{permit, homebrew,  *,       0, .. }
+#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 1,    1234567, 204    }
+#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 1,    1234567, 205    }
+#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 2,    1234567, 9990   }
+repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 2,    1234567, 2042214   }
 repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  .. }
 
 # Our upstream peer
@@ -37,14 +41,14 @@ homebrew_rx_freq=433787500
 homebrew_tx_freq=438787500
 homebrew_tx_power=99
 homebrew_height=999
-homebrew_latitude=12.3456
-homebrew_longitude=7.8901
+homebrew_latitude=52.2969
+homebrew_longitude=4.5961
 
 # Our "LF" side
 modem_type=mmdvm
 mmdvm_rate=115200
-mmdvm_rx_freq=433787500
-mmdvm_tx_freq=438787500
+#mmdvm_rx_freq=433787500
+#mmdvm_tx_freq=438787500
 # Linux:
 mmdvm_port=/dev/ttyACM0
 #mmdvm_port=/dev/ttyUSB0

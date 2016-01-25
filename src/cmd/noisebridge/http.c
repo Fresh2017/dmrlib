@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <talloc.h>
 #include <dmr/error.h>
-#include <dmr/malloc.h>
 #include "http.h"
 #include "config.h"
 
@@ -250,7 +250,7 @@ static int http_start_thread(void *ptr)
     }
 
     while (1) {
-        struct http_client *client = dmr_malloc(struct http_client);
+        struct http_client *client = talloc_zero(NULL, struct http_client);
         if (client == NULL) {
             dmr_error(DMR_ENOMEM);
             ret = dmr_thread_error;
@@ -260,7 +260,7 @@ static int http_start_thread(void *ptr)
         socklen_t addrlen = 0;
         if ((client->fd = accept(server.fd, (struct sockaddr *)&client->addr, &addrlen)) == 0) {
             dmr_log_error("http: accept(): %s", strerror(errno));
-            dmr_free(client);
+            TALLOC_FREE(client);
             ret = dmr_thread_error;
             goto stop;
         }

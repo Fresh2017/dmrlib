@@ -73,13 +73,28 @@ typedef struct __attribute__((packed)) {
     char    package_id[40];     // %-40.40s
 } dmr_homebrew_config_t;
 
+typedef struct __attribute__((packed)) {
+    uint8_t signature[4];       // "DMRD"
+    uint8_t sequence;
+    uint8_t src_id[3];
+    uint8_t dst_id[3];
+    uint8_t repeater_id[4];
+    uint8_t type;
+    uint8_t stream_id[4];
+    uint8_t payload[DMR_PAYLOAD_BYTES];
+} dmr_homebrew_data_t;
+
 typedef struct {
     dmr_proto_t           proto;
     int                   fd;
     struct sockaddr_in    server, remote;
     dmr_homebrew_auth_t   auth;
     dmr_id_t              id;
-    uint8_t               buffer[512];
+    uint8_t               buffer[512];  /* receive buffer */
+    dmr_packet_t          **queue;      /* send buffer */
+    size_t                queue_size;
+    size_t                queue_used;
+    dmr_mutex_t           *queue_lock;
     uint8_t               random[8];
     dmr_homebrew_config_t config;
     struct {
@@ -92,6 +107,11 @@ typedef struct {
         struct timeval  last_voice_packet_sent;
         struct timeval  last_data_packet_sent;
     } tx[2];
+    struct {
+        uint8_t         seq;
+        uint32_t        stream_id;
+        uint8_t         voice_frame;
+    } rx[2];
     struct timeval last_ping_sent;
 } dmr_homebrew_t;
 
@@ -100,6 +120,8 @@ extern int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
 extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_loop(dmr_homebrew_t *homebrew);
+extern int dmr_homebrew_queue(dmr_homebrew_t *homebrew, dmr_packet_t *packet_out);
+extern dmr_packet_t *dmr_homebrew_queue_shift(dmr_homebrew_t *homebrew);
 extern int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packet);
 extern int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len);
 extern int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout);

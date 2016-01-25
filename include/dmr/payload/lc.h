@@ -31,8 +31,8 @@ typedef enum {
 
 typedef struct {
     dmr_flco_pdu_t flco_pdu;
-    bool           reserved;
-    bool           privacy;
+    bool           r;
+    bool           pf;
     dmr_fid_t      fid;
     uint8_t        service_options;
     dmr_id_t       dst_id;

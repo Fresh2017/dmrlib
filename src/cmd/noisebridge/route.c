@@ -190,10 +190,10 @@ done_route_rule_parse:
     return rule;
 }
 
-bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_proto_t *dst_proto, dmr_packet_t *packet)
+dmr_route_t route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_proto_t *dst_proto, dmr_packet_t *packet)
 {
     if (repeater == NULL || src_proto == NULL || dst_proto == NULL || packet == NULL)
-        return false;
+        return DMR_ROUTE_REJECT;
 
     config_t *config = load_config();
     dmr_log_debug("noisebridge: route: type=%s, proto=%s->%s, ts=%s, flco=%s, id=%u->%u",
@@ -202,6 +202,13 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
         dmr_ts_name(packet->ts),
         dmr_flco_name(packet->flco),
         packet->src_id, packet->dst_id);
+
+    // Only accept TS1 from homebrew
+    /*
+    if (src_proto->type == DMR_PROTO_HOMEBREW && packet->ts != DMR_TS1) {
+        return false;
+    }
+    */
 
     size_t i = 0;
     for (; i < config->repeater_routes; i++) {
@@ -240,11 +247,17 @@ bool route_rule_packet(dmr_repeater_t *repeater, dmr_proto_t *src_proto, dmr_pro
             } else {
                 dmr_log_debug("noisebridge: route[%s]: do not modify", rule->name);
             }
+            
             if (rule->policy == ROUTE_REJECT) {
                 dmr_log_debug("noisebridge: route[%s]: rejected by policy", rule->name);
-                return false;
+                return DMR_ROUTE_REJECT;
             }
             dmr_log_debug("noisebridge: route[%s]: permitted by policy", rule->name);
+            if (rule->modify) {
+                return DMR_ROUTE_PERMIT;
+            } else {
+                return DMR_ROUTE_UNMODIFIED;
+            }
         }
     }
 

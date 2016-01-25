@@ -8,7 +8,7 @@ int dmr_proto_init(void)
     if (dmr_proto_lock != NULL)
         return 0;
 
-    dmr_proto_lock = malloc(sizeof(dmr_mutex_t));
+    dmr_proto_lock = talloc_zero(NULL, dmr_mutex_t);
     if (dmr_proto_lock == NULL)
         return dmr_error(DMR_ENOMEM);
 
@@ -26,7 +26,7 @@ int dmr_proto_mutex_init(dmr_proto_t *proto)
     if (proto->mutex != NULL)
         return 0;
 
-    proto->mutex = malloc(sizeof(dmr_mutex_t));
+    proto->mutex = talloc_zero(NULL, dmr_mutex_t);
     if (proto->mutex == NULL)
         return dmr_error(DMR_ENOMEM);
 
@@ -122,7 +122,7 @@ bool dmr_proto_rx_cb_add(dmr_proto_t *proto, dmr_proto_io_cb_func_t cb, void *us
         return false;
 
     if (proto->rx_cb[proto->rx_cbs] == NULL) {
-        proto->rx_cb[proto->rx_cbs] = malloc(sizeof(dmr_proto_io_cb_t));
+        proto->rx_cb[proto->rx_cbs] = talloc_zero(NULL, dmr_proto_io_cb_t);
     }
     if (proto->rx_cb[proto->rx_cbs] == NULL) {
         dmr_error(DMR_ENOMEM);

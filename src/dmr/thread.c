@@ -23,6 +23,7 @@ freely, subject to the following restrictions:
 */
 
 #include <stdlib.h>
+#include <talloc.h>
 #include "dmr/platform.h"
 #include "dmr/thread.h"
 
@@ -512,7 +513,7 @@ static void _dmr_thread_locals_cleanup (void) {
 
   while (_dmr_thread_locals_head != NULL) {
     data = _dmr_thread_locals_head->next;
-    free (_dmr_thread_locals_head);
+    TALLOC_FREE(_dmr_thread_locals_head);
     _dmr_thread_locals_head = data;
   }
   _dmr_thread_locals_head = NULL;
@@ -571,7 +572,7 @@ static void * _dmr_thread_wrapper_function(void * aArg)
   arg = ti->mArg;
 
   /* The thread is responsible for freeing the startup information */
-  free((void *)ti);
+  TALLOC_FREE(ti);
 
   /* Call the actual client thread function */
   res = fun(arg);
@@ -592,7 +593,7 @@ int dmr_thread_create(dmr_thread_t *thr, dmr_thread_start_t func, void *arg)
 {
   /* Fill out the thread startup information (passed to the thread wrapper,
      which will eventually free it) */
-  _thread_start_info* ti = (_thread_start_info*)malloc(sizeof(_thread_start_info));
+  _thread_start_info* ti = (_thread_start_info*)talloc_zero(NULL, _thread_start_info);
   if (ti == NULL)
   {
     return dmr_thread_nomem;
@@ -613,7 +614,7 @@ int dmr_thread_create(dmr_thread_t *thr, dmr_thread_start_t func, void *arg)
   /* Did we fail to create the thread? */
   if(!*thr)
   {
-    free(ti);
+    TALLOC_FREE(ti);
     return dmr_thread_error;
   }
 
@@ -848,7 +849,7 @@ int dmr_locals_set(dmr_locals_t key, void *val)
   struct dmr_thread_tss_data* data = (struct dmr_thread_tss_data*)TlsGetValue(key);
   if (data == NULL)
   {
-    data = (struct dmr_thread_tss_data*)malloc(sizeof(struct dmr_thread_tss_data));
+    data = (struct dmr_thread_tss_data*)talloc_zero(NULL, struct dmr_thread_tss_data);
     if (data == NULL)
     {
       return dmr_thread_error;
@@ -874,7 +875,7 @@ int dmr_locals_set(dmr_locals_t key, void *val)
 
     if (!TlsSetValue(key, data))
     {
-      free (data);
+      TALLOC_FREE(data);
 	  return dmr_thread_error;
     }
   }

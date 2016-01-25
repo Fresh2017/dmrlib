@@ -22,18 +22,17 @@
 
 #define ETHER_TYPE_IP (0x0800)
 
-#if !defined(HAVE_NETINET_UDP_H)
 #include <sys/param.h>
 /* Internet address.  */
 typedef uint32_t in_addr_t;
 #define ETH_ALEN       6               /* Octets in one ethernet addr   */
-struct ether_header
+struct my_ether_header
 {
     u_int8_t  ether_dhost[ETH_ALEN];      /* destination eth addr */
     u_int8_t  ether_shost[ETH_ALEN];      /* source ether addr    */
     u_int16_t ether_type;                 /* packet type ID field */
 } __attribute__ ((__packed__));
-struct ip {
+struct my_ip {
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;               /* header length */
     unsigned int ip_v:4;                /* version */
@@ -51,9 +50,8 @@ struct ip {
   	struct in_addr ip_src, ip_dst;      /* source and dest address */
   	u_int	op_pad;			  // Option + Padding
 };
-#endif
 
-struct udpheader {
+struct my_udpheader {
 	u_short uh_sport;			// Source port
 	u_short uh_dport;			// Destination port
 	u_short uh_len;			// Datagram length
@@ -150,9 +148,9 @@ void dump_dmr_packet(dmr_packet_t *packet)
             fprintf(stderr, "full LC decode failed: %s\n", dmr_error_get());
             return;
         }
-        printf("full LC: flco=%s (%d), privacy=%s, fid=%s (%d), %u->%u\n",
+        printf("full LC: flco=%s (%d), pf=%s, fid=%s (%d), %u->%u\n",
             dmr_flco_pdu_name(full_lc.flco_pdu), full_lc.flco_pdu,
-            DMR_LOG_BOOL(full_lc.privacy),
+            DMR_LOG_BOOL(full_lc.pf),
             dmr_fid_name(full_lc.fid), full_lc.fid,
             full_lc.src_id, full_lc.dst_id);
         dmr_dump_hex(&full_lc, sizeof(dmr_full_lc_t));
@@ -163,9 +161,9 @@ void dump_dmr_packet(dmr_packet_t *packet)
             return;
         }
         dmr_dump_packet(&debug);
-        printf("full LC: flco=%s (%d), privacy=%s, fid=%s (%d), %u->%u\n",
+        printf("full LC: flco=%s (%d), pf=%s, fid=%s (%d), %u->%u\n",
             dmr_flco_pdu_name(full_lc.flco_pdu), full_lc.flco_pdu,
-            DMR_LOG_BOOL(full_lc.privacy),
+            DMR_LOG_BOOL(full_lc.pf),
             dmr_fid_name(full_lc.fid), full_lc.fid,
             full_lc.src_id, full_lc.dst_id);
         break;
@@ -221,7 +219,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
     }
 }
 
-void dump_homebrew(struct ip *ip_hdr, struct udpheader *udp, const uint8_t *bytes, unsigned int len)
+void dump_homebrew(struct my_ip *ip_hdr, struct my_udpheader *udp, const uint8_t *bytes, unsigned int len)
 {
     dmr_packet_t *packet;
     dmr_homebrew_frame_type_t frame_type = dmr_homebrew_dump((uint8_t *)bytes, len);
@@ -323,12 +321,12 @@ int main(int argc, char **argv)
             fprintf(stderr, "unknown ethernet type %04X, skipping...\n", ether_type);
         }
 
-        pkt_ptr += sizeof(struct ether_header);
-        caplen -= sizeof(struct ether_header);
-        if (caplen < sizeof(struct ip))
+        pkt_ptr += sizeof(struct my_ether_header);
+        caplen -= sizeof(struct my_ether_header);
+        if (caplen < sizeof(struct my_ip))
             continue;
 
-        struct ip *ip_hdr = (struct ip *)pkt_ptr;
+        struct my_ip *ip_hdr = (struct my_ip *)pkt_ptr;
         unsigned int ip_headerlen = ip_hdr->ip_hl * 4;  /* ip_hl is in 4-byte words */
         if (caplen < ip_headerlen)
             continue;
@@ -340,12 +338,12 @@ int main(int argc, char **argv)
 
         pkt_ptr += ip_headerlen;
         caplen -= ip_headerlen;
-        if (caplen < sizeof(struct udpheader))
+        if (caplen < sizeof(struct my_udpheader))
             continue;
 
-        struct udpheader *udp = (struct udpheader *)pkt_ptr;
-        pkt_ptr += sizeof(struct udpheader);
-        caplen -= sizeof(struct udpheader);
+        struct my_udpheader *udp = (struct my_udpheader *)pkt_ptr;
+        pkt_ptr += sizeof(struct my_udpheader);
+        caplen -= sizeof(struct my_udpheader);
         if (ntohs(udp->uh_sport) == 62030 || ntohs(udp->uh_dport) == 62030) {
             dump_homebrew(ip_hdr, udp, pkt_ptr, caplen);
         }

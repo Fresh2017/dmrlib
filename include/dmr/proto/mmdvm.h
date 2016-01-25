@@ -114,19 +114,40 @@ typedef enum {
     dmr_mmdvm_error
 } dmr_mmdvm_response_t;
 
+typedef struct __attribute__((packed)) {
+    uint8_t frame_start;
+    uint8_t length;
+    uint8_t command;
+} dmr_mmdvm_header_t;
+
+typedef struct __attribute__((packed)) {
+    dmr_mmdvm_header_t header;
+    uint8_t            modes;
+    uint8_t            state;
+    uint8_t            flags;
+    uint8_t            dstar_buffers;
+    uint8_t            dmr_buffers[2];
+    uint8_t            ysf_buffers;
+} dmr_mmdvm_status_t;
+
 typedef struct {
-    dmr_proto_t  proto;
-    dmr_serial_t fd;
-    uint16_t     flag;
-    int          error;
-    long         baud;
-    char         *port;
-    uint8_t      buffer[200];
-    bool         rx;
-    bool         adc_overflow;
-    uint8_t      version;
-    char         *firmware;
-    uint8_t      last_mode;
+    dmr_proto_t    proto;
+    dmr_serial_t   fd;
+    uint16_t       flag;
+    int            error;
+    long           baud;
+    char           *port;
+    uint8_t        buffer[200];  /* receive buffer */
+    dmr_packet_t   **queue;      /* send buffer */
+    size_t         queue_size;
+    size_t         queue_used;
+    dmr_mutex_t    *queue_lock;
+    bool           rx;
+    bool           adc_overflow;
+    uint8_t        version;
+    char           *firmware;
+    uint8_t        last_mode;
+    struct timeval *last_status_received;
     struct {
         bool    enable_dstar;
         bool    enable_dmr;
@@ -161,7 +182,11 @@ typedef struct {
 extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, uint16_t flag);
 extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
 extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
+extern int dmr_mmdvm_send(dmr_mmdvm_t *modem, dmr_packet_t *packet);
+extern int dmr_mmdvm_queue(dmr_mmdvm_t *modem, dmr_packet_t *packet_out);
+extern dmr_packet_t *dmr_mmdvm_queue_shift(dmr_mmdvm_t *modem);
 extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries);
+extern bool dmr_mmdvm_get_status(dmr_mmdvm_t *modem);
 extern bool dmr_mmdvm_set_config(dmr_mmdvm_t *modem);
 extern bool dmr_mmdvm_set_mode(dmr_mmdvm_t *modem, uint8_t mode);
 extern bool dmr_mmdvm_set_rf_config(dmr_mmdvm_t *modem, uint32_t rx_freq, uint32_t tx_freq);

@@ -28,9 +28,8 @@ bool test_decode(void)
 		eq(dmr_sync_pattern_decode(packet) != DMR_SYNC_PATTERN_BS_SOURCED_DATA, "sync pattern mismatch");
 		packet->data_type = DMR_DATA_TYPE_VOICE_LC;
 		go(dmr_full_lc_decode(full_lc, packet), "full LC decode");
-		printf("full link control: flco_pdu=%u, privacy=%u, fid=%u, %u->%u\n",
-			full_lc->flco_pdu, full_lc->privacy, full_lc->fid,
-			full_lc->src_id, full_lc->dst_id);
+		printf("full link control: flco_pdu=%u, fid=%u, %u->%u\n",
+			full_lc->flco_pdu, full_lc->fid, full_lc->src_id, full_lc->dst_id);
 	}
 
 	talloc_free(packet);
@@ -58,15 +57,14 @@ bool test_encode(void)
 
 	full_lc->src_id = packet->src_id;
 	full_lc->dst_id = packet->dst_id;
-	printf("full link control: flco_pdu=%u, privacy=%u, fid=%u, %u->%u\n",
-			full_lc->flco_pdu, full_lc->privacy, full_lc->fid,
-			full_lc->src_id, full_lc->dst_id);
+	printf("full link control: flco_pdu=%u, fid=%u, %u->%u\n",
+			full_lc->flco_pdu, full_lc->fid, full_lc->src_id, full_lc->dst_id);
 	go(dmr_full_lc_encode(full_lc, packet), "encode");
 	dmr_dump_hex(packet->payload, 33);
 
 	go(dmr_full_lc_decode(full_lc_decoded, packet), "decode");
-	printf("full link control: flco_pdu=%u, privacy=%u, fid=%u, %u->%u\n",
-			full_lc_decoded->flco_pdu, full_lc_decoded->privacy, full_lc_decoded->fid,
+	printf("full link control: flco_pdu=%u, fid=%u, %u->%u\n",
+			full_lc_decoded->flco_pdu, full_lc_decoded->fid,
 			full_lc_decoded->src_id, full_lc_decoded->dst_id);
 
 	talloc_free(packet);

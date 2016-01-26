@@ -68,19 +68,7 @@ optional_binaries = (
     ('pkg-config', ('--version',)),
 )
 
-required_compiles = (
-    ('lua version >= 5.2', '''
-#include <lua.h>
-#include <lualib.h>
-#if !defined(LUA_VERSION_NUM) || LUA_VERSION_NUM < 502
-#error "Requires Lua 5.2 or later"
-#endif
-
-int main(int argc, char **argv) {
-    return 5;
-}
-    ''', []),
-)
+required_compiles = ()
 
 if sys.platform in ('darwin', 'linux', 'linux2'):
     required_libraries += (('pthread', 'pthread.h'),)

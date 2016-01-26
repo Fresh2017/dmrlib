@@ -432,10 +432,14 @@ def configure(args):
                 lua_version = version
                 break
 
-    if lua_version is None :
+    if lua_version is None:
+        os.environ['LUA_USE_PKG_CONFIG'] = '0'
         for version in ('lua5.3', 'lua5.2', 'lua'):
             if check_library(version, ('lua.h',)):
                 lua_version = version
+
+    else:
+        os.environ['LUA_USE_PKG_CONFIG'] = '1'
 
     if lua_version is None:
         echo('no suitable lua version could be found\n')

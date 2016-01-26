@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <talloc.h>
-#ifdef DMR_DEBUG
-#include <assert.h>
-#endif
 #if defined(DMR_PLATFORM_LINUX)
 #include <sys/socket.h>
 #endif
@@ -366,9 +363,6 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
 
         case DMR_HOMEBREW_AUTH_CONF:
             dmr_log_trace("homebrew: logged in, sending our configuration");
-#ifdef DMR_DEBUG
-            assert(sizeof(dmr_homebrew_config_t) == 306);
-#endif
             memcpy(buf, &homebrew->config, sizeof(dmr_homebrew_config_t));
             if ((ret = dmr_homebrew_sendraw(homebrew, buf, sizeof(dmr_homebrew_config_t))) < 0)
                 return ret;
@@ -814,7 +808,7 @@ dmr_homebrew_frame_type_t dmr_homebrew_dump(uint8_t *buf, ssize_t len)
             dmr_id_t src_id = (dmrd->src_id[0] << 16) | (dmrd->src_id[1] << 8) | dmrd->src_id[2];
             dmr_id_t dst_id = (dmrd->dst_id[0] << 16) | (dmrd->dst_id[1] << 8) | dmrd->dst_id[2];
             dmr_id_t repeater_id = (dmrd->repeater_id[0] << 24) | (dmrd->repeater_id[1] << 16) | (dmrd->repeater_id[2] << 8) | dmrd->repeater_id[3];
-            uint32_t stream_id = (dmrd->stream_id[3] << 24) | (dmrd->stream_id[2] << 16) | (dmrd->stream_id[1] << 8) | dmrd->stream_id[0];   
+            uint32_t stream_id = (dmrd->stream_id[3] << 24) | (dmrd->stream_id[2] << 16) | (dmrd->stream_id[1] << 8) | dmrd->stream_id[0];
             dmr_log_debug("homebrew: sequence: %u (0x%02x)", dmrd->sequence, dmrd->sequence);
             dmr_log_debug("homebrew: src->dst: %u->%u", src_id, dst_id);
             dmr_log_debug("homebrew: repeater: %u (%08x)", repeater_id, repeater_id);
@@ -868,8 +862,6 @@ dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *data, ssize_t len)
         return NULL;
     }
     dmr_homebrew_data_t *dmrd = (dmr_homebrew_data_t *)data;
-
-    assert(sizeof(dmr_homebrew_data_t) == 53);
 
     packet->meta.sequence = dmrd->sequence;
     packet->meta.stream_id = (dmrd->stream_id[3] << 24) | (dmrd->stream_id[2] << 16) | (dmrd->stream_id[1] << 8) | dmrd->stream_id[0];

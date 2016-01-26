@@ -321,7 +321,7 @@ static int dmr_repeater_voice_call_end(dmr_repeater_t *repeater, dmr_packet_t *p
         return dmr_error(DMR_EINVAL);
 
     dmr_ts_t ts = packet->ts;
-    dmr_repeater_timeslot_t rts = repeater->ts[ts];
+    //dmr_repeater_timeslot_t rts = repeater->ts[ts];
 
     if (!dmr_repeater_voice_call_active(repeater, ts)) {
         dmr_log_debug("repeater[%u]: not stopping inactive voice call", ts);
@@ -344,6 +344,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
         dmr_log_error("repeater: can't start voice call, received NULL");
         return dmr_error(DMR_EINVAL);
     }
+    DMR_UNUSED(full_lc);
 
     dmr_ts_t ts = packet->ts;
     dmr_repeater_timeslot_t rts = repeater->ts[ts];
@@ -518,7 +519,7 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                             dmr_log_error("repeater[%u]: failed to end voice call: %s", ts, dmr_error_get());
                             continue;
                         }
-                        break;                            
+                        break;
 
                     default:
                         break;
@@ -527,7 +528,7 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                     dmr_repeater_fix_headers(repeater, packet);
                 }
                 dmr_proto_tx(slot->proto, slot->userdata, packet);
-           
+
                 /* Clean up our *cloned* packet. */
                 TALLOC_FREE(packet);
             }

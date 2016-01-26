@@ -57,6 +57,8 @@ void kill_handler(int sig)
 
 dmr_route_t route(dmr_repeater_t *repeater, dmr_proto_t *src, dmr_proto_t *dst, dmr_packet_t *packet)
 {
+    DMR_UNUSED(repeater);
+
     config_t *config = load_config();
     lua_State *L = config->L;
     dmr_route_t policy = DMR_ROUTE_REJECT;
@@ -66,7 +68,7 @@ dmr_route_t route(dmr_repeater_t *repeater, dmr_proto_t *src, dmr_proto_t *dst, 
     lua_pass_proto(L, src);
     lua_pass_proto(L, dst);
     lua_pass_packet(L, packet);
-    
+
     /* Call route(), 3 arguments, 1 return */
     if (lua_pcall(L, 3, 1, 0) != 0) {
         dmr_log_error("noisebridge: %s->route() failed: %s",
@@ -106,7 +108,7 @@ dmr_route_t route(dmr_repeater_t *repeater, dmr_proto_t *src, dmr_proto_t *dst, 
     // Packet is modified
     if (policy == DMR_ROUTE_PERMIT) {
         lua_modify_packet(L, packet);
-    }   
+    }
 
     lua_pop(L, 1); /* pop returned value from stack */
 
@@ -125,13 +127,15 @@ bail:
         dmr_log_trace("noisebridge: %s->route(): invalid %u, rejecting", config->script, policy);
         return DMR_ROUTE_REJECT;
     }
-    
+
 
     return policy;
 }
 
 int init_proto_homebrew(config_t *config, proto_t *proto)
 {
+    DMR_UNUSED(config);
+
     int ret = 0;
     dmr_log_info("noisebridge: connect to BrandMeister homebrew on %s:%d",
         inet_ntoa(*proto->instance.homebrew.addr),
@@ -165,6 +169,9 @@ bail:
 
 int init_proto_mbe(config_t *config, proto_t *proto)
 {
+    DMR_UNUSED(config);
+    DMR_UNUSED(proto);
+
     int ret = 0;
 #if !defined(WITH_MBELIB) || !defined(HAVE_LIBPORTAUDIO)
     dmr_log_critical("noisebridge: mbe not available");
@@ -200,6 +207,9 @@ bail:
 
 int init_proto_mmdvm(config_t *config, proto_t *proto)
 {
+    DMR_UNUSED(config);
+    DMR_UNUSED(proto);
+
     int ret = 0;
     dmr_log_info("noisebridge: connect to MMDVM modem on %s",
         proto->instance.mmdvm.port);
@@ -338,6 +348,7 @@ int loop_repeater(void)
     if ((ret = dmr_proto_call_wait(repeater)) != 0) {
         goto bail;
     }
+    goto done;
 
 bail:
     dmr_log_error("noisebridge: repeater stopped with error: %s", dmr_error_get());

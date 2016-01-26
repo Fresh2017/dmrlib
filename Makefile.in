@@ -133,6 +133,7 @@ NOISEBRIDGE_OBJECTS  = $(patsubst %.c,%.o,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS) -Lsrc/dmr
 NOISEBRIDGE_LIBS     = -ldmr -lpthread -ltalloc
+
 {% if env.LUA_USE_PKG_CONFIG == '1' -%}
 NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags {{ env.LUA_VERSION }})
 NOISEBRIDGE_LIBS    += $(shell pkg-config --libs {{ env.LUA_VERSION }})
@@ -152,7 +153,7 @@ TEST_LIBS     		 = -ldmr -lpthread -ltalloc
 UNAME := $(shell uname -s)
 
 ifeq ($(UNAME),Linux)
-NOISEBRIDGE_LIBS    += -lbsd
+NOISEBRIDGE_LIBS    += -lbsd -lm -ldl
 endif
 
 all: build

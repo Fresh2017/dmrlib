@@ -134,10 +134,10 @@ NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS) -Lsrc/dmr
 NOISEBRIDGE_LIBS     = -ldmr -lpthread -ltalloc
 {% if env.HAVE_PKG_CONFIG == '1' -%}
-NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags lua)
-NOISEBRIDGE_LIBS    += $(shell pkg-config --libs lua)
+NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags {{ env.LUA_VERSION }})
+NOISEBRIDGE_LIBS    += $(shell pkg-config --libs {{ env.LUA_VERSION }})
 {% else -%}
-NOISEBRIDGE_LIBS	+= -llua
+NOISEBRIDGE_LIBS	+= -l{{ env.LUA_VERSION }}
 {% endif %}
 {% if args.with_mbelib and env.HAVE_LIBPORTAUDIO == '1' %}
 NOISEBRIDGE_LIBS 	+= -lportaudio

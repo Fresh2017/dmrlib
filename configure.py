@@ -50,7 +50,6 @@ optional_headers = (
 )
 
 required_libraries = (
-    ('lua',    'lua.h'),
     ('m',      'math.h'),
     ('talloc', 'talloc.h'),
     ('pcap',   'pcap.h'),
@@ -63,6 +62,10 @@ optional_libraries = (
 optional_defines = (
     ('SO_REUSEADDR', ('sys/socket.h',), []),
     ('SO_REUSEPORT', ('sys/socket.h',), []),
+)
+
+optional_binaries = (
+    ('pkg-config', ('--version',)),
 )
 
 required_compiles = (
@@ -103,6 +106,12 @@ def env_append(key, value):
         os.environ[key] += ' ' + value
     else:
         os.environ[key] = value
+
+
+def env_name(name):
+    name = name.replace('-', '_')
+    name = name.replace('.', '_')
+    return name
 
 
 def log(*args):
@@ -158,6 +167,16 @@ def check_platform():
         return False
 
     return True
+
+
+def check_binary(binary, args=(), optional=False):
+    echo('checking for {0}... '.format(binary))
+    name = env_name(binary)
+    if _test_call((binary,) + args):
+        os.environ['HAVE_{0}'.format(name.upper())] = '1'
+        return True
+    os.environ['HAVE_{0}'.format(name.upper())] = '0'
+    return optional
 
 
 def check_compiler(bin):
@@ -326,6 +345,16 @@ def check_library(name, headers, optional=False):
                 pass
 
 
+def check_pkg_config(package):
+    echo('checking package {0}... '.format(package))
+    name = env_name(package)
+    if _test_call(['pkg-config', '--exists', package]):
+        os.environ['HAVE_{0}'.format(name.upper())] = '1'
+        return True
+    os.environ['HAVE_{0}'.format(name.upper())] = '0'
+    return False
+
+
 def check_versions(name):
     echo('checking versions file {0}... '.format(name))
     tag = ''
@@ -338,7 +367,7 @@ def check_versions(name):
 
             tag = 'git'
             patch_git = '-'.join(GIT_VERSION[-2:])
-            
+
         except subprocess.CalledProcessError:
             tag = 'git'
             pass
@@ -385,9 +414,13 @@ def configure(args):
     if not check_compiler(os.environ.get('CC', env_defaults['CC'])):
         return False
 
+    for binary, args in optional_binaries:
+        check_binary(binary, args)
+
     for header in required_headers:
         if not check_header(header):
             return False
+
     for header in optional_headers:
         check_header(header, optional=True)
 
@@ -403,6 +436,24 @@ def configure(args):
 
     for name, header in optional_libraries:
         os.environ['have_{0}'.format(name)] = str(int(check_library(name, header)))
+
+    lua_version = None
+    if os.environ.get('HAVE_PKG_CONFIG', '') == '1':
+        for version in ('lua5.3', 'lua5.2', 'lua'):
+            if check_pkg_config(version):
+                lua_version = version
+                break
+
+    if lua_version is None :
+        for version in ('lua5.3', 'lua5.2', 'lua'):
+            if check_library(version, ('lua.h',)):
+                lua_version = version
+
+    if lua_version is None:
+        echo('no suitable lua version could be found\n')
+        return False
+
+    os.environ['LUA_VERSION'] = lua_version
 
     for name, code, libs in required_compiles:
         if not check_compile(name, code, libs):

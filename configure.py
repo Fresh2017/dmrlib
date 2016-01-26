@@ -350,7 +350,7 @@ def check_versions(name):
     if os.path.isdir('.git'):
         try:
             GIT_VERSION = subprocess.check_output([
-                'git', 'describe', '--long',
+                'git', 'describe', '--long', '--tags',
             ]).strip().split('-')
 
             tag = 'git'
@@ -426,20 +426,18 @@ def configure(args):
         os.environ['have_{0}'.format(name)] = str(int(check_library(name, header)))
 
     lua_version = None
+    os.environ['LUA_USE_PKG_CONFIG'] = '0'
     if os.environ.get('HAVE_PKG_CONFIG', '') == '1':
         for version in ('lua5.3', 'lua5.2', 'lua'):
             if check_pkg_config(version):
                 lua_version = version
+                os.environ['LUA_USE_PKG_CONFIG'] = '1'
                 break
 
     if lua_version is None:
-        os.environ['LUA_USE_PKG_CONFIG'] = '0'
         for version in ('lua5.3', 'lua5.2', 'lua'):
             if check_library(version, ('lua.h',)):
                 lua_version = version
-
-    else:
-        os.environ['LUA_USE_PKG_CONFIG'] = '1'
 
     if lua_version is None:
         echo('no suitable lua version could be found\n')

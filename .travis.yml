@@ -10,6 +10,7 @@ addons:
       - libtalloc-dev
       - libpcap-dev
       - libbsd-dev
+      - liblua5.2
       - python-jinja2
 
 cache: apt

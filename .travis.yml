@@ -1,8 +1,17 @@
 language: c
 
+sudo: false
+
 compiler:
   - clang
   - gcc
+
+env:
+  global:
+    - CC=$CC
+  matrix:
+    - LUA=lua5.2
+    - LUA=lua5.3
 
 addons:
   apt:
@@ -15,8 +24,10 @@ addons:
 
 cache: apt
 
+before_install:
+  - source .travis/setenv_lua.sh
+
 script:
-  - export CC=$CC
   - ./configure --with-debug || (cat config.log && false)
   - make
   - make install PREFIX=./dist

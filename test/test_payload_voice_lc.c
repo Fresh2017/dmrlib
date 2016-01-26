@@ -33,8 +33,8 @@ bool test_decode(void)
 			full_lc->src_id, full_lc->dst_id);
 	}
 
-	dmr_free(packet);
-	dmr_free(full_lc);
+	talloc_free(packet);
+	talloc_free(full_lc);
 
 	return true;
 }
@@ -69,9 +69,9 @@ bool test_encode(void)
 			full_lc_decoded->flco_pdu, full_lc_decoded->privacy, full_lc_decoded->fid,
 			full_lc_decoded->src_id, full_lc_decoded->dst_id);
 
-	dmr_free(packet);
-	dmr_free(full_lc_decoded);
-	dmr_free(full_lc);
+	talloc_free(packet);
+	talloc_free(full_lc_decoded);
+	talloc_free(full_lc);
 
 	return true;
 }

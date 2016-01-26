@@ -16,7 +16,7 @@ bool test_all(void)
 
         go(dmr_bptc_196_96_encode(&bptc, packet, data), "encode");
         go(dmr_bptc_196_96_decode(&bptc, packet, test), "decode");
-        dmr_free(packet);
+        talloc_free(packet);
 
         if (memcmp(data, test, 12)) {
             printf("input data:\n");
@@ -55,7 +55,7 @@ bool test_noise(void)
         dmr_log_trace("%s: flipped random bit at %u: %#02x -> %#02x",
             prog, p, n, packet->payload[p]);
         go(dmr_bptc_196_96_decode(&bptc, packet, test), "decode");
-        dmr_free(packet);
+        talloc_free(packet);
 
         if (memcmp(data, test, 12)) {
             printf("input data:\n");

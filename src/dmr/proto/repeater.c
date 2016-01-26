@@ -200,6 +200,8 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
     repeater->queue_size = 32;
     repeater->queue_used = 0;
     repeater->queue_lock = talloc_zero(repeater, dmr_mutex_t);
+    repeater->queue_wait = talloc_zero(repeater, dmr_cond_t);
+    repeater->queue_wait_lock = talloc_zero(repeater, dmr_mutex_t);
     repeater->queue = talloc_size(repeater, sizeof(dmr_repeater_item_t) * repeater->queue_size);
 
     if (repeater->queue == NULL) {
@@ -218,8 +220,18 @@ dmr_repeater_t *dmr_repeater_new(dmr_repeater_route_t route)
     repeater->proto.active = repeater_proto_active;
     repeater->slots = 0;
     if (dmr_proto_mutex_init(&repeater->proto) != 0) {
-        dmr_log_error("repeater: failed to init mutex");
-        free(repeater);
+        dmr_log_error("repeater: failed to init mutex: %s", strerror(errno));
+        TALLOC_FREE(repeater);
+        return NULL;
+    }
+    if (dmr_cond_init(repeater->queue_wait) != dmr_thread_success) {
+        dmr_log_error("repeater: failed to init wait: %s", strerror(errno));
+        TALLOC_FREE(repeater);
+        return NULL;
+    }
+    if (dmr_mutex_init(repeater->queue_wait_lock, dmr_mutex_plain) != dmr_thread_success) {
+        dmr_log_error("repeater: failed to init wait mutex: %s", strerror(errno));
+        TALLOC_FREE(repeater);
         return NULL;
     }
 
@@ -258,6 +270,11 @@ int dmr_repeater_queue(dmr_repeater_t *repeater, dmr_proto_t *proto, dmr_packet_
         ret = -1;
     }
     //dmr_mutex_unlock(repeater->queue_lock);
+
+    /* Inform the repeater loop that there's a new packet in the queue */
+    if (repeater_proto_active(repeater)) {
+        dmr_cond_signal(repeater->queue_wait);
+    }
 
     return ret;
 }
@@ -312,9 +329,11 @@ static int dmr_repeater_voice_call_end(dmr_repeater_t *repeater, dmr_packet_t *p
     }
 
     dmr_log_trace("repeater: voice call end on %s", dmr_ts_name(ts));
+    /*
     if (rts.vbptc_emb_lc != NULL) {
         dmr_vbptc_16_11_free(rts.vbptc_emb_lc);
     }
+    */
     dmr_repeater_voice_call_set_active(repeater, ts, false);
     return 0;
 }
@@ -339,6 +358,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
 
     rts.voice_frame = 0;
 
+    /*
     if (full_lc != NULL) {
         dmr_log_trace("repeater: constructing emb LC");
         if ((rts.vbptc_emb_lc = dmr_vbptc_16_11_new(8, NULL)) == NULL) {
@@ -364,6 +384,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
         }
         TALLOC_FREE(ebits);
     }
+    */
 
     return 0;
 }
@@ -391,6 +412,9 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
 {
     // Run callbacks
     while (repeater_proto_active(repeater)) {
+        /* Wait at most 60ms for the queue wait condvar to be raised */
+        struct timespec timeout = { 0, 60000 };
+        dmr_cond_timedwait(repeater->queue_wait, repeater->queue_wait_lock, &timeout);
         dmr_repeater_expire(repeater);
         dmr_repeater_item_t *item = dmr_repeater_queue_shift(repeater);
         if (item != NULL) {

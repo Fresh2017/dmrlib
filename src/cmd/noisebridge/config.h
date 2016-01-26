@@ -1,71 +1,64 @@
 #ifndef _NOISEBRIDGE_CONFIG_H
 #define _NOISEBRIDGE_CONFIG_H
 
-#include <dmr/log.h>
+#include <inttypes.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include <dmr/config.h>
 #include <dmr/proto.h>
 #include <dmr/proto/homebrew.h>
+#if defined(WITH_MBELIB)
 #include <dmr/proto/mbe.h>
+#endif
 #include <dmr/proto/mmdvm.h>
 #include <dmr/proto/repeater.h>
-#include <dmr/payload/voice.h>
 
-#include "route.h"
-#include "module.h"
-
-extern const char *software_id, *package_id;
-
-typedef enum {
-    PEER_NONE,
-    PEER_HOMEBREW,
-    PEER_MBE,
-    PEER_MMDVM
-} peer_t;
-
-#define NOISEBRIDGE_MAX_PLUGINS 64
+#define NOISEBRIDGE_MAX_PROTOS 16
 
 typedef struct {
-    const char *filename;
-    const char **argv;
-    int        argc;
-    module_t   *module;
-#if defined(HAVE_DL)
-    void       *handle;
-#endif
-} plugin_t;
+    dmr_proto_t      *proto;
+    dmr_proto_type_t type;
+    char             *name;
+    void             *mem;
+    union {
+        struct {
+            struct in_addr   *addr;
+            int              port;
+            char             *auth;
+            char             *call;
+            dmr_id_t         repeater_id;
+            dmr_color_code_t color_code;
+            uint32_t         rx_freq;
+            uint32_t         tx_freq;
+            uint8_t          tx_power;
+            int              height;
+            float            latitude;
+            float            longitude;
+        } homebrew;
+        struct {
+            char *device;
+            int  quality;
+        } mbe;
+        struct {
+            char              *port;
+            dmr_mmdvm_model_t model;
+        } mmdvm;
+    } instance;
+} proto_t;
 
-typedef struct config_s {
-    const char            *filename;
-    peer_t                upstream, modem;
-    route_rule_t          *repeater_route[ROUTE_RULE_MAX];
-    size_t                repeater_routes;
-    dmr_color_code_t      repeater_color_code;
-    char                  *http_addr;
-    int                   http_port;
-    char                  *http_root;
-    dmr_homebrew_t        *homebrew;
-    dmr_homebrew_config_t homebrew_config;
-    dmr_id_t              homebrew_id;
-    char                  *homebrew_host_s;
-    struct hostent        *homebrew_host;
-    int                   homebrew_port;
-    char                  *homebrew_auth;
-    dmr_mmdvm_t           *mmdvm;
-    char                  *mmdvm_port;
-    int                   mmdvm_rate;
-    uint32_t              mmdvm_rx_freq;
-    uint32_t              mmdvm_tx_freq;
-    dmr_mbe_t             *mbe;
-    uint8_t               mbe_quality;
-    bool                  audio_needed;
-    char                  *audio_device;
-    dmr_log_priority_t    log_level;
-    plugin_t              *plugin[NOISEBRIDGE_MAX_PLUGINS];
-    size_t                plugins;
+typedef int (*parse_section_t)(char *line, char *filename, size_t lineno);
+
+typedef struct {
+    char            *filename;
+    char            *script;
+    lua_State       *L;
+    proto_t         *proto[NOISEBRIDGE_MAX_PROTOS];
+    size_t          protos;
+    parse_section_t section;
 } config_t;
 
-char *join_path(char *dir, char *filename);
+int init_config(char *filename);
 config_t *load_config(void);
-config_t *init_config(const char *filename);
-void kill_config();
 
 #endif // _NOISEBRIDGE_CONFIG_H

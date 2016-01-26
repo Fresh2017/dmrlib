@@ -103,9 +103,9 @@ void dump_dmr_packet(dmr_packet_t *packet)
         packet->data_type == DMR_DATA_TYPE_VOICE_LC           ||
         packet->data_type == DMR_DATA_TYPE_TERMINATOR_WITH_LC ||
         packet->data_type == DMR_DATA_TYPE_CSBK               ||
-        packet->data_type == DMR_DATA_TYPE_MBC                ||
-        packet->data_type == DMR_DATA_TYPE_MBCC               ||
-        packet->data_type == DMR_DATA_TYPE_DATA               ||
+        packet->data_type == DMR_DATA_TYPE_MBC_HEADER         ||
+        packet->data_type == DMR_DATA_TYPE_MBC_CONTINUATION   ||
+        packet->data_type == DMR_DATA_TYPE_DATA_HEADER        ||
         packet->data_type == DMR_DATA_TYPE_RATE12_DATA        ||
         packet->data_type == DMR_DATA_TYPE_RATE34_DATA        ||
         packet->data_type == DMR_DATA_TYPE_IDLE) {

@@ -134,6 +134,7 @@ int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         lc->src_id, lc->dst_id);
 
     uint8_t bytes[12];
+    memset(bytes, 0, sizeof(bytes));
     if (dmr_full_lc_encode_bytes(lc, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
 

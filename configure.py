@@ -50,6 +50,7 @@ optional_headers = (
 )
 
 required_libraries = (
+    ('lua',    'lua.h'),
     ('m',      'math.h'),
     ('talloc', 'talloc.h'),
     ('pcap',   'pcap.h'),
@@ -62,6 +63,20 @@ optional_libraries = (
 optional_defines = (
     ('SO_REUSEADDR', ('sys/socket.h',), []),
     ('SO_REUSEPORT', ('sys/socket.h',), []),
+)
+
+required_compiles = (
+    ('lua version >= 5.2', '''
+#include <lua.h>
+#include <lualib.h>
+#if !defined(LUA_VERSION_NUM) || LUA_VERSION_NUM < 502
+#error "Requires Lua 5.2 or later"
+#endif
+
+int main(int argc, char **argv) {
+    return 5;
+}
+    ''', []),
 )
 
 if sys.platform in ('darwin', 'linux', 'linux2'):
@@ -162,6 +177,44 @@ def check_compiler(bin):
             return True
 
 
+def check_compile(description, code, libs=[]):
+    echo('checking {0}... '.format(description))
+    with tempfile.NamedTemporaryFile(suffix='check-compile.c') as temp:
+        temp.write(code)
+        temp.seek(0)
+        log('test program:\n{0}\n'.format(temp.read()))
+        args = [
+            os.environ['CC'],
+            '-o',
+            temp.name + '.o',
+            temp.name,
+        ] + shlex.split(os.environ.get('CFLAGS', ''))
+        for lib in libs:
+            args.append('-l{0}'.format(lib))
+
+        try:
+            code = _test_call_code(args)
+            if code == 0:
+                # Compilation success, now run
+                code = _test_call_code([temp.name + '.o'])
+                if code == 5:
+                    echo('yes\n')
+                    return True
+
+                elif code == 6:
+                    echo('no\n')
+                    return True
+
+            echo('error\n')
+            log('failed with exit code {0}'.format(code))
+            return False
+        finally:
+            try:
+                os.unlink(temp.name + '.o')
+            except:
+                pass
+
+
 def check_define(define, headers=[], libs=[]):
     echo('checking define {0}... '.format(define))
     with tempfile.NamedTemporaryFile(suffix='check-define.c') as temp:
@@ -186,23 +239,29 @@ def check_define(define, headers=[], libs=[]):
         for lib in libs:
             args.append('-l{0}'.format(lib))
 
-        code = _test_call_code(args)
-        if code == 0:
-            # Compilation success, now run
-            code = _test_call_code([temp.name + '.o'])
-            if code == 5:
-                echo('yes\n')
-                os.environ['HAVE_{0}'.format(define)] = '1'
-                return True
+        try:
+            code = _test_call_code(args)
+            if code == 0:
+                # Compilation success, now run
+                code = _test_call_code([temp.name + '.o'])
+                if code == 5:
+                    echo('yes\n')
+                    os.environ['HAVE_{0}'.format(define)] = '1'
+                    return True
 
-            elif code == 6:
-                echo('no\n')
-                os.environ['HAVE_{0}'.format(define)] = '0'
-                return True
+                elif code == 6:
+                    echo('no\n')
+                    os.environ['HAVE_{0}'.format(define)] = '0'
+                    return True
 
-        echo('error\n')
-        log('failed with exit code {0}'.format(code))
-        return False
+            echo('error\n')
+            log('failed with exit code {0}'.format(code))
+            return False
+        finally:
+            try:
+                os.unlink(temp.name + '.o')
+            except:
+                pass
 
 
 def check_header(header, optional=False):
@@ -220,15 +279,21 @@ def check_header(header, optional=False):
         ] + shlex.split(os.environ.get('CFLAGS', ''))
 
         name = header.upper().replace('.', '_').replace('/', '_')
-        if _test_call(args):
-            os.environ['HAVE_{0}'.format(name)] = '1'
-            return True
+        try:
+            if _test_call(args):
+                os.environ['HAVE_{0}'.format(name)] = '1'
+                return True
 
-        os.environ['HAVE_{0}'.format(name)] = '0'
-        return optional
+            os.environ['HAVE_{0}'.format(name)] = '0'
+            return optional
+        finally:
+            try:
+                os.unlink(temp.name + '.o')
+            except:
+                pass
 
 
-def check_library(name, headers):
+def check_library(name, headers, optional=False):
     echo('checking library {0}... '.format(name))
     with tempfile.NamedTemporaryFile(suffix='check-library.c') as temp:
         headers = headers or []
@@ -248,11 +313,17 @@ def check_library(name, headers):
         ]
         args.extend(shlex.split(os.environ.get('CFLAGS', '')))
         args.extend(shlex.split(os.environ.get('LDFLAGS', '')))
-        if _test_call(args):
-            os.environ['HAVE_LIB' + name.upper()] = '1'
-            return True
-        os.environ['HAVE_LIB' + name.upper()] = '0'
-        return True
+        try:
+            if _test_call(args):
+                os.environ['HAVE_LIB' + name.upper()] = '1'
+                return True
+            os.environ['HAVE_LIB' + name.upper()] = '0'
+            return optional
+        finally:
+            try:
+                os.unlink(temp.name + '.o')
+            except:
+                pass
 
 
 def check_versions(name):
@@ -333,6 +404,10 @@ def configure(args):
     for name, header in optional_libraries:
         os.environ['have_{0}'.format(name)] = str(int(check_library(name, header)))
 
+    for name, code, libs in required_compiles:
+        if not check_compile(name, code, libs):
+            return False
+
     if not check_versions('versions'):
         return False
 
@@ -389,7 +464,7 @@ def run():
     atexit.register(_close_log)
 
     if not configure(args):
-        echo('configure failed, see config.log for more details')
+        echo('configure failed, see config.log for more details\n')
         return 1
     return 0
 

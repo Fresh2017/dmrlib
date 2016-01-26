@@ -254,11 +254,11 @@ char *dmr_data_type_name(dmr_data_type_t data_type)
         return "terminator with lc";
     case DMR_DATA_TYPE_CSBK:
         return "csbk";
-    case DMR_DATA_TYPE_MBC:
+    case DMR_DATA_TYPE_MBC_HEADER:
         return "multi block control";
-    case DMR_DATA_TYPE_MBCC:
+    case DMR_DATA_TYPE_MBC_CONTINUATION:
         return "multi block control continuation";
-    case DMR_DATA_TYPE_DATA:
+    case DMR_DATA_TYPE_DATA_HEADER:
         return "data";
     case DMR_DATA_TYPE_RATE12_DATA:
         return "rate 1/2 data";
@@ -287,11 +287,11 @@ char *dmr_data_type_name_short(dmr_data_type_t data_type)
         return "term lc";
     case DMR_DATA_TYPE_CSBK:
         return "csbk";
-    case DMR_DATA_TYPE_MBC:
+    case DMR_DATA_TYPE_MBC_HEADER:
         return "mbc";
-    case DMR_DATA_TYPE_MBCC:
+    case DMR_DATA_TYPE_MBC_CONTINUATION:
         return "mbcc";
-    case DMR_DATA_TYPE_DATA:
+    case DMR_DATA_TYPE_DATA_HEADER:
         return "data";
     case DMR_DATA_TYPE_RATE12_DATA:
         return "r 1/2";

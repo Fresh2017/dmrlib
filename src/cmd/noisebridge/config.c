@@ -1,315 +1,330 @@
+#include <ctype.h>
 #include <stdlib.h>
+#include <talloc.h>
 #include <string.h>
 #include <netdb.h>
-#include <talloc.h>
-#include <dmr/config.h>
-#include <dmr/version.h>
+#include <dmr/error.h>
 #include "config.h"
-#include "util.h"
-#include "version.h"
-#if defined(DMR_PLATFORM_UNIX)
-#include <sys/param.h>
-#endif
-#if defined(DMR_PLATFORM_LINUX)
-#include <bsd/string.h>
-#endif
-#if defined(HAVE_DL)
-#include <dlfcn.h>
-#endif
-#if defined(HAVE_GETAUXVAL)
-#include <sys/auxv.h>
-#endif
-#if defined(HAVE_LIBPROC)
-#include <libproc.h>
-#endif
-#if defined(HAVE_LIBGEN_H)
-#include <libgen.h>
-#endif
-
-const char *software_id = NOISEBRIDGE_SOFTWARE_ID;
 
 static config_t *config = NULL;
 
-char *progname(void)
+void rtrim(char *str)
 {
-    char *name = NULL;
-#if defined(HAVE_GETAUXVAL)
-    if ((name = getauxval(AT_EXECFN)) != NULL)
-        return name;
-#endif
-#if defined(HAVE_LIBPROC)
-    if ((name = malloc(PROC_PIDPATHINFO_MAXSIZE)) != NULL) {
-        if (proc_pidpath(getpid(), (void *)name, PROC_PIDPATHINFO_MAXSIZE) > 0)
-            return name;
+    size_t n;
+    n = strlen(str);
+    while (n > 0 && isspace((unsigned char)str[n - 1])) {
+        n--;
     }
-#endif
-#if defined(HAVE_LIBGEN_H)
-    if ((name = malloc(PATH_MAX)) != NULL) {
-        if (getcwd(name, PATH_MAX) == NULL) {
-            return NULL;
+    str[n] = '\0';
+}
+
+void ltrim(char *str)
+{
+    size_t n;
+    n = 0;
+    while (str[n] != '\0' && isspace((unsigned char)str[n])) {
+        n++;
+    }
+    memmove(str, str + n, strlen(str) - n + 1);
+}
+
+void trim(char *str)
+{
+    rtrim(str);
+    ltrim(str);
+}
+
+#define CONFIG_ERROR(x,...) \
+    dmr_log_critical("noisebridge: %s[%zu]: " x, filename, lineno, ##__VA_ARGS__); \
+    return -1
+
+#define CONFIG_STR(_b, _m, _t) \
+if (!strcmp(k, _m)) { \
+    if (_t != NULL) { CONFIG_ERROR("duplicate key %s", k); } \
+    _t = talloc_strdup(_b, v); \
+}
+
+#define CONFIG_INT(_b, _m, _t) \
+if (!strcmp(k, _m)) { \
+    if (_t != 0) { CONFIG_ERROR("duplicate key %s", k); } \
+    _t = atoi(v); \
+}
+
+#define CONFIG_FLOAT(_b, _m, _t) \
+if (!strcmp(k, _m)) { \
+    if (_t != 0) { CONFIG_ERROR("duplicate key %s", k); } \
+    _t = atof(v); \
+}
+
+bool split(char *line, char *sep, char **k, char **v)
+{
+    *k = strtok_r(line, sep, v);
+    if (*k != NULL) {
+        trim(*k);
+    }
+    if (*v != NULL) {
+        trim(*v);
+    }
+    return *k != NULL && *v != NULL && strlen(*v) > 0;
+}
+
+int read_config(char *line, char *filename, size_t lineno);
+
+int read_config_homebrew(char *line, char *filename, size_t lineno)
+{
+    proto_t *proto = config->proto[config->protos - 1];
+    dmr_log_trace("noisebridge: %s[%zu]: (homebrew) %s", filename, lineno, line);
+    if (strlen(line) == 0 || line[0] == '#' || line[0] == ';') {
+        return 0;
+    }
+    if (!strcmp(line, "}")) {
+        dmr_log_trace("noisebridge: %s[%zu]: end of section homebrew", filename, lineno);
+        config->section = read_config;
+        return 0;
+    }
+
+    char *k = NULL, *v = NULL;
+    if (!split(line, "=", &k, &v)) {
+        CONFIG_ERROR("syntax error \"%s\"", line);
+        return -1;
+    }
+    dmr_log_trace("noisebridge: config %s = \"%s\"", k, v);
+    CONFIG_STR(proto, "name", proto->name)
+    else CONFIG_STR(proto, "auth", proto->instance.homebrew.auth)
+    else CONFIG_STR(proto, "call", proto->instance.homebrew.call)
+    else CONFIG_INT(proto, "repeater_id", proto->instance.homebrew.repeater_id)
+    else CONFIG_INT(proto, "color_code", proto->instance.homebrew.color_code)
+    else CONFIG_INT(proto, "rx_freq", proto->instance.homebrew.rx_freq)
+    else CONFIG_INT(proto, "tx_freq", proto->instance.homebrew.tx_freq)
+    else CONFIG_INT(proto, "tx_power", proto->instance.homebrew.tx_power)
+    else CONFIG_INT(proto, "height", proto->instance.homebrew.height)
+    else CONFIG_FLOAT(proto, "latitude", proto->instance.homebrew.latitude)
+    else CONFIG_FLOAT(proto, "longitude", proto->instance.homebrew.longitude)
+    else if (!strcmp(k, "host")) {
+        if (proto->instance.homebrew.addr != NULL) {
+            CONFIG_ERROR("duplicate host");
         }
-        return dirname(name);
+        char *host = v, *port = NULL;
+        host = strtok_r(v, ":", &port);
+        if (port == NULL) {
+            proto->instance.homebrew.port = 62030;
+        } else {
+            proto->instance.homebrew.port = atoi(port);
+        }
+        if (proto->instance.homebrew.port == 0) {
+            proto->instance.homebrew.port = 62030;
+        }
+        struct hostent *hostent = NULL;
+        if ((hostent = gethostbyname(host)) == NULL || hostent->h_length == 0) {
+            CONFIG_ERROR("could not resolve %s: %s", host, strerror(errno));
+        }
+        proto->instance.homebrew.addr = (struct in_addr *)hostent->h_addr_list[0];
+        dmr_log_trace("noisebridge: %s resolved to %s", host, inet_ntoa(*proto->instance.homebrew.addr));
+    } else {
+        CONFIG_ERROR("unknown key \"%s\"", k);
     }
-#endif
-    return NULL;
+    return 0;
 }
 
-#if 0
-plugin_t *load_plugin(char *filename, int argv, char **argc)
+int read_config_mbe(char *line, char *filename, size_t lineno)
 {
-#if defined(HAVE_DL)
-    plugin_t *plugin = talloc_zero(NULL, plugin_t);
-    if (plugin == NULL) {
-        dmr_error(DMR_ENOMEM);
-        return NULL;
+    proto_t *proto = config->proto[config->protos - 1];
+    dmr_log_trace("noisebridge: %s[%zu]: (mbe) %s", filename, lineno, line);
+    if (strlen(line) == 0 || line[0] == '#' || line[0] == ';') {
+        return 0;
+    }
+    if (!strcmp(line, "}")) {
+        dmr_log_trace("noisebridge: %s[%zu]: end of section mbe", filename, lineno);
+        config->section = read_config;
+        return 0;
     }
 
-    plugin->handle = dlopen(filename, RTLD_LAZY);
-    char *error = NULL;
-    if (plugin->handle == NULL) {
-        dmr_log_error("noisebridge: can't open %s: %s", filename, dlerror());
-        talloc_free(plugin);
-        return NULL;
+    char *k = NULL, *v = NULL;
+    if (!split(line, "=", &k, &v)) {
+        CONFIG_ERROR("syntax error \"%s\"", line);
+        return -1;
+    }
+    dmr_log_trace("noisebridge: config %s = \"%s\"", k, v);
+    CONFIG_STR(proto, "name", proto->name)
+    else CONFIG_INT(proto, "quality", proto->instance.mbe.quality)
+    else {
+        CONFIG_ERROR("unknown key \"%s\"", k);
+    }
+    return 0;
+}
+
+int read_config_mmdvm(char *line, char *filename, size_t lineno)
+{
+    proto_t *proto = config->proto[config->protos - 1];
+    dmr_log_trace("noisebridge: %s[%zu]: (mmdvm) %s", filename, lineno, line);
+    if (strlen(line) == 0 || line[0] == '#' || line[0] == ';') {
+        return 0;
+    }
+    if (!strcmp(line, "}")) {
+        dmr_log_trace("noisebridge: %s[%zu]: end of section mmdvm", filename, lineno);
+        config->section = read_config;
+        return 0;
     }
 
-    dlerror(); /* Clear any existing error */
+    char *k = NULL, *v = NULL;
+    if (!split(line, "=", &k, &v)) {
+        CONFIG_ERROR("syntax error \"%s\"", line);
+        return -1;
+    }
+    dmr_log_trace("noisebridge: config %s = \"%s\"", k, v);
+    CONFIG_STR(proto, "name", proto->name)
+    else CONFIG_STR(proto, "port", proto->instance.mmdvm.port)
+    else if (!strcmp(k, "model")) {
+        if (!strcmp(v, "generic")) {
+            proto->instance.mmdvm.model = DMR_MMDVM_MODEL_GENERIC;
+        } else if (!strcmp(v, "g4klx")) {
+            proto->instance.mmdvm.model = DMR_MMDVM_MODEL_G4KLX;
+        } else if (!strcmp(v, "dvmega")) {
+            proto->instance.mmdvm.model = DMR_MMDVM_MODEL_DVMEGA;
+        } else {
+            CONFIG_ERROR("unknown MMDVM model \"%s\"", v);
+        }
+    }
+    else {
+        CONFIG_ERROR("unknown key \"%s\"", k);
+    }
+    return 0;
+}
 
-    plugin->filename = talloc_strdup(plugin, filename);
-    plugin->module = (module_t *)dlsym(plugin->handle, "module");
-    if ((error = dlerror()) != NULL) {
-        dmr_log_error("noisebridge: can't find entry point in %s", filename);
-        talloc_free(plugin);
-        return NULL;
+int read_config(char *line, char *filename, size_t lineno)
+{
+    dmr_log_trace("noisebridge: %s[%zu]: %s", filename, lineno, line);
+    if (strlen(line) == 0 || line[0] == '#' || line[0] == ';') {
+        return 0;
     }
 
-    dmr_log_info("noisebridge: loaded \"%s\" from %s", plugin->module->name, filename);
-    return plugin;
-#else
-    dmr_log_error("noisebridge: module loading not supported");
-    return NULL;
+    char *k, *v;
+    if (line[strlen(line) - 1] == '{') {
+        k = strtok_r(line, "{", &v);
+        trim(k);
+        if (!strcmp(k, "homebrew")) {
+            dmr_log_trace("noisebridge: %s[%zu]: switch to section homebrew", filename, lineno);
+            config->section = read_config_homebrew;
+            config->proto[config->protos] = talloc_zero(config, proto_t);
+            config->proto[config->protos]->type = DMR_PROTO_HOMEBREW;
+            config->protos++;
+            return 0;
+        } else if (!strcmp(k, "mbe")) {
+            dmr_log_trace("noisebridge: %s[%zu]: switch to section mbe", filename, lineno);
+#if !defined(WITH_MBELIB)
+            CONFIG_ERROR("mbelib support not enabled");
 #endif
-}
+#if !defined(HAVE_LIBPORTAUDIO)
+            CONFIG_ERROR("portaudio support not enabled");
 #endif
+            config->section = read_config_mbe;
+            config->proto[config->protos] = talloc_zero(config, proto_t);
+            config->proto[config->protos]->type = DMR_PROTO_MBE;
+            config->protos++;
+            return 0;
+        } else if (!strcmp(k, "mmdvm")) {
+            dmr_log_trace("noisebridge: %s[%zu]: switch to section mmdvm", filename, lineno);
+            config->section = read_config_mmdvm;
+            config->proto[config->protos] = talloc_zero(config, proto_t);
+            config->proto[config->protos]->type = DMR_PROTO_MMDVM;
+            config->protos++;
+            return 0;
+        }
+        CONFIG_ERROR("unknown section \"%s\"", k);
+        return -1;
+    } else {
+        if (!split(line, "=", &k, &v)) {
+            CONFIG_ERROR("syntax error \"%s\"", line);
+            return -1;
+        }
+        dmr_log_trace("noisebridge: config %s = \"%s\"", k, v);
+        if (!strcmp(k, "script")) {
+            if (config->script != NULL) {
+                dmr_log_critical("noisebridge: %s[%zu]: duplicate script", filename, lineno);
+                return -1;
+            }
+            config->script = talloc_strdup(config, v);
+        } else {
+            CONFIG_ERROR("unknown key \"%s\"", k);
+        }
+    }
 
-config_t *load_config(void)
-{
-    return config;
+    return 0;
 }
 
-char *join_path(char *dir, char *filename)
+int init_config(char *filename)
 {
-#if defined(DMR_PLATFORM_WINDOWS)
-    char sep[] = "\\";
-#else
-    char sep[] = "/";
-#endif
-    size_t len = strlen(dir) + sizeof(sep) + strlen(filename) + 1;
-    char *tmp = realloc(dir, len);
-    strlcat(tmp, sep, len);
-    strlcat(tmp, filename, len);
-    return tmp;
-}
-
-config_t *init_config(const char *filename)
-{
-    bool valid = true;
-    FILE *fp;
-    char *line = NULL, *k, *v;
+    FILE *fp = NULL;
+    int ret = 0;
+    char *line = NULL;
     size_t len = 0;
     size_t lineno = 0;
     ssize_t read;
 
+    if (filename == NULL) {
+        return dmr_error(DMR_EINVAL);
+    }
+
+    dmr_log_debug("noisebridge: reading %s", filename);
     if (config == NULL) {
         config = talloc_zero(NULL, config_t);
         if (config == NULL) {
-            dmr_log_critical("noisebridge: out of memory");
-            return NULL;
+            dmr_log_critical("config: out of memory");
+            ret = dmr_error(DMR_ENOMEM);
+            goto bail;
         }
+        config->protos = 0;
+        config->section = read_config;
     }
 
-    config->filename = filename;
-    config->log_level = DMR_LOG_PRIORITY_INFO;
-    config->http_port = 62080;
-    config->http_root = join_path(getcwd(NULL, MAXPATHLEN), "/html");
-    config->mbe_quality = 3;
-    dmr_homebrew_config_init(&config->homebrew_config);
-    dmr_homebrew_config_software_id(&config->homebrew_config, software_id);
+    if (config->filename != NULL) {
+        talloc_free(config->filename);
+    }
+    config->filename = talloc_strdup(config, filename);
 
-    if ((fp = fopen(filename, "r")) == NULL) {
-        dmr_log_critical("failed to open %s: %s", filename, strerror(errno));
-        return NULL;
+    if ((fp = fopen(config->filename, "r")) == NULL) {
+        dmr_log_critical("failed to open %s: %s", config->filename, strerror(errno));
+        ret = -1;
+        goto bail;
     }
 
     while ((read = getline(&line, &len, fp)) != -1) {
         lineno++;
         trim(line);
-        dmr_log_trace("noisebridge: %s[%zu]: %s", filename, lineno, line);
-
-        if (strlen(line) == 0 || line[0] == '#' || line[0] == ';')
-            continue;
-
-        k = strtok_r(line, "=", &v);
-        trim(k);
-        trim(v);
-        if (k == NULL || v == NULL || strlen(v) == 0) {
-            dmr_log_critical("noisebridge: %s[%zu]: syntax error", filename, lineno);
-            valid = false;
-            break;
-        }
-
-        dmr_log_debug("noisebridge: config %s = \"%s\"", k, v);
-        if (!strcmp(k, "log_level")) {
-            config->log_level = atoi(v);
-            dmr_log_trace("noisebridge: config %s = %d", k, config->log_level);
-            dmr_log_priority_set(config->log_level);
-
-        /*
-        } else if (!strcmp(k, "load")) {
-            if (config->plugins >= NOISEBRIDGE_MAX_PLUGINS) {
-                dmr_log_critical("noisebridge: %s[%zu]: max number of plugins reached", filename, lineno);
-                valid = false;
-                break;
-            }
-            char *args;
-            v = strtok_r(v, ",", &args);
-            trim(v);
-            trim(args);
-            plugin_t *plugin = load_plugin(v, strlen(args) > 0 ? 1 : 0, NULL);
-            if (plugin == NULL) {
-                dmr_log_critical("noisebridge: %s[%zu]: load failed", filename, lineno);
-                valid = false;
-                break;
-            }
-        */
-
-        } else if (!strcmp(k, "http_addr")) {
-            config->http_addr = strdup(v);
-
-        } else if (!strcmp(k, "http_port")) {
-            config->http_port = atoi(v);
-
-        } else if (!strcmp(k, "http_root")) {
-            free(config->http_root);
-            config->http_root = strdup(v);
-
-        } else if (!strcmp(k, "repeater_color_code")) {
-            config->repeater_color_code = atoi(v);
-
-        } else if (!strcmp(k, "repeater_route")) {
-            config->repeater_route[config->repeater_routes] = route_rule_parse(v);
-            if (config->repeater_route[config->repeater_routes] == NULL) {
-                dmr_log_critical("noisebridge: %s[%zu]: invalid route rule", filename, lineno);
-                valid = false;
-                break;
-            }
-            config->repeater_routes++;
-
-        } else if (!strcmp(k, "upstream_type")) {
-            if (!strcmp(v, "homebrew")) {
-                config->upstream = PEER_HOMEBREW;
-            } else {
-                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s", filename, lineno, v);
-                valid = false;
-                break;
-            }
-
-        } else if (!strcmp(k, "homebrew_host")) {
-            config->homebrew_host = gethostbyname(v);
-            if (config->homebrew_host == NULL) {
-                dmr_log_critical("noisebridge: %s[%zu]: unresolved name %s", filename, lineno, v);
-                valid = false;
-                break;
-            }
-            config->homebrew_host_s = strdup(v);
-
-        } else if (!strcmp(k, "homebrew_port")) {
-            config->homebrew_port = atoi(v);
-
-        } else if (!strcmp(k, "homebrew_auth")) {
-            config->homebrew_auth = talloc_strdup(config, v);
-
-        } else if (!strcmp(k, "homebrew_id")) {
-            config->homebrew_id = (dmr_id_t)atoi(v);
-            dmr_homebrew_config_repeater_id(&config->homebrew_config, config->homebrew_id);
-
-        } else if (!strcmp(k, "homebrew_call")) {
-            dmr_homebrew_config_callsign(&config->homebrew_config, v);
-
-        } else if (!strcmp(k, "homebrew_cc")) {
-            dmr_homebrew_config_color_code(&config->homebrew_config, (dmr_id_t)atoi(v));
-
-        } else if (!strcmp(k, "homebrew_rx_freq")) {
-            dmr_homebrew_config_rx_freq(&config->homebrew_config, strtol(v, NULL, 10));
-
-        } else if (!strcmp(k, "homebrew_tx_freq")) {
-            dmr_homebrew_config_tx_freq(&config->homebrew_config, strtol(v, NULL, 10));
-
-        } else if (!strcmp(k, "homebrew_tx_power")) {
-            dmr_homebrew_config_tx_power(&config->homebrew_config, atoi(v));
-
-        } else if (!strcmp(k, "homebrew_height")) {
-            dmr_homebrew_config_height(&config->homebrew_config, atoi(v));
-
-        } else if (!strcmp(k, "homebrew_latitude")) {
-            dmr_homebrew_config_latitude(&config->homebrew_config, strtod(v, NULL));
-
-        } else if (!strcmp(k, "homebrew_longitude")) {
-            dmr_homebrew_config_longitude(&config->homebrew_config, strtod(v, NULL));
-
-        } else if (!strcmp(k, "modem_type")) {
-            if (!strcmp(v, "mmdvm")) {
-                config->modem = PEER_MMDVM;
-
-            } else if (!strcmp(v, "mbe")) {
-                config->modem = PEER_MBE;
-                config->audio_needed = true;
-
-            } else {
-                dmr_log_critical("noisebridge: %s[%zu]: unsupported type %s", filename, lineno, v);
-                valid = false;
-                break;
-            }
-
-        } else if (!strcmp(k, "mbe_quality")) {
-            config->mbe_quality = atoi(v);
-
-        } else if (!strcmp(k, "mmdvm_port")) {
-            config->mmdvm_port = talloc_strdup(config, v);
-
-        } else if (!strcmp(k, "mmdvm_rate")) {
-            config->mmdvm_rate = atoi(v);
-
-        } else if (!strcmp(k, "mmdvm_rx_freq")) {
-                    config->mmdvm_rx_freq = atoi(v);
-
-        } else if (!strcmp(k, "mmdvm_tx_freq")) {
-                    config->mmdvm_tx_freq = atoi(v);
-
-        } else if (!strcmp(k, "audio_device")) {
-            config->audio_device = talloc_strdup(config, v);
-
-        } else {
-            dmr_log_critical("noisebridge: %s[%zu]: syntax error, invalid key \"%s\"", filename, lineno, k);
-            valid = false;
-            break;
+        if ((ret = config->section(line, filename, lineno)) != 0) {
+            goto bail;
         }
     }
-    fclose(fp);
 
-    if (!valid)
-        return NULL;
+    if (config->script == NULL) {
+        dmr_log_critical("noisebridge: %s: missing script", filename);
+        ret = -1;
+        goto bail;
+    }
 
-    return config;
+    if (config->protos == 0) {
+        dmr_log_critical("noisebridge: %s: missing protos", filename);
+        ret = -1;
+        goto bail;
+    }
+    dmr_log_info("noisebridge: configuring %d protos", config->protos);
+
+    goto done;
+
+bail:
+    if (config != NULL) {
+        talloc_free(config);
+    }
+
+done:
+    if (fp != NULL) {
+        fclose(fp);
+    }
+
+    return ret;
 }
 
-void kill_config(void)
+config_t *load_config(void)
 {
-    if (config->homebrew != NULL) {
-        dmr_homebrew_free(config->homebrew);
-    }
-#if defined(WITH_MBELIB) && defined(HAVE_LIBPORTAUDIO)
-    if (config->mbe != NULL) {
-        dmr_mbe_free(config->mbe);
-    }
-#endif
+    return config;
 }

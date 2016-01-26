@@ -119,15 +119,29 @@ endif
 
 DMRDUMP_SOURCES      = $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      = $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))
-DMRDUMP_CFLAGS       = $(CFLAGS) -D_DEFAULT_SOURCE
+DMRDUMP_CFLAGS       = $(CFLAGS) -D_BSD_SOURCE
 DMRDUMP_LDFLAGS      = $(LDFLAGS) -Lsrc/dmr
-DMRDUMP_LIBS 		 = -lpcap -lpthread -ltalloc -ldmr
+DMRDUMP_LIBS 		 = -lpthread -ltalloc -ldmr
+{% if env.HAVE_PCAP_CONFIG == '1' -%}
+DMRDUMP_LIBS        += $(shell pcap-config --libs)
+{% else -%}
+DMRDUMP_LIBS 		+= -lpcap
+{% endif %}
 
 NOISEBRIDGE_SOURCES  = $(wildcard src/cmd/noisebridge/*.c)
 NOISEBRIDGE_OBJECTS  = $(patsubst %.c,%.o,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS) -Lsrc/dmr
-NOISEBRIDGE_LIBS     = -ldmr -lpcap -lpthread -ltalloc
+NOISEBRIDGE_LIBS     = -ldmr -lpthread -ltalloc
+{% if env.HAVE_PKG_CONFIG == '1' -%}
+NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags lua)
+NOISEBRIDGE_LIBS    += $(shell pkg-config --libs lua)
+{% else -%}
+NOISEBRIDGE_LIBS	+= -llua
+{% endif %}
+{% if args.with_mbelib and env.HAVE_LIBPORTAUDIO == '1' %}
+NOISEBRIDGE_LIBS 	+= -lportaudio
+{% endif -%}
 
 TEST_SOURCES 		 = $(wildcard test/test_*.c)
 TEST_PROGRAMS 		 = $(patsubst %.c,%.test,$(TEST_SOURCES))

@@ -40,9 +40,9 @@ void dmr_crc16(uint16_t *crc, uint8_t byte)
     uint8_t i, v = 0x80;
     bool xor;
     for (i = 0; i < 8; i++) {
-        xor = ((*crc) & 0x8000) == 0x8000;
+        xor = ((*crc) & 0x8000) != 0;
         (*crc) <<= 1;
-        if (byte & v) {
+        if ((byte & v) > 0) {
             (*crc)++;
         }
         if (xor) {
@@ -58,7 +58,7 @@ void dmr_crc16_finish(uint16_t *crc)
     uint8_t i;
     bool xor;
     for (i = 0; i < 8; i++) {
-        xor = ((*crc) & 0x8000) == 0x8000;
+        xor = ((*crc) & 0x8000) != 0;
         (*crc) <<= 1;
         if (xor) {
             (*crc) ^= 0x1021;

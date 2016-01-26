@@ -140,7 +140,7 @@ int dmr_serial_open(const char *port, long rate, bool rts)
     settings.c_cflag    |= CS8;
     settings.c_oflag    &= ~(OPOST);
     settings.c_cc[VMIN]  = 0;
-    settings.c_cc[VTIME] = 10;
+    settings.c_cc[VTIME] = 2;
     cfsetispeed(&settings, baud);
     cfsetospeed(&settings, baud);
     if (tcsetattr(fd, TCSANOW, &settings) < 0) {
@@ -248,6 +248,9 @@ int dmr_serial_read(dmr_serial_t fd, void *buf, size_t len, struct timeval *time
             if (n > 0)
                 pos += n;
         }
+    }
+    if (pos > 0 && dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
+        dmr_dump_hex(buf, pos);
     }
     return pos;
 }

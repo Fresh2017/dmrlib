@@ -1,60 +1,37 @@
-# Logging
-log_level=2
-
 # Modules
-#load=dist/module/mod_python.so,noisebridge.py
+script=noisebridge.lua
 
-# Our repeater
-repeater_color_code=1
-# Route rules: <name>:{<policy>,<proto>,<proto>,<ts>,<src_id>,<dst_id>}
-# policy = reject,permit
-# proto  = homebrew,mmdvm,mbe,repeater
-# modify = 0: do not modify
-# 		   1: modify
-# ts     = 0: do not modify
-#          1: time slot 1
-#          2: time slot 2
-# pi     = 0: do not modify
-# 		   1: off (group call)
-# 		   2: on (unit to unit call)
-# src_id = 0: do not modify
-#          n: rewrite src_id
-# dst_id = 0: do not modify
-#          n: rewrite dst_id
-#
-#                                policy  proto     proto     mod ts flco, src_id   dst_id 
-repeater_route=from_homebrew_up:{permit, homebrew,  *,       0, .. }
-#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 1,    1234567, 204    }
-#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 1,    1234567, 205    }
-#repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 2,    1234567, 9990   }
-repeater_route=from_mmdvm_modem:{permit, mmdvm,    *,        1,  2, 2,    1234567, 2042214   }
-repeater_route=dest_mmdvm_modem:{permit, *,        mmdvm,    0,  .. }
+homebrew {
+    name        = master_nl
+    host        = brandmeister.pd0zry.ampr.org
+    auth        = secret
+    call        = N0CALL
+    repeater_id = 1234567
+    color_code  = 1
+    # Only enable for repeater mode:
+    #rx_freq     = 433787500
+    #tx_freq     = 438787500
+    tx_power    = 99
+    height      = 999
+    latitude    = 12.3456
+    longitude   = 7.8901
+}
 
-# Our upstream peer
-upstream_type=homebrew
-homebrew_host=brandmeister.pd0zry.ampr.org
-homebrew_auth=secret
-homebrew_call=N0CALL
-homebrew_id=1234567
-homebrew_cc=1
-homebrew_rx_freq=433787500
-homebrew_tx_freq=438787500
-homebrew_tx_power=99
-homebrew_height=999
-homebrew_latitude=52.2969
-homebrew_longitude=4.5961
+#mbe {
+#    name        = audio
+#    quality     = 3
+#}
 
-# Our "LF" side
-modem_type=mmdvm
-mmdvm_rate=115200
-#mmdvm_rx_freq=433787500
-#mmdvm_tx_freq=438787500
-# Linux:
-mmdvm_port=/dev/ttyACM0
-#mmdvm_port=/dev/ttyUSB0
-# OS X:
-#mmdvm_port=/dev/cu.usbmodem1421
-# OS X (Chinese knock-off CH340 chip)
-#mmdvm_port=/dev/cu.wchusbserial1420
-# Windows:
-#mmdvm_port=COM5
+mmdvm {
+    name        = modem
+    model       = dvmega
+    # Linux:
+    port        = /dev/ttyACM0
+    #port        = /dev/ttyUSB0
+    # OS X:
+    #port        = /dev/cu.usbmodem1421
+    # OS X (Chinese knock-off CH340 chip):
+    #port        = /dev/cu.wchusbserial1420
+    # Windows:
+    #port        = COM5
+}

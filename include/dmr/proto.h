@@ -23,11 +23,12 @@ extern "C" {
 #define DMR_PROTO_CB_MAX 64
 
 typedef enum {
-    DMR_PROTO_UNKNOWN,
-    DMR_PROTO_HOMEBREW,
-    DMR_PROTO_MBE,
-    DMR_PROTO_MMDVM,
-    DMR_PROTO_REPEATER
+    DMR_PROTO_UNKNOWN  = 0x00,
+    DMR_PROTO_HOMEBREW = 0x01,
+    DMR_PROTO_MMDVM    = 0x10,
+    DMR_PROTO_MBE      = 0x20,
+    DMR_PROTO_REPEATER = 0xf0,
+    DMR_PROTO_SMS      = 0xf1
 } dmr_proto_type_t;
 
 struct dmr_proto_s;

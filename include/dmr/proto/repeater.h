@@ -19,7 +19,7 @@ typedef struct dmr_repeater_s dmr_repeater_t;
 typedef enum {
     DMR_ROUTE_REJECT = 0x00,
     DMR_ROUTE_PERMIT,
-    DMR_ROUTE_UNMODIFIED 
+    DMR_ROUTE_PERMIT_UNMODIFIED 
 } dmr_route_t;
 
 /**
@@ -64,6 +64,8 @@ struct dmr_repeater_s {
     size_t                  queue_size;
     size_t                  queue_used;
     dmr_mutex_t             *queue_lock;
+    dmr_cond_t              *queue_wait;
+    dmr_mutex_t             *queue_wait_lock;
 };
 
 /** Create a new repeater. */

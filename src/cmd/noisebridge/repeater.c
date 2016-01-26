@@ -1,253 +1,349 @@
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <signal.h>
-
 #include <dmr/config.h>
-#include <dmr/error.h>
-#include <dmr/proto.h>
+#include <signal.h>
+#include "config.h"
+#include "script.h"
 
-#include "audio.h"
-#include "repeater.h"
+#if defined(WITH_MBELIB) && defined(HAVE_LIBPORTAUDIO)
+#include <portaudio.h>
 
-static volatile bool active = true;
-static dmr_repeater_t *repeater = NULL;
+static PaStream *stream = NULL;
+static float stream_data[DMR_DECODED_AMBE_FRAME_SAMPLES];
 
-void kill_handler(int sig)
+static int stream_samples(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
 {
-    DMR_UNUSED(sig);
-    if (active) {
-        dmr_log_info("repeater: interrupt, stopping, hit again to kill");
-        active = false;
-        if (repeater != NULL) {
-            dmr_proto_call_stop(repeater);
-        }
-    } else {
-        dmr_log_info("repeater: interrupt, killing");
-        exit(2);
-    }
-}
+    dmr_log_trace("noisebridge: reading %lu samples from stream", frameCount);
+    float *data = (float *)userData;
+    float *out = (float *)output;
+    DMR_UNUSED(input);
+    DMR_UNUSED(timeInfo);
+    DMR_UNUSED(statusFlags);
 
-bool init_repeater()
-{
-    bool valid = true;
-    config_t *config = load_config();
-
-    if (config->repeater_routes == 0) {
-        dmr_log_warn("noisebrige: no route rules defined, repeater will be useless!");
-    }
-
-    switch (config->modem) {
-    case PEER_MBE:
-#if !defined(WITH_MBELIB)
-        dmr_log_critical("noisebridge: libdmr not compiled with MBE support");
-        valid = false;
-#elif !defined(HAVE_LIBPORTAUDIO)
-        dmr_log_critical("noisebridge: libdmr not compiled with portaudio support");
-        valid = false;
-#else
-        dmr_log_info("noisebridge: MBE decoder with quality %d", config->mbe_quality);
-        config->mbe = dmr_mbe_new(config->mbe_quality, stream_audio);
-        if (config->mbe == NULL) {
-            valid = false;
-            break;
-        }
-#endif
-        break;
-
-    case PEER_MMDVM:
-        if (!(valid = (config->mmdvm_port != NULL))) {
-            dmr_log_critical("noisebridge: %s: mmdvm_port required", config->filename);
-            break;
-        }
-        if (config->mmdvm_rate == 0) {
-            config->mmdvm_rate = DMR_MMDVM_BAUD_RATE;
-        }
-
-        dmr_log_info("noisebridge: connecting to MMDVM modem on port %s with %d baud",
-            config->mmdvm_port, config->mmdvm_rate);
-
-        uint16_t flag = DMR_MMDVM_FLAG_FIXUP_VOICE |
-                        DMR_MMDVM_FLAG_FIXUP_VOICE_LC;
-        config->mmdvm = dmr_mmdvm_open(config->mmdvm_port, config->mmdvm_rate, flag);
-        if (config->mmdvm == NULL) {
-            exit(1);
-            break;
-        }
-
-        if ((flag & DMR_MMDVM_FLAG_SYNC) > 0 && dmr_mmdvm_sync(config->mmdvm) != 0) {
-            valid = false;
-            dmr_log_critical("noisebridge: %s: mmdvm modem sync failed\n", config->filename);
-        }
-        break;
-
-    default:
-        valid = false;
-        dmr_log_critical("noisebridge: %s: modem_type required", config->filename);
-        break;
-    }
-
-    switch (config->upstream) {
-    case PEER_HOMEBREW:
-        if (!(valid = (config->homebrew_host != NULL))) {
-            dmr_log_critical("noisebridge: %s: homebrew_host required", config->filename);
-            break;
-        }
-        if (config->homebrew_port == 0) {
-            config->homebrew_port = DMR_HOMEBREW_PORT;
-        }
-        if (!(valid = (config->homebrew_auth != NULL))) {
-            dmr_log_critical("noisebridge: %s: homebrew_auth required", config->filename);
-            break;
-        }
-        if (!(valid = (config->homebrew_id != 0))) {
-            dmr_log_critical("noisebridge: %s: homebrew_id required", config->filename);
-            break;
-        }
-
-        struct in_addr **addr_list;
-        struct in_addr server_addr;
-        int i;
-        addr_list = (struct in_addr **)config->homebrew_host->h_addr_list;
-        for (i = 0; addr_list[i] != NULL; i++) {
-            server_addr.s_addr = (*addr_list[0]).s_addr;
-            dmr_log_debug("noisebridge: connecting to homebrew system %s(%s) as %d",
-                config->homebrew_host->h_name,
-                inet_ntoa(server_addr),
-                config->homebrew_id);
-
-            config->homebrew = dmr_homebrew_new(
-                config->homebrew_port,
-                server_addr);
-            memcpy(&config->homebrew->config, &config->homebrew_config, sizeof(dmr_homebrew_config_t));
-            config->homebrew->id = config->homebrew_id;
-            valid = (dmr_homebrew_auth(config->homebrew, config->homebrew_auth) == 0);
-            if (valid)
-                break;
-
-            free(config->homebrew);
-            config->homebrew = NULL;
-        }
-        break;
-
-    default:
-        valid = false;
-        dmr_log_critical("noisebridge: %s: homebrew_type required", config->filename);
-        break;
-    }
-
-    return valid;
-}
-
-static int loop_repeater_start_protos(void)
-{
-    int ret;
-    config_t *config = load_config();
-
-    if ((ret = dmr_proto_init()) != 0) {
-        dmr_log_critical("noisebridge: can't init proto");
-        return ret;
-    }
-    if (config->homebrew != NULL) {
-        dmr_log_info("noisebridge: starting homebrew proto");
-        if ((ret = dmr_proto_call_init(config->homebrew)) != 0)
-            return ret;
-        if ((ret = dmr_proto_call_start(config->homebrew)) != 0)
-            return ret;
-    } else {
-        dmr_log_info("noisebridge: homebrew not enabled");
-    }
-    if (config->mmdvm != NULL) {
-        dmr_log_info("noisebridge: starting mmdvm proto");
-        if ((ret = dmr_proto_call_init(config->mmdvm)) != 0)
-            return ret;
-        if ((ret = dmr_proto_call_start(config->mmdvm)) != 0)
-            return ret;
-
-        if (config->mmdvm_rx_freq || config->mmdvm_tx_freq) {
-            dmr_msleep(250);
-            dmr_mmdvm_set_rf_config(config->mmdvm,
-                config->mmdvm_rx_freq, config->mmdvm_tx_freq);
-        }
-    } else {
-        dmr_log_info("noisebridge: mmdvm not enabled");
-    }
-    if (config->mbe != NULL) {
-        dmr_log_info("noisebridge: starting mbe proto");
-        if ((ret = dmr_proto_call_init(config->mbe)) != 0)
-            return ret;
-        if ((ret = dmr_proto_call_start(config->mbe)) != 0)
-            return ret;
-    } else {
-        dmr_log_info("noisebridge: mbe not enabled");
+    unsigned long i;
+    for (i = 0; i < min(frameCount, DMR_DECODED_AMBE_FRAME_SAMPLES); i++) {
+        *out++ = *data++;
     }
 
     return 0;
 }
 
-static void loop_repeater_stop_protos(void)
+static void stream_write(float *samples, size_t len)
 {
-    config_t *config = load_config();
-    if (config->homebrew && dmr_proto_is_active(config->homebrew)) {
-        dmr_log_info("noisebridge: stopping homebrew proto");
-        dmr_proto_call_stop(config->homebrew);
-    }
-    if (config->mmdvm && dmr_proto_is_active(config->mmdvm)) {
-        dmr_log_info("noisebridge: stopping mmdvm proto");
-        dmr_proto_call_stop(config->mmdvm);
-    }
-    if (config->mbe && dmr_proto_is_active(config->mbe)) {
-        dmr_log_info("noisebridge: stopping mbe proto");
-        dmr_proto_call_stop(config->mbe);
+    dmr_log_trace("noisebridge: writing %lu samples to stream", len);
+    size_t i;
+    for (i = 0; i < min(len, DMR_DECODED_AMBE_FRAME_SAMPLES); i++) {
+        stream_data[i] = samples[i];
     }
 }
 
-bool loop_repeater(void)
+#endif
+
+static dmr_repeater_t *repeater = NULL;
+static dmr_cond_t *active = NULL;
+static dmr_mutex_t *active_lock = NULL;
+static volatile bool stopped = false;
+
+void kill_handler(int sig)
 {
-    bool ret = false;
+    DMR_UNUSED(sig);
+    if (stopped) {
+        dmr_log_info("repeater: interrupt, killing");
+        exit(2);
+    } else {
+        dmr_log_info("repeater: interrupt, stopping, hit again to kill");
+        stopped = true;
+        dmr_cond_signal(active);
+    }
+}
+
+dmr_route_t route(dmr_repeater_t *repeater, dmr_proto_t *src, dmr_proto_t *dst, dmr_packet_t *packet)
+{
     config_t *config = load_config();
-    repeater = dmr_repeater_new(route_rule_packet);
-    if (repeater == NULL)
-        return false;
-    repeater->color_code = config->repeater_color_code;
+    lua_State *L = config->L;
+    dmr_route_t policy = DMR_ROUTE_REJECT;
 
-    if (loop_repeater_start_protos() != 0)
-        goto bail_loop_repeater;
+    dmr_log_trace("noisebridge: %s->route()", config->script);
+    lua_getglobal(L, "route"); /* Call script.lua->route() */
+    lua_pass_proto(L, src);
+    lua_pass_proto(L, dst);
+    lua_pass_packet(L, packet);
+    
+    /* Call route(), 3 arguments, 1 return */
+    if (lua_pcall(L, 3, 1, 0) != 0) {
+        dmr_log_error("noisebridge: %s->route() failed: %s",
+            config->script, lua_tostring(L, -1));
+        goto bail;
+    }
 
-    if (config->homebrew != NULL &&
-        dmr_repeater_add(repeater, config->homebrew, &config->homebrew->proto) != 0)
-        goto bail_loop_repeater;
-    if (config->mmdvm != NULL &&
-        dmr_repeater_add(repeater, config->mmdvm, &config->mmdvm->proto) != 0)
-        goto bail_loop_repeater;
-    if (config->mbe != NULL &&
-        dmr_repeater_add(repeater, config->mbe, &config->mbe->proto) != 0)
-        goto bail_loop_repeater;
+    /* Retrieve packet */
+    switch (lua_type(L, lua_gettop(L))) {
+        case LUA_TNIL: {
+            // Packet is not modified
+            dmr_log_debug("noisebridge: %s->route() returned nil packet (ok)",
+                config->script);
+            policy = DMR_ROUTE_PERMIT_UNMODIFIED;
+            break;
+        }
+        case LUA_TBOOLEAN: {
+            dmr_log_debug("noisebridge: %s->route() returned boolean %s (ok)",
+                config->script, DMR_LOG_BOOL(lua_toboolean(L, 1)));
+            policy = lua_toboolean(L, 1) ? DMR_ROUTE_PERMIT_UNMODIFIED : DMR_ROUTE_REJECT;
+            break;
+        }
+        case LUA_TTABLE: {
+            dmr_log_debug("noisebridge: %s->route() returned modified packet (ok)",
+                config->script);
+            policy = DMR_ROUTE_PERMIT;
+            break;
+        }
+        default: {
+            dmr_log_error("noisebridge: %s->route() did not return a table, boolean or nil",
+                config->script);
+            policy = DMR_ROUTE_REJECT;
+            break;
+        }
+    }
 
-    if (dmr_proto_call_init(repeater) != 0)
-        goto bail_loop_repeater;
+    // Packet is modified
+    if (policy == DMR_ROUTE_PERMIT) {
+        lua_modify_packet(L, packet);
+    }   
 
-    dmr_log_info("noisebridge: starting repeater proto");
-    if ((ret = dmr_proto_call_start(repeater)) != 0)
-        dmr_log_critical("noisebridge: start of repeater failed");
+    lua_pop(L, 1); /* pop returned value from stack */
 
-    active = true;
+bail:
+    switch (policy) {
+    case DMR_ROUTE_REJECT:
+        dmr_log_trace("noisebridge: %s->route(): reject", config->script);
+        break;
+    case DMR_ROUTE_PERMIT:
+        dmr_log_trace("noisebridge: %s->route(): permit", config->script);
+        break;
+    case DMR_ROUTE_PERMIT_UNMODIFIED:
+        dmr_log_trace("noisebridge: %s->route(): permit (unmodified)", config->script);
+        break;
+    default:
+        dmr_log_trace("noisebridge: %s->route(): invalid %u, rejecting", config->script, policy);
+        return DMR_ROUTE_REJECT;
+    }
+    
+
+    return policy;
+}
+
+int init_proto_homebrew(config_t *config, proto_t *proto)
+{
+    int ret = 0;
+    dmr_log_info("noisebridge: connect to BrandMeister homebrew on %s:%d",
+        inet_ntoa(*proto->instance.homebrew.addr),
+        proto->instance.homebrew.port);
+    dmr_homebrew_t *homebrew = dmr_homebrew_new(
+        proto->instance.homebrew.port,
+        *proto->instance.homebrew.addr);
+    if (homebrew == NULL) {
+        return dmr_error(DMR_ENOMEM);
+    }
+
+    dmr_homebrew_config_callsign(&homebrew->config, proto->instance.homebrew.call);
+    dmr_homebrew_config_repeater_id(&homebrew->config, proto->instance.homebrew.repeater_id);
+    dmr_homebrew_config_rx_freq(&homebrew->config, proto->instance.homebrew.rx_freq);
+    dmr_homebrew_config_tx_freq(&homebrew->config, proto->instance.homebrew.tx_freq);
+    dmr_homebrew_config_tx_power(&homebrew->config, proto->instance.homebrew.tx_power);
+    dmr_homebrew_config_height(&homebrew->config, proto->instance.homebrew.height);
+    dmr_homebrew_config_latitude(&homebrew->config, proto->instance.homebrew.latitude);
+    dmr_homebrew_config_longitude(&homebrew->config, proto->instance.homebrew.longitude);
+
+    if ((ret = dmr_homebrew_auth(homebrew, proto->instance.homebrew.auth)) != 0) {
+        goto bail;
+    }
+
+    proto->proto = &homebrew->proto;
+    proto->mem = homebrew;
+
+bail:
+    return ret;
+}
+
+int init_proto_mbe(config_t *config, proto_t *proto)
+{
+    int ret = 0;
+#if !defined(WITH_MBELIB) || !defined(HAVE_LIBPORTAUDIO)
+    dmr_log_critical("noisebridge: mbe not available");
+    return -1;
+#else
+    dmr_log_info("noisebridge: connect to MBE audio on %s",
+        proto->instance.mbe.device == NULL
+            ? "<auto detect>"
+            : proto->instance.mbe.device);
+
+    if (stream == NULL) {
+        if ((ret = Pa_Initialize()) != paNoError) {
+            dmr_log_critical("noisebridge: failed to initialize audio: %s",
+                Pa_GetErrorText(ret));
+            goto bail;
+        }
+        if ((ret = Pa_OpenDefaultStream(&stream, 0, 1, paFloat32, 8000, DMR_DECODED_AMBE_FRAME_SAMPLES, stream_samples, &stream_data)) != paNoError) {
+            dmr_log_critical("noisebridge: failed to initialize stream: %s",
+                Pa_GetErrorText(ret));
+            goto bail;
+        }
+    }
+
+    dmr_mbe_t *mbe = dmr_mbe_new(max(3, proto->instance.mbe.quality), stream_write);
+
+    proto->proto = &mbe->proto;
+    proto->mem = mbe;
+
+bail:
+#endif // WITH_MBELIB && HAVE_LIBPORTAUDIO
+    return ret;
+}
+
+int init_proto_mmdvm(config_t *config, proto_t *proto)
+{
+    int ret = 0;
+    dmr_log_info("noisebridge: connect to MMDVM modem on %s",
+        proto->instance.mmdvm.port);
+    dmr_mmdvm_t *mmdvm = dmr_mmdvm_open(proto->instance.mmdvm.port, 115200, 0);
+    if (mmdvm == NULL) {
+        return dmr_error(DMR_ENOMEM);
+    }
+
+    proto->proto = &mmdvm->proto;
+    proto->mem = mmdvm;
+    return ret;
+}
+
+int init_repeater(void)
+{
+    int ret = 0;
+    config_t *config = load_config();
+    repeater = dmr_repeater_new(route);
+    if (repeater == NULL) {
+        ret = -1;
+        goto bail;
+    }
+
+    uint8_t i;
+    for (i = 0; i < config->protos; i++) {
+        proto_t *proto = config->proto[i];
+        switch (proto->type) {
+            case DMR_PROTO_HOMEBREW: {
+                ret = init_proto_homebrew(config, proto);
+                break;
+            }
+            case DMR_PROTO_MBE: {
+                ret = init_proto_mbe(config, proto);
+                break;
+            }
+            case DMR_PROTO_MMDVM: {
+                ret = init_proto_mmdvm(config, proto);
+                break;
+            }
+            default: {
+                dmr_log_critical("noisebridge: unknown proto %u", proto->type);
+                ret = -1;
+                goto bail;
+            }
+        }
+
+        if (ret != 0) {
+            goto bail;
+        }
+
+        if (proto->proto == NULL) {
+            dmr_log_critical("noisebridge: no proto returned from %s", proto->name);
+            ret = -1;
+            goto bail;
+        }
+
+        if ((ret = dmr_proto_call_init(proto->mem) != 0)) {
+            goto bail;
+        }
+        dmr_repeater_add(repeater, proto->mem, proto->proto);
+        if ((ret = dmr_proto_call_start(proto->mem) != 0)) {
+            goto bail;
+        }
+    }
+
+    if ((ret = dmr_proto_call_init(repeater)) != 0) {
+        goto bail;
+    }
+    if ((ret = dmr_proto_call_start(repeater)) != 0) {
+        goto bail;
+    }
+
+    goto done;
+
+bail:
+    talloc_free(repeater);
+    repeater = NULL;
+
+done:
+    return ret;
+}
+
+int loop_repeater(void)
+{
+    int ret = 0;
+
+    if (active == NULL) {
+        active = talloc_zero(NULL, dmr_cond_t);
+    }
+    if (active_lock == NULL) {
+        active_lock = talloc_zero(NULL, dmr_mutex_t);
+    }
+    if (active == NULL || active_lock == NULL) {
+        dmr_log_critical("noisebridge: out of memory");
+        ret = dmr_error(DMR_ENOMEM);
+        goto bail;
+    }
+
+    if (dmr_mutex_init(active_lock, dmr_mutex_plain) != dmr_thread_success) {
+        dmr_log_critical("noisebridge: failed to setup lock");
+        ret = -1;
+        goto bail;
+    }
+    if (dmr_cond_init(active) != dmr_thread_success) {
+        dmr_log_critical("noisebridge: failed to setup cond");
+        ret = -1;
+        goto bail;
+    }
     signal(SIGINT, kill_handler);
 
     dmr_log_info("noisebridge: running repeater");
-    while (active) {
-        dmr_msleep(60);
-    }
-    if ((ret = dmr_proto_call_wait(repeater)) != 0)
-        goto bail_loop_repeater;
-    goto stop_loop_repeater;
+    dmr_cond_wait(active, active_lock);
 
-bail_loop_repeater:
+    dmr_log_info("noisebridge: stopping repeater");
+    dmr_cond_destroy(active);
+    active = NULL;
+    dmr_mutex_destroy(active_lock);
+    active_lock = NULL;
+
+    config_t *config = load_config();
+    uint8_t i;
+    for (i = 0; i < config->protos; i++) {
+        proto_t *proto = config->proto[i];
+        dmr_log_info("noisebridge: stop %s", proto->name);
+        if (proto->proto->stop != NULL) {
+            if ((ret = dmr_proto_call_stop(proto->mem)) != 0) {
+                dmr_log_error("noisebridge: failed to stop %s: %s",
+                    proto->name, dmr_error_get());
+                ret = 0;
+            }
+        }
+    }
+    if ((ret = dmr_proto_call_stop(repeater)) != 0) {
+        goto bail;
+    }
+    if ((ret = dmr_proto_call_wait(repeater)) != 0) {
+        goto bail;
+    }
+
+bail:
     dmr_log_error("noisebridge: repeater stopped with error: %s", dmr_error_get());
 
-stop_loop_repeater:
-    loop_repeater_stop_protos();
-    dmr_repeater_free(repeater);
+done:
+    talloc_free(repeater);
+    repeater = NULL;
     return ret;
 }

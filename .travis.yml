@@ -10,6 +10,8 @@ env:
   global:
     - CC=$CC
     - LUAROCKS=2.3.0
+    - CFLAGS=-Iinstall/lua/include
+    - LDFLAGS=-Linstall/lua/lib
   matrix:
     - LUA=lua5.2
     - LUA=lua5.3

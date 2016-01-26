@@ -16,8 +16,8 @@ static uint8_t raw[2][33] = {
 
 bool test_decode(void)
 {
-	dmr_packet_t *packet = dmr_malloc(dmr_packet_t);
-	dmr_full_lc_t *full_lc = dmr_malloc(dmr_full_lc_t);
+	dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
+	dmr_full_lc_t *full_lc = talloc_zero(NULL, dmr_full_lc_t);
 	uint8_t i;
 
 	for (i = 0; i < 1; i++) {
@@ -42,9 +42,9 @@ bool test_decode(void)
 
 bool test_encode(void)
 {
-	dmr_packet_t *packet = dmr_malloc(dmr_packet_t);
-	dmr_full_lc_t *full_lc = dmr_malloc(dmr_full_lc_t);
-	dmr_full_lc_t *full_lc_decoded = dmr_malloc(dmr_full_lc_t);
+	dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
+	dmr_full_lc_t *full_lc = talloc_zero(NULL, dmr_full_lc_t);
+	dmr_full_lc_t *full_lc_decoded = talloc_zero(NULL, dmr_full_lc_t);
 
 	memset(packet, 0, sizeof(dmr_packet_t));
 	packet->src_id = rand() & 0xffffff;
@@ -52,10 +52,10 @@ bool test_encode(void)
 	packet->repeater_id = rand();
 	packet->data_type = DMR_DATA_TYPE_VOICE_LC;
 	dmr_dump_hex(packet->payload, 33);
-	
+
 	go(dmr_sync_pattern_encode(DMR_SYNC_PATTERN_BS_SOURCED_DATA, packet), "sync pattern encode");
 	dmr_dump_hex(packet->payload, 33);
-	
+
 	full_lc->src_id = packet->src_id;
 	full_lc->dst_id = packet->dst_id;
 	printf("full link control: flco_pdu=%u, privacy=%u, fid=%u, %u->%u\n",

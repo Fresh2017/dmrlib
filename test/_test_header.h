@@ -1,9 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <talloc.h>
 #include <dmr/error.h>
 #include <dmr/log.h>
-#include <dmr/malloc.h>
 #include <dmr/packet.h>
 
 static char *prog = NULL;
@@ -35,7 +36,7 @@ void flip_random_byte(uint8_t *buf, uint8_t len, uint8_t count)
 
 dmr_packet_t *test_packet(void)
 {
-    dmr_packet_t *packet = dmr_malloc(dmr_packet_t);
+    dmr_packet_t *packet = talloc_zero(NULL, dmr_packet_t);
     if (packet == NULL) {
         printf("out of memory\n");
         exit(1);

@@ -10,12 +10,16 @@
 extern "C" {
 #endif
 
-int8_t byte_cmp(uint8_t *a, uint8_t *b, size_t len);
-#if defined(HAVE_RESTRICT)
-void byte_copy(void *restrict dst, void *restrict src, size_t len);
+#if defined(__restrict__)
+#define ___restrict __restrict__
+#elif defined(__restrict)
+#define ___restrict __restrict
 #else
-void byte_copy(void *dst, void *src, size_t len);
+#define ___restrict
 #endif
+
+int8_t byte_cmp(uint8_t *a, uint8_t *b, size_t len);
+void byte_copy(void *___restrict dst, void *___restrict src, size_t len);
 bool byte_equal_safe(uint8_t *a, uint8_t *b, size_t len);
 void byte_zero(void *buf, size_t len);
 

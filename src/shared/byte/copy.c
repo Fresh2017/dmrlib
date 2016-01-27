@@ -1,10 +1,6 @@
 #include "shared/byte.h"
 
-#if defined(HAVE_RESTRICT)
-void byte_copy(void *restrict dst, void *restrict src, size_t len)
-#else
-void byte_copy(void *dst, void *src, size_t len)
-#endif
+void byte_copy(void *___restrict dst, void *___restrict src, size_t len)
 {
     uint8_t *a = dst;
     const uint8_t *b = src;

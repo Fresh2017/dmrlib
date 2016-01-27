@@ -73,6 +73,7 @@ optional_binaries = (
 
 optional_compiles = (
     ('inline',        os.path.join('test', 'have_inline.c'), []),
+    ('restrict',      os.path.join('test', 'have_restrict.c'), []),
     ('libc ipv6',     os.path.join('test', 'have_libc_ipv6.c'), []),
     ('libc scope_id', os.path.join('test', 'have_libc_scope_id.c'), []),
     ('epoll',         os.path.join('test', 'have_epoll.c'), []),

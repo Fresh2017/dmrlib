@@ -347,7 +347,6 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
     DMR_UNUSED(full_lc);
 
     dmr_ts_t ts = packet->ts;
-    dmr_repeater_timeslot_t rts = repeater->ts[ts];
 
     if (dmr_repeater_voice_call_active(repeater, ts)) {
         dmr_log_debug("repeater[%u]: terminating ready-active voice call", ts);
@@ -357,6 +356,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
     dmr_log_info("repeater[%u]: voice call start", ts);
     dmr_repeater_voice_call_set_active(repeater, ts, true);
 
+    dmr_repeater_timeslot_t rts = repeater->ts[ts];
     rts.voice_frame = 0;
 
     /*

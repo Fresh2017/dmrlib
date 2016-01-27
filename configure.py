@@ -10,13 +10,16 @@ import argparse
 import datetime
 import tempfile
 import os
+import pickle
 import shlex
 import subprocess
 import sys
+from functools import wraps
 from jinja2 import Environment, FileSystemLoader
 
 
 option_defaults = (
+    ('config-cache', 'Configure cache',       'path', 'config.cache'),
     ('prefix',       'Install prefix',        'path', '/usr/local'),
     ('builddir',     'Build directory',       'path', '{pwd}/build'),
     ('with-debug',   'Enable debug features', 'bool', False),
@@ -68,6 +71,16 @@ optional_binaries = (
     ('pkg-config', ('--version',)),
 )
 
+optional_compiles = (
+    ('inline',        os.path.join('test', 'have_inline.c'), []),
+    ('libc ipv6',     os.path.join('test', 'have_libc_ipv6.c'), []),
+    ('libc scope_id', os.path.join('test', 'have_libc_scope_id.c'), []),
+    ('epoll',         os.path.join('test', 'have_epoll.c'), []),
+    ('/dev/epoll',    os.path.join('test', 'have_dev_epoll.c'), []),
+    ('kqueue',        os.path.join('test', 'have_kqueue.c'), []),
+    ('poll',          os.path.join('test', 'have_poll.c'), []),
+    ('select',        os.path.join('test', 'have_select.c'), []),
+)
 required_compiles = ()
 
 if sys.platform in ('darwin', 'linux', 'linux2'):
@@ -80,12 +93,13 @@ elif sys.platform == 'win32':
     )
 
 generated_files = (
-    os.path.join('include', 'dmr', 'config.h'),
     os.path.join('include', 'dmr', 'version.h'),
     os.path.join('src', 'cmd', 'noisebridge', 'version.h'),
+    os.path.join('src', 'shared', 'config.h'),
 )
 
 
+CONFIG_CACHE = {}
 LOG_FD = None
 
 
@@ -97,9 +111,9 @@ def env_append(key, value):
 
 
 def env_name(name):
-    name = name.replace('-', '_')
-    name = name.replace('.', '_')
-    return name
+    for char in '/-. ':
+        name = name.replace(char, '_')
+    return name.strip('_').upper()
 
 
 def log(*args):
@@ -114,6 +128,53 @@ def log(*args):
 def echo(*args):
     sys.stdout.write(' '.join(args))
     sys.stdout.flush()
+
+
+def cache(key):
+    def decorate(func):
+        @wraps(func)
+        def _decorated(name, *args, **kwargs):
+            global CONFIG_CACHE
+            try:
+                if CONFIG_CACHE[(key, name)]:
+                    echo('checking {0} {1}... yes (cached)\n'.format(
+                        key, name))
+                    return True
+            except KeyError:
+                pass
+
+            result = func(name, *args, **kwargs)
+            if result is True:
+                CONFIG_CACHE[(key, name)] = True
+            return result
+        return _decorated
+    return decorate
+
+
+def cache_load(args):
+    global CONFIG_CACHE
+
+    if args.config_cache == '':
+        log('config cache: disabled')
+        return True
+
+    log('config cache: loading from {0}'.format(args.config_cache))
+
+    if os.path.exists(args.config_cache):
+        with open(args.config_cache, 'rb') as fp:
+            CONFIG_CACHE.update(pickle.load(fp))
+
+    def _cache_save():
+        global CONFIG_CACHE
+        with open(args.config_cache, 'wb') as fp:
+            pickle.dump(CONFIG_CACHE, fp)
+
+    atexit.register(_cache_save)
+    return True
+
+
+def have(name, result):
+    os.environ['HAVE_' + env_name(name)] = str(int(result))
 
 
 def _test_call_code(args):
@@ -146,9 +207,30 @@ def check_platform():
 
     elif sys.platform == 'darwin':
         echo('ok\n')
-        echo('enabling Homebrew (http://brew.sh/) support in /usr/local...\n')
-        env_append('CFLAGS', '-I/usr/local/include')
-        env_append('LDFLAGS', '-L/usr/local/lib')
+        have_pkg_manager = False
+
+        if not have_pkg_manager:
+            for brew in ('/usr/local', '/opt/brew', '/opt/homebrew'):
+                if os.access(os.path.join(brew, 'bin/brew'), os.X_OK):
+                    echo('enabling Homebrew (http://brew.sh/) support in {0}...\n'.format(brew))
+                    env_append('CFLAGS', '-I' + brew)
+                    env_append('LDFLAGS', '-L' + brew)
+                    have_pkg_manager = True
+                    break
+
+        if not have_pkg_manager:
+            for base in ('/opt/mports', '/opt/macports', '/opt/local'):
+                if os.path.isdir(base):
+                    echo('enabling MacPorts (https://www.macports.org) support in {0}...\n'.format(base))
+                    env_append('CFLAGS', '-I' + base)
+                    env_append('LDFLAGS', '-L' + base)
+                    have_pkg_manager = True
+                    break
+
+        if not have_pkg_manager:
+            echo('no package manager was detected, it is highly recommended to get either:\n')
+            echo(' - Homebrew, see http://brew.sh/\n')
+            echo(' - MacPorts, see https://www.macports.org/\n')
 
     else:
         echo('not supported\n'.format(sys.platform))
@@ -157,14 +239,13 @@ def check_platform():
     return True
 
 
+@cache('binary')
 def check_binary(binary, args=(), optional=False):
-    echo('checking for {0}... '.format(binary))
+    echo('checking binary {0}... '.format(binary))
     name = env_name(binary)
     if _test_call((binary,) + args):
-        os.environ['HAVE_{0}'.format(name.upper())] = '1'
         return True
-    os.environ['HAVE_{0}'.format(name.upper())] = '0'
-    return optional
+    return False
 
 
 def check_compiler(bin):
@@ -184,44 +265,36 @@ def check_compiler(bin):
             return True
 
 
-def check_compile(description, code, libs=[]):
-    echo('checking {0}... '.format(description))
+@cache('for')
+def check_compile(description, filename, libs=[]):
+    echo('checking for {0}... '.format(description))
+    log('test program from: {0}\n'.format(filename))
     with tempfile.NamedTemporaryFile(suffix='check-compile.c') as temp:
-        temp.write(code)
-        temp.seek(0)
-        log('test program:\n{0}\n'.format(temp.read()))
         args = [
             os.environ['CC'],
             '-o',
-            temp.name + '.o',
             temp.name,
+            filename
         ] + shlex.split(os.environ.get('CFLAGS', ''))
         for lib in libs:
             args.append('-l{0}'.format(lib))
 
-        try:
-            code = _test_call_code(args)
+        name = env_name(description)
+        os.environ['HAVE_{0}'.format(name)] = '0'
+        code = _test_call_code(args)
+        if code == 0:
+            # Compilation success, now run
+            code = _test_call_code([temp.name])
             if code == 0:
-                # Compilation success, now run
-                code = _test_call_code([temp.name + '.o'])
-                if code == 5:
-                    echo('yes\n')
-                    return True
+                echo('yes\n')
+                return True
 
-                elif code == 6:
-                    echo('no\n')
-                    return True
-
-            echo('error\n')
-            log('failed with exit code {0}'.format(code))
-            return False
-        finally:
-            try:
-                os.unlink(temp.name + '.o')
-            except:
-                pass
+        echo('no\n')
+        log('failed with exit code {0}'.format(code))
+        return False
 
 
+@cache('define')
 def check_define(define, headers=[], libs=[]):
     echo('checking define {0}... '.format(define))
     with tempfile.NamedTemporaryFile(suffix='check-define.c') as temp:
@@ -230,9 +303,9 @@ def check_define(define, headers=[], libs=[]):
             temp.write('#include <{0}>\n'.format(header))
         temp.write('int main(int argc, char **argv) {\n')
         temp.write('#if defined({0})\n'.format(define))
-        temp.write('    exit(5);\n')
+        temp.write('    return 0;\n')
         temp.write('#else\n')
-        temp.write('    exit(6);\n')
+        temp.write('    return 1;\n')
         temp.write('#endif\n')
         temp.write('}\n')
         temp.seek(0)
@@ -251,17 +324,11 @@ def check_define(define, headers=[], libs=[]):
             if code == 0:
                 # Compilation success, now run
                 code = _test_call_code([temp.name + '.o'])
-                if code == 5:
+                if code == 0:
                     echo('yes\n')
-                    os.environ['HAVE_{0}'.format(define)] = '1'
                     return True
 
-                elif code == 6:
-                    echo('no\n')
-                    os.environ['HAVE_{0}'.format(define)] = '0'
-                    return True
-
-            echo('error\n')
+            echo('no\n')
             log('failed with exit code {0}'.format(code))
             return False
         finally:
@@ -271,6 +338,7 @@ def check_define(define, headers=[], libs=[]):
                 pass
 
 
+@cache('header')
 def check_header(header, optional=False):
     echo('checking header {0}... '.format(header))
     with tempfile.NamedTemporaryFile(suffix='check-header.c') as temp:
@@ -288,10 +356,8 @@ def check_header(header, optional=False):
         name = header.upper().replace('.', '_').replace('/', '_')
         try:
             if _test_call(args):
-                os.environ['HAVE_{0}'.format(name)] = '1'
                 return True
 
-            os.environ['HAVE_{0}'.format(name)] = '0'
             return optional
         finally:
             try:
@@ -300,7 +366,8 @@ def check_header(header, optional=False):
                 pass
 
 
-def check_library(name, headers, optional=False):
+@cache('library')
+def check_library(name, headers):
     echo('checking library {0}... '.format(name))
     with tempfile.NamedTemporaryFile(suffix='check-library.c') as temp:
         headers = headers or []
@@ -321,11 +388,7 @@ def check_library(name, headers, optional=False):
         args.extend(shlex.split(os.environ.get('CFLAGS', '')))
         args.extend(shlex.split(os.environ.get('LDFLAGS', '')))
         try:
-            if _test_call(args):
-                os.environ['HAVE_LIB' + name.upper()] = '1'
-                return True
-            os.environ['HAVE_LIB' + name.upper()] = '0'
-            return optional
+            return _test_call(args)
         finally:
             try:
                 os.unlink(temp.name + '.o')
@@ -336,11 +399,7 @@ def check_library(name, headers, optional=False):
 def check_pkg_config(package):
     echo('checking package {0}... '.format(package))
     name = env_name(package)
-    if _test_call(['pkg-config', '--exists', package]):
-        os.environ['HAVE_{0}'.format(name.upper())] = '1'
-        return True
-    os.environ['HAVE_{0}'.format(name.upper())] = '0'
-    return False
+    return _test_call(['pkg-config', '--exists', package])
 
 
 def check_versions(name):
@@ -403,27 +462,38 @@ def configure(args):
         return False
 
     for binary, args in optional_binaries:
-        check_binary(binary, args)
+        have(binary, 0)
+        if check_binary(binary, args):
+            have(binary, 1)
 
     for header in required_headers:
         if not check_header(header):
             return False
+        have(header, 1)
 
     for header in optional_headers:
-        check_header(header, optional=True)
+        have(header, check_header(header))
 
     for define, headers, libraries in optional_defines:
         headers = headers or []
         libraries = libraries or []
-        if not check_define(define, headers, libraries):
-            return False
+        have(define, check_define(define, headers, libraries))
 
     for name, header in required_libraries:
         if not check_library(name, header):
             return False
+        have('lib' + name, True)
 
     for name, header in optional_libraries:
-        os.environ['have_{0}'.format(name)] = str(int(check_library(name, header)))
+        have('lib' + name, check_library(name, header))
+
+    for name, code, libs in optional_compiles:
+        have(name, check_compile(name, code, libs))
+
+    for name, code, libs in required_compiles:
+        if not check_compile(name, code, libs):
+            return False
+        have(name, True)
 
     lua_version = None
     os.environ['LUA_USE_PKG_CONFIG'] = '0'
@@ -432,22 +502,20 @@ def configure(args):
             if check_pkg_config(version):
                 lua_version = version
                 os.environ['LUA_USE_PKG_CONFIG'] = '1'
+                have(version, 1)
                 break
 
     if lua_version is None:
         for version in ('lua5.3', 'lua5.2', 'lua'):
             if check_library(version, ('lua.h',)):
                 lua_version = version
+                have(version, 1)
 
     if lua_version is None:
         echo('no suitable lua version could be found\n')
         return False
 
     os.environ['LUA_VERSION'] = lua_version
-
-    for name, code, libs in required_compiles:
-        if not check_compile(name, code, libs):
-            return False
 
     if not check_versions('versions'):
         return False
@@ -503,6 +571,9 @@ def run():
         LOG_FD.close()
 
     atexit.register(_close_log)
+
+    if not cache_load(args):
+        echo('configure cache load failed, see config.log for more details\n')
 
     if not configure(args):
         echo('configure failed, see config.log for more details\n')

@@ -1,4 +1,4 @@
-#include <dmr/config.h>
+#include <shared/config.h>
 #include <signal.h>
 #include "config.h"
 #include "script.h"

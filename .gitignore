@@ -1,4 +1,5 @@
 # Object files
+*.a
 *.o
 *.ko
 *.obj
@@ -37,8 +38,8 @@ src/cmd/noisebridge/noisebridge
 build/
 dist/
 doc/Doxyfile
-include/dmr/config.h
 include/dmr/version.h
 src/cmd/noisebridge/version.h
+src/shared/config.h
 Makefile
 config.log

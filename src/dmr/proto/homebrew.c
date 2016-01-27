@@ -12,7 +12,8 @@
 #include "dmr/proto.h"
 #include "dmr/proto/homebrew.h"
 #include "dmr/type.h"
-#include "sha256.h"
+#include "shared/sha256.h"
+#include "shared/uint.h"
 
 static const char *dmr_homebrew_proto_name = "homebrew";
 static const char hex[16] = "0123456789abcdef";
@@ -864,10 +865,10 @@ dmr_packet_t *dmr_homebrew_parse_packet(const uint8_t *data, ssize_t len)
     dmr_homebrew_data_t *dmrd = (dmr_homebrew_data_t *)data;
 
     packet->meta.sequence = dmrd->sequence;
-    packet->meta.stream_id = (dmrd->stream_id[3] << 24) | (dmrd->stream_id[2] << 16) | (dmrd->stream_id[1] << 8) | dmrd->stream_id[0];
-    packet->repeater_id = (dmrd->repeater_id[0] << 24) | (dmrd->repeater_id[1] << 16) | (dmrd->repeater_id[2] << 8) | dmrd->repeater_id[3];
-    packet->src_id = (dmrd->src_id[0] << 16) | (dmrd->src_id[1] << 8) | dmrd->src_id[2];
-    packet->dst_id = (dmrd->dst_id[0] << 16) | (dmrd->dst_id[1] << 8) | dmrd->dst_id[2];
+    packet->meta.stream_id = uint32_le(dmrd->stream_id);
+    packet->repeater_id = uint32(dmrd->repeater_id);
+    packet->src_id = uint24(dmrd->src_id);
+    packet->dst_id = uint24(dmrd->dst_id);
     packet->ts = (dmrd->type & 0x01);
     packet->flco = (dmrd->type & 0x02) >> 1;
     switch ((dmrd->type & 0x0c) >> 2) {

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "dmr/config.h"
+#include "shared/config.h"
 
 #if defined(WITH_MBELIB)
 

@@ -12,7 +12,6 @@ extern "C" {
 #include <errno.h>
 #include <stdarg.h>
 
-#include <dmr/config.h>
 #include <dmr/log.h>
 
 #define DMR_ERR_MAX_STRLEN  128

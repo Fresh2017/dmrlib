@@ -42,18 +42,18 @@ endif
 ifeq ($(BUILD_VERBOSE),1)
   quiet =
   Q =
+  QAR = $(AR)
   QCC = $(CC)
   QLD = $(CC)
   QMM = $(CC)
-  QRM = $(RM)
   QINSTALL = $(INSTALL)
 else
   quiet=quiet_
   Q = @
+  QAR = @printf "[\033[1;32mARCHIV\033[0m] %s\n" "$@"; $(AR)
   QCC = @printf "[\033[1;33m  CC  \033[0m] %s\n" "$@"; $(CC)
   QLD = @printf "[\033[1;32m LINK \033[0m] %s\n" "$@"; $(CC)
   QMM = @printf "[\033[1;34m DEPS \033[0m] %s\n" "$<"; $(CC)
-  QRM = @printf "[\033[1;31m  RM  \033[0m] %s\n" "$@"; $(RM)
   QINSTALL = @printf "[\033[1;32m COPY \033[0m] %s\n" "$^"; $(INSTALL)
 endif
 
@@ -92,7 +92,7 @@ BUILD   ?= {{ args.builddir }}
 CFLAGS  ?= {{ env.CFLAGS }}
 CFLAGS  += -Wall -Wextra -ffast-math
 CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
-CFLAGS  += -Iinclude -fPIC
+CFLAGS  += -Iinclude -Isrc -fPIC
 {% if args.with_debug -%}
 CFLAGS  += -g
 {% else -%}
@@ -100,9 +100,16 @@ CFLAGS  += -O2
 {% endif -%}
 LDFLAGS ?= {{ env.LDFLAGS }}
 
+SHARED_SOURCES 		 = $(wildcard src/shared/**/*.c src/shared/*.c)
+SHARED_OBJECTS 		 = $(patsubst %.c,%.o,$(SHARED_SOURCES))
+SHARED_DEPS 		 = $(patsubst %.c,%.d,$(SHARED_SOURCES))
+SHARED_CFLAGS 		 = $(CFLAGS)
+SHARED_ARCHIVE 		 = src/shared/libshared.a
+
 {% if args.with_mbelib -%}
 MBELIB_SOURCES       = $(wildcard src/mbelib/*.c)
 MBELIB_OBJECTS       = $(patsubst %.c,%.o,$(MBELIB_SOURCES))
+MBELIB_DEPS          = $(patsubst %.c,%.d,$(MBELIB_SOURCES))
 MBELIB_CFLAGS        = $(CFLAGS)
 MBELIB_LDFLAGS 		 = $(LDFLAGS) -shared
 MBELIB_LIBS 		 =
@@ -110,15 +117,18 @@ MBELIB_LIBS 		 =
 
 DMRLIB_SOURCES       = $(wildcard src/dmr/**/*.c src/dmr/*.c)
 DMRLIB_OBJECTS       = $(patsubst %.c,%.o,$(DMRLIB_SOURCES))
+DMRLIB_DEPS          = $(patsubst %.c,%.d,$(DMRLIB_SOURCES))
 DMRLIB_CFLAGS        = $(CFLAGS)
 DMRLIB_LDFLAGS       = $(LDFLAGS) -shared -Lsrc/mbelib
-DMRLIB_LIBS 		 = {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
+DMRLIB_LIBS 		+= $(SHARED_ARCHIVE)
+DMRLIB_LIBS 		+= {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
 ifeq ($(UNAME),Linux)
 DMRLIB_LIBS         += -lrt
 endif
 
 DMRDUMP_SOURCES      = $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      = $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))
+DMRDUMP_DEPS         = $(patsubst %.c,%.d,$(DMRDUMP_SOURCES))
 DMRDUMP_CFLAGS       = $(CFLAGS) -D_BSD_SOURCE
 DMRDUMP_LDFLAGS      = $(LDFLAGS) -Lsrc/dmr
 DMRDUMP_LIBS 		 = -lpthread -ltalloc -ldmr
@@ -130,6 +140,7 @@ DMRDUMP_LIBS 		+= -lpcap
 
 NOISEBRIDGE_SOURCES  = $(wildcard src/cmd/noisebridge/*.c)
 NOISEBRIDGE_OBJECTS  = $(patsubst %.c,%.o,$(NOISEBRIDGE_SOURCES))
+NOISEBRIDGE_DEPS     = $(patsubst %.c,%.d,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS) -Lsrc/dmr
 NOISEBRIDGE_LIBS     = -ldmr -lpthread -ltalloc
@@ -145,6 +156,8 @@ NOISEBRIDGE_LIBS 	+= -lportaudio
 {% endif -%}
 
 TEST_SOURCES 		 = $(wildcard test/test_*.c)
+TEST_OBJECTS 		 = $(patsubst %.c,%.o,$(TEST_SOURCES))
+TEST_DEPS 			 = $(patsubst %.c,%.d,$(TEST_SOURCES))
 TEST_PROGRAMS 		 = $(patsubst %.c,%.test,$(TEST_SOURCES))
 TEST_CFLAGS 		 = $(CFLAGS)
 TEST_LDFLAGS  		 = $(LDFLAGS) -Lsrc/dmr
@@ -160,7 +173,7 @@ all: build
 
 debug: build-debug
 
-build: {% if args.with_mbelib %} build-mbelib{% endif %} build-dmrlib build-cmd
+build: build-shared {% if args.with_mbelib %} build-mbelib{% endif %} build-dmrlib build-cmd
 
 build-debug: FLAGS += DEBUG=1
 build-debug: build
@@ -169,11 +182,36 @@ install-dir:
 	$(INSTALL) -m0755 -d $(BINDIR)
 	$(INSTALL) -m0755 -d $(LIBDIR)
 
-install: install-dir{% if args.with_mbelib %} install-mbelib{% endif %} install-dmrlib install-cmd
-
-clean:{% if args.with_mbelib %} clean-mbelib{% endif %} clean-dmrlib clean-cmd clean-test
+install: install-dir {% if args.with_mbelib %}install-mbelib {% endif %}install-dmrlib install-cmd
 
 test: test-all
+
+clean: clean-shared {% if args.with_mbelib %}clean-mbelib {% endif %}clean-dmrlib clean-cmd clean-test
+
+#
+# shared/
+#
+
+src/shared/libshared.a: $(SHARED_OBJECTS)
+	$(QAR) -rcs $@ $^
+
+build-shared: $(SHARED_ARCHIVE)
+
+src/shared/%.o: src/shared/%.c
+src/shared/%.o: src/shared/%.c src/shared/%.d
+	$(QCC) -c $(SHARED_CFLAGS) -o $@ $<
+
+src/shared/%.d: src/shared/%.c
+	$(QMM) -MM $(DEPFLAGS) $(SHARED_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
+
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),clean-shared)
+-include $(patsubst %.o,%.d,$(SHARED_OBJECTS))
+endif
+endif
+
+clean-shared:
+	$(Q)for file in $(SHARED_ARCHIVE) $(SHARED_OBJECTS) $(SHARED_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 {% if args.with_mbelib -%}
 
@@ -184,7 +222,7 @@ test: test-all
 src/mbelib/libmbe$(SHLIBEXT): $(MBELIB_OBJECTS)
 	$(QLD) $(MBELIB_CFLAGS) -shared -o $@ -fPIC $^ $(MBELIB_LIBS)
 
-build-mbelib: src/mbelib/libmbe$(SHLIBEXT)
+build-mbelib: $(SHARED_ARCHIVE) src/mbelib/libmbe$(SHLIBEXT)
 
 src/mbelib/%.o: src/mbelib/%.c
 src/mbelib/%.o: src/mbelib/%.c src/mbelib/%.d
@@ -193,8 +231,14 @@ src/mbelib/%.o: src/mbelib/%.c src/mbelib/%.d
 src/mbelib/%.d: src/mbelib/%.c
 	$(QMM) -MM $(DEPFLAGS) $(MBELIB_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),clean-mbelib)
+-include $(patsubst %.o,%.d,$(MBELIB_OBJECTS))
+endif
+endif
+
 clean-mbelib:
-	$(QRM) src/mbelib/*.{d,o,so} || true
+	$(Q)for file in src/mbelib/libmbe$(SHLIBEXT) $(MBELIB_OBJECTS) $(MBELIB_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 {%- endif %}
 
@@ -202,7 +246,7 @@ clean-mbelib:
 # lib/dmrlib
 #
 
-build-dmrlib: src/dmr/libdmr$(SHLIBEXT)
+build-dmrlib: $(SHARED_ARCHIVE) src/dmr/libdmr$(SHLIBEXT)
 
 src/dmr/libdmr$(SHLIBEXT): $(DMRLIB_OBJECTS)
 	$(QLD) $(DMRLIB_LDFLAGS) -shared -o $@ -fPIC $^ $(DMRLIB_LIBS)
@@ -214,13 +258,17 @@ src/dmr/%.o: src/dmr/%.c src/dmr/%.d
 src/dmr/%.d: src/dmr/%.c
 	$(QMM) -MM $(DEPFLAGS) $(DMRLIB_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),clean-dmrlib)
 -include $(patsubst %.o,%.d,$(DMRLIB_OBJECTS))
+endif
+endif
 
 install-dmrlib: src/dmr/libdmr$(SHLIBEXT)
 	$(QINSTALL) -m0644 src/dmr/libdmr$(SHLIBEXT) $(LIBDIR)/libdmr$(SHLIBEXT)
 
 clean-dmrlib:
-	$(QRM) src/dmr/*.{d,o,so} src/dmr/*/*.{d,o} || true
+	$(Q)for file in src/dmrlib/libdmr$(SHLIBEXT) $(DMRLIB_OBJECTS) $(DMRLIB_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 #
 # bin/*
@@ -236,7 +284,7 @@ clean-cmd: clean-dmrdump clean-noisebridge
 # bin/dmrdump
 #
 
-build-dmrdump: src/cmd/dmrdump/dmrdump
+build-dmrdump: $(SHARED_ARCHIVE) src/cmd/dmrdump/dmrdump
 
 src/cmd/dmrdump/dmrdump: $(DMRDUMP_OBJECTS)
 	$(QLD) $(DMRDUMP_LDFLAGS) -o $@ $^ $(DMRDUMP_LIBS)
@@ -248,19 +296,24 @@ src/cmd/dmrdump/%.o: src/cmd/dmrdump/%.c src/cmd/dmrdump/%.d
 src/cmd/dmrdump/%.d: src/cmd/dmrdump/%.c
 	$(QMM) -MM $(DEPFLAGS) $(DMRLIB_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),clean-dmrdump)
 -include $(patsubst %.o,%.d,$(DMRDUMP_OBJECTS))
+endif
+endif
 
 install-dmrdump: src/cmd/dmrdump/dmrdump
 	$(QINSTALL) -m0755 $< $(BINDIR)/dmrdump
 
 clean-dmrdump:
-	$(QRM) src/cmd/dmrdump/*.{d,o} src/cmd/dmrdump/dmrdump || true
+	$(Q)for file in src/cmd/dmrdump/dmrdump $(DMRDUMP_OBJECTS) $(DMRDUMP_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
+
 
 #
 # bin/noisebridge
 #
 
-build-noisebridge: src/cmd/noisebridge/noisebridge
+build-noisebridge: $(SHARED_ARCHIVE) src/cmd/noisebridge/noisebridge
 
 src/cmd/noisebridge/noisebridge: $(NOISEBRIDGE_OBJECTS)
 	$(QLD) $(NOISEBRIDGE_LDFLAGS) -o $@ $^ $(NOISEBRIDGE_LIBS)
@@ -272,19 +325,21 @@ src/cmd/noisebridge/%.o: src/cmd/noisebridge/%.c src/cmd/noisebridge/%.d
 src/cmd/noisebridge/%.d: src/cmd/noisebridge/%.c
 	$(QMM) -MM $(DEPFLAGS) $(NOISEBRIDGE_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(patsubst %.o,%.d,$(NOISEBRIDGE_OBJECTS))
+endif
 
 install-noisebridge: src/cmd/noisebridge/noisebridge
 	$(QINSTALL) -m0755 $< $(BINDIR)/noisebridge
 
 clean-noisebridge:
-	$(QRM) src/cmd/noisebridge/*.{d,o} src/cmd/noisebridge/noisebridge || true
+	$(Q)for file in src/cmd/noisebridge/noisebridge $(NOISEBRIDGE_OBJECTS) $(NOISEBRIDGE_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 #
 # tests
 #
 
-test-all: .force src/dmr/libdmr$(SHLIBEXT) $(TEST_PROGRAMS) test-run
+test-all: .force $(SHARED_ARCHIVE) src/dmr/libdmr$(SHLIBEXT) $(TEST_PROGRAMS) test-run
 
 test/%.test: test/%.o
 	$(QLD) $(TEST_LDFLAGS) -o $@ $^ $(TEST_LIBS)
@@ -300,6 +355,6 @@ test-run: .force $(TEST_PROGRAMS)
 	@for test in $(TEST_PROGRAMS); do printf "[\033[1;37m TEST \033[0m] %s\n" "$$test"; $$test; done
 
 clean-test:
-	$(QRM) $(TEST_PROGRAMS) || true
+	$(Q)for file in $(TEST_PROGRAMS) $(TEST_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 .force:

@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-#include <dmr/config.h>
 #include <dmr/bits.h>
 #include <dmr/type.h>
 

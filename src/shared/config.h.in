@@ -9,7 +9,7 @@
 {% endif %}
 
 {% if args.with_dmalloc -%}
-#ifndef WITH_DMALLOC
+#if !defined(WITH_DMALLOC)
 #define WITH_DMALLOC
 #endif
 #include <string.h>
@@ -19,7 +19,7 @@
 {% endif %}
 
 {% if args.with_mbelib -%}
-#ifndef WITH_MBELIB
+#if !defined(WITH_MBELIB)
 #define WITH_MBELIB
 #endif
 {% else -%}
@@ -27,12 +27,12 @@
 {% endif %}
 
 {% for key, value in env.items()|sort %}{% if key.startswith('HAVE_') and value == '1' -%}
-#ifndef {{ key }}
+#if !defined({{ key }})
 #define {{ key }}
 #endif
 
 {% endif %}{% endfor %}
-#ifdef HAVE_LIBPTHREAD
+#if !defined(HAVE_LIBPTHREAD)
 #define DMR_HAVE_PTHREAD
 #endif
 

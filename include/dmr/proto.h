@@ -13,7 +13,6 @@ extern "C" {
 #include <stddef.h>
 
 #include <dmr/error.h>
-#include <dmr/config.h>
 #include <dmr/platform.h>
 #include <dmr/type.h>
 #include <dmr/thread.h>

@@ -35,7 +35,9 @@ static int maildirmake(char *path)
 		ret = mkdir(maildirs[i], 0700);
 		if (ret != 0 && errno != EEXIST) {
 			dmr_log_error("sms: mkdir \"%s/%s\": %s", path, maildirs[i], strerror(errno));
-			chdir(wd);
+			if (chdir(wd) != 0) {
+				dmr_log_error("sms: chdir \"%s\": %s", wd, strerror(errno));
+			}
 			return ret;
 		}
 		ret = 0;
@@ -119,7 +121,7 @@ static void sms_proto_tx(void *smsptr, dmr_packet_t *packet)
 	    	}
 	    	default:
 	    		break;
-    	}    		
+    	}
     	break;
     }
     case DMR_DATA_TYPE_RATE34_DATA: {

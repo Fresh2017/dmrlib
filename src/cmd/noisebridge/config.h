@@ -5,7 +5,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <dmr/config.h>
+#include <shared/config.h>
 #include <dmr/proto.h>
 #include <dmr/proto/homebrew.h>
 #if defined(WITH_MBELIB)

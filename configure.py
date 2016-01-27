@@ -269,11 +269,13 @@ def check_compiler(bin):
 def check_compile(description, filename, libs=[]):
     echo('checking for {0}... '.format(description))
     log('test program from: {0}\n'.format(filename))
-    with tempfile.NamedTemporaryFile(suffix='check-compile.c') as temp:
+    fd, temp = tempfile.mkstemp(suffix='check-compile.o')
+    os.close(fd)
+    try:
         args = [
             os.environ['CC'],
             '-o',
-            temp.name,
+            temp,
             filename
         ] + shlex.split(os.environ.get('CFLAGS', ''))
         for lib in libs:
@@ -284,7 +286,7 @@ def check_compile(description, filename, libs=[]):
         code = _test_call_code(args)
         if code == 0:
             # Compilation success, now run
-            code = _test_call_code([temp.name])
+            code = _test_call_code([temp])
             if code == 0:
                 echo('yes\n')
                 return True
@@ -292,6 +294,8 @@ def check_compile(description, filename, libs=[]):
         echo('no\n')
         log('failed with exit code {0}'.format(code))
         return False
+    finally:
+        os.unlink(temp)
 
 
 @cache('define')

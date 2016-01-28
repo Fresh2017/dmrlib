@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "shared/config.h"
+#include "common/config.h"
 
 #if defined(WITH_MBELIB)
 

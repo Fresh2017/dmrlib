@@ -11,10 +11,10 @@
 #include <dmr/payload/lc.h>
 #include <dmr/fec/vbptc_16_11.h>
 
-#define DMR_EMB_LCSS_SINGLE_FRAGMENT                0b00
-#define DMR_EMB_LCSS_FIRST_FRAGMENT                 0b01
-#define DMR_EMB_LCSS_LAST_FRAGMENT                  0b10
-#define DMR_EMB_LCSS_CONTINUATION                   0b11
+#define DMR_EMB_LCSS_SINGLE_FRAGMENT                0x00
+#define DMR_EMB_LCSS_FIRST_FRAGMENT                 0x01
+#define DMR_EMB_LCSS_LAST_FRAGMENT                  0x02
+#define DMR_EMB_LCSS_CONTINUATION                   0x03
 typedef uint8_t dmr_emb_lcss_t;
 
 typedef struct {

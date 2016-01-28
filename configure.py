@@ -18,17 +18,24 @@ from functools import wraps
 from jinja2 import Environment, FileSystemLoader
 
 
+platform = sys.platform
+if platform == 'linux2':
+    platform = 'linux'
+
+
 option_defaults = (
-    ('config-cache', 'Configure cache',       'path', 'config.cache'),
-    ('prefix',       'Install prefix',        'path', '/usr/local'),
-    ('builddir',     'Build directory',       'path', '{pwd}/build'),
-    ('with-debug',   'Enable debug features', 'bool', False),
-    ('with-mbelib',  'Enable mbelib support', 'bool', False),
+    ('config-cache',  'Configure cache',       'path',     'config.cache'),
+    ('cross-compile', 'Cross compiler',        'prefix',   ''),
+    ('cross-execute', 'Cross executer',        'command',  ''),
+    ('platform',      'Target platform',       'name',     platform),
+    ('prefix',        'Install prefix',        'path',     '/usr/local'),
+    ('builddir',      'Build directory',       'path',     '{pwd}/build'),
+    ('with-debug',    'Enable debug features', 'bool',     False),
+    ('with-mbelib',   'Enable mbelib support', 'bool',     False),
 )
 
-env_defaults = {
-    'CC':     'gcc',
-}
+os.environ.setdefault('CROSS_COMPILE', '')
+os.environ.setdefault('CC', os.environ.get('CROSS_COMPILE') + 'gcc')
 
 required_headers = (
     'ctype.h',
@@ -55,9 +62,9 @@ optional_headers = (
 required_libraries = (
     ('m',      'math.h'),
     ('talloc', 'talloc.h'),
-    ('pcap',   'pcap.h'),
 )
 optional_libraries = (
+    ('bsd',       'bsd/bsd.h'),
     ('portaudio', 'portaudio.h'),
     ('proc',      'libproc.h'),
 )
@@ -72,31 +79,34 @@ optional_binaries = (
 )
 
 optional_compiles = (
-    ('inline',        os.path.join('test', 'have_inline.c'), []),
-    ('restrict',      os.path.join('test', 'have_restrict.c'), []),
-    ('libc ipv6',     os.path.join('test', 'have_libc_ipv6.c'), []),
-    ('libc scope_id', os.path.join('test', 'have_libc_scope_id.c'), []),
-    ('epoll',         os.path.join('test', 'have_epoll.c'), []),
-    ('/dev/epoll',    os.path.join('test', 'have_dev_epoll.c'), []),
-    ('kqueue',        os.path.join('test', 'have_kqueue.c'), []),
-    ('poll',          os.path.join('test', 'have_poll.c'), []),
-    ('select',        os.path.join('test', 'have_select.c'), []),
+    # Compiler specific
+    ('mingw',           os.path.join('test', 'have_mingw.c'), []),
+    ('inline',          os.path.join('test', 'have_inline.c'), []),
+    ('restrict',        os.path.join('test', 'have_restrict.c'), []),
+    ('binary literals', os.path.join('test', 'have_binary_literals.c'), []),
+    # Libc
+    ('libc ipv6',       os.path.join('test', 'have_libc_ipv6.c'), []),
+    ('libc scope_id',   os.path.join('test', 'have_libc_scope_id.c'), []),
+    # Functions
+    ('if_indextoname',  os.path.join('test', 'have_if_indextoname.c'), []),
+    ('getline',         os.path.join('test', 'have_getline.c'), []),
+    ('strtok_r',        os.path.join('test', 'have_strtok_r.c'), []),
+    # Types
+    ('socklen_t',       os.path.join('test', 'have_socklen_t.c'), []),
+    # Multiplexing
+    ('epoll',           os.path.join('test', 'have_epoll.c'), []),
+    ('/dev/epoll',      os.path.join('test', 'have_dev_epoll.c'), []),
+    ('kqueue',          os.path.join('test', 'have_kqueue.c'), []),
+    ('poll',            os.path.join('test', 'have_poll.c'), []),
+    ('select',          os.path.join('test', 'have_select.c'), []),
 )
 required_compiles = ()
 
-if sys.platform in ('darwin', 'linux', 'linux2'):
-    required_libraries += (('pthread', 'pthread.h'),)
-
-elif sys.platform == 'win32':
-    required_headers += ('windows.h',)
-    required_libraries += (
-        ('ws2_32', 'winsock2.h'),
-    )
-
 generated_files = (
+    os.path.join('include', 'dmr', 'config.h'),
     os.path.join('include', 'dmr', 'version.h'),
     os.path.join('src', 'cmd', 'noisebridge', 'version.h'),
-    os.path.join('src', 'shared', 'config.h'),
+    os.path.join('src', 'common', 'config.h'),
 )
 
 
@@ -198,15 +208,39 @@ def _test_call(args):
         return True
 
 
-def check_platform():
+def _unlink(filename):
+    try:
+        os.unlink(filename)
+    except:
+        pass
+
+
+def check_platform(args):
+    global required_headers
     global required_libraries
 
     echo('checking platform... {}... '.format(sys.platform))
-    if sys.platform in ('linux', 'linux2'):
-        required_libraries += (('bsd', None),)
+    if args.platform in ('darwin', 'linux'):
+        required_libraries += (
+            ('pthread', 'pthread.h'),
+            ('pcap',    'pcap.h'),
+        )
+        os.environ['LIBPCAP_NAME'] = 'pcap'
+
+    if args.platform == 'linux':
+        os.environ['BINEXT'] = ''
+        os.environ['ARLIBPRE'] = 'lib'
+        os.environ['ARLIBEXT'] = '.a'
+        os.environ['SHLIBPRE'] = 'lib'
+        os.environ['SHLIBEXT'] = '.so'
         echo('ok\n')
 
-    elif sys.platform == 'darwin':
+    elif args.platform == 'darwin':
+        os.environ['BINEXT'] = ''
+        os.environ['ARLIBPRE'] = 'lib'
+        os.environ['ARLIBEXT'] = '.a'
+        os.environ['SHLIBPRE'] = 'lib'
+        os.environ['SHLIBEXT'] = '.dylib'
         echo('ok\n')
         have_pkg_manager = False
 
@@ -214,8 +248,8 @@ def check_platform():
             for brew in ('/usr/local', '/opt/brew', '/opt/homebrew'):
                 if os.access(os.path.join(brew, 'bin/brew'), os.X_OK):
                     echo('enabling Homebrew (http://brew.sh/) support in {0}...\n'.format(brew))
-                    env_append('CFLAGS', '-I' + brew)
-                    env_append('LDFLAGS', '-L' + brew)
+                    env_append('CFLAGS', '-I{0}/include'.format(brew))
+                    env_append('LDFLAGS', '-L{0}/lib'.format(brew))
                     have_pkg_manager = True
                     break
 
@@ -223,8 +257,8 @@ def check_platform():
             for base in ('/opt/mports', '/opt/macports', '/opt/local'):
                 if os.path.isdir(base):
                     echo('enabling MacPorts (https://www.macports.org) support in {0}...\n'.format(base))
-                    env_append('CFLAGS', '-I' + base)
-                    env_append('LDFLAGS', '-L' + base)
+                    env_append('CFLAGS', '-I{0}/include'.format(base))
+                    env_append('LDFLAGS', '-L{0}/lib'.format(base))
                     have_pkg_manager = True
                     break
 
@@ -232,6 +266,22 @@ def check_platform():
             echo('no package manager was detected, it is highly recommended to get either:\n')
             echo(' - Homebrew, see http://brew.sh/\n')
             echo(' - MacPorts, see https://www.macports.org/\n')
+
+    elif args.platform in ('win32', 'win64'):
+        os.environ['BINEXT'] = '.exe'
+        os.environ['ARLIBPRE'] = 'lib'
+        os.environ['ARLIBEXT'] = '.a'
+        os.environ['SHLIBPRE'] = ''
+        os.environ['SHLIBEXT'] = '.dll'
+        env_append('CFLAGS', '-I' + os.path.join('support', 'windows', 'wpcap', 'Include'))
+        env_append('LDFLAGS', '-L' + os.path.join('support', 'windows', 'wpcap', 'Lib'))
+        os.environ['LIBPCAP_NAME'] = 'wpcap'
+
+        required_headers += ('windows.h',)
+        required_libraries += (
+            ('ws2_32', 'winsock2.h'),
+            ('wpcap',  ('pcap.h', 'Packet32.h')),
+        )
 
     else:
         echo('not supported\n'.format(sys.platform))
@@ -249,20 +299,20 @@ def check_binary(binary, args=(), optional=False):
     return False
 
 
-def check_compiler(bin):
-    echo('checking compiler {0}... '.format(bin))
+def check_compiler(binary):
+    echo('checking compiler {0}... '.format(binary))
     with tempfile.NamedTemporaryFile(suffix='check-compiler.c') as temp:
-        temp.write('int main(int argc, char **argv) { return 0; }')
+        temp.write('int main() { return 0; }\n\n')
         temp.flush()
         temp.seek(0)
-        log('test program:\n{0}\n'.format(temp.read()))
+        log('test program ({0}):\n{1}\n'.format(binary, temp.read()))
         if _test_call([
-                bin,
+                binary,
                 '-o',
                 temp.name + '.o',
                 temp.name,
             ]):
-            os.environ['CC'] = bin
+            os.environ['CC'] = binary
             return True
 
 
@@ -296,7 +346,7 @@ def check_compile(description, filename, libs=[]):
         log('failed with exit code {0}'.format(code))
         return False
     finally:
-        os.unlink(temp)
+        _unlink(temp)
 
 
 @cache('define')
@@ -337,10 +387,7 @@ def check_define(define, headers=[], libs=[]):
             log('failed with exit code {0}'.format(code))
             return False
         finally:
-            try:
-                os.unlink(temp.name + '.o')
-            except:
-                pass
+            _unlink(temp.name + '.o')
 
 
 @cache('header')
@@ -348,7 +395,7 @@ def check_header(header, optional=False):
     echo('checking header {0}... '.format(header))
     with tempfile.NamedTemporaryFile(suffix='check-header.c') as temp:
         temp.write('#include <{0}>\n'.format(header))
-        temp.write('int main(int argc, char **argv) { return 0; }')
+        temp.write('int main() { return 0; }\n\n')
         temp.seek(0)
         log('test program:\n{0}\n'.format(temp.read()))
         args = [
@@ -365,10 +412,7 @@ def check_header(header, optional=False):
 
             return optional
         finally:
-            try:
-                os.unlink(temp.name + '.o')
-            except:
-                pass
+            _unlink(temp.name + '.o')
 
 
 @cache('library')
@@ -380,7 +424,7 @@ def check_library(name, headers):
             headers = (headers,)
         for header in headers:
             temp.write('#include <{0}>\n'.format(header))
-        temp.write('int main(int argc, char **argv) { return 0; }')
+        temp.write('int main() { return 0; }\n\n')
         temp.seek(0)
         log('test program:\n{0}\n'.format(temp.read()))
         args = [
@@ -395,10 +439,7 @@ def check_library(name, headers):
         try:
             return _test_call(args)
         finally:
-            try:
-                os.unlink(temp.name + '.o')
-            except:
-                pass
+            _unlink(temp.name + '.o')
 
 
 def check_pkg_config(package):
@@ -460,10 +501,10 @@ def write_makefile(args):
 
 def configure(args):
     # Run checks
-    if not check_platform():
+    if not check_platform(args):
         return False
 
-    if not check_compiler(os.environ.get('CC', env_defaults['CC'])):
+    if not check_compiler(os.environ.get('CC')):
         return False
 
     for binary, args in optional_binaries:
@@ -559,10 +600,13 @@ def run():
                 '--{0}'.format(key),
                 default=default,
                 metavar=kind,
-                help=desc + ' (default: {0})'.format(default),
+                help=desc + ' (default: {0})'.format(default) if default else desc,
             )
 
     args = parser.parse_args()
+
+    if args.cross_compile:
+        os.environ['CROSS_COMPILE'] = args.cross_compile + '-'
 
     LOG_FD = open('config.log', 'wb')
     LOG_FD.write('{0} starting {1} {2}\n'.format(

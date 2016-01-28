@@ -223,8 +223,6 @@ void dmr_log_messagev(dmr_log_priority_t priority, const char *fmt, va_list ap)
     free(msg);
 }
 
-typedef void (*dmr_log_cb_t)(void *mem, dmr_log_priority_t priority, const char *msg);
-
 void dmr_log_cb_get(dmr_log_cb_t *cb, void **mem)
 {
     if (cb)

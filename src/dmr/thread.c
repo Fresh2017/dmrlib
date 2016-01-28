@@ -753,6 +753,8 @@ void dmr_thread_yield(void)
 int dmr_thread_name(char *buf, size_t len)
 {
 #if defined(_DMR_THREAD_WIN32_)
+    DMR_UNUSED(buf);
+    DMR_UNUSED(len);
     return 0;
 #else
     return pthread_getname_np(dmr_thread_current(), buf, len);
@@ -762,6 +764,7 @@ int dmr_thread_name(char *buf, size_t len)
 int dmr_thread_name_set(char *buf)
 {
 #if defined(_DMR_THREAD_WIN32_)
+    DMR_UNUSED(buf);
     return 0;
 #elif defined(_DMR_THREAD_MAC_)
     return pthread_setname_np(buf);

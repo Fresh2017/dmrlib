@@ -9,10 +9,18 @@
 #include "dmr/log.h"
 #include "dmr/payload/data.h"
 #include "dmr/proto/sms.h"
+#include "dmr/platform.h"
 
 static char *default_inbox = "";
 static char *default_outbox = "outbox";
 static char *maildirs[] = {"cur", "new", "tmp", NULL};
+
+#if defined(DMR_PLATFORM_WINDOWS)
+#define __mkdir(path, mode) mkdir(path)
+#define realpath(src, dst)  strncpy(dst, src, PATH_MAX)
+#else
+#define __mkdir mkdir
+#endif
 
 static int maildirmake(char *path)
 {
@@ -22,7 +30,7 @@ static int maildirmake(char *path)
 		dmr_log_error("sms: can't get current working directory: %s", strerror(errno));
 		return ret;
 	}
-	ret = mkdir(path, 0700);
+	ret = __mkdir(path, 0700);
 	if (ret != 0 && errno != EEXIST) {
 		dmr_log_error("sms: mkdir \"%s\": %s", path, strerror(errno));
 		return ret;
@@ -32,7 +40,7 @@ static int maildirmake(char *path)
 		return ret;
 	}
 	for (i = 0; maildirs[i] != NULL; i++) {
-		ret = mkdir(maildirs[i], 0700);
+		ret = __mkdir(maildirs[i], 0700);
 		if (ret != 0 && errno != EEXIST) {
 			dmr_log_error("sms: mkdir \"%s/%s\": %s", path, maildirs[i], strerror(errno));
 			if (chdir(wd) != 0) {

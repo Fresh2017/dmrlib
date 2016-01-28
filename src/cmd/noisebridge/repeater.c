@@ -1,4 +1,4 @@
-#include <shared/config.h>
+#include <common/config.h>
 #include <signal.h>
 #include "config.h"
 #include "script.h"

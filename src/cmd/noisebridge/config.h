@@ -5,7 +5,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <shared/config.h>
 #include <dmr/proto.h>
 #include <dmr/proto/homebrew.h>
 #if defined(WITH_MBELIB)
@@ -13,6 +12,7 @@
 #endif
 #include <dmr/proto/mmdvm.h>
 #include <dmr/proto/repeater.h>
+#include "common/config.h"
 
 #define NOISEBRIDGE_MAX_PROTOS 16
 
@@ -57,6 +57,13 @@ typedef struct {
     size_t          protos;
     parse_section_t section;
 } config_t;
+
+#if !defined(HAVE_GETLINE)
+size_t getline(char **lineptr, size_t *n, FILE *stream);
+#endif
+#if !defined(HAVE_STRTOK_R)
+char* strtok_r(char *str, const char *delim, char **nextp);
+#endif
 
 int init_config(char *filename);
 config_t *load_config(void);

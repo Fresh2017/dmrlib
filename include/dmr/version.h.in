@@ -22,3 +22,4 @@ extern "C" {
 #endif
 
 #endif // _DMR_VERSION_H
+

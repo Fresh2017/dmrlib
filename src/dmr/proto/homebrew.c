@@ -12,8 +12,8 @@
 #include "dmr/proto.h"
 #include "dmr/proto/homebrew.h"
 #include "dmr/type.h"
-#include "shared/sha256.h"
-#include "shared/uint.h"
+#include "common/sha256.h"
+#include "common/uint.h"
 
 static const char *dmr_homebrew_proto_name = "homebrew";
 static const char hex[16] = "0123456789abcdef";

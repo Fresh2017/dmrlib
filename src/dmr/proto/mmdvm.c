@@ -107,7 +107,7 @@ static int mmdvm_proto_start_thread(void *modemptr)
             //dmr_mmdvm_get_status(modem);
             gettimeofday(modem->last_status_requested, NULL);
         }
-            
+
         switch (dmr_mmdvm_poll(modem)) {
         case dmr_mmdvm_error:
             dmr_log_critical("mmdvm: stop on error: %s", strerror(modem->error));
@@ -197,7 +197,7 @@ static void mmdvm_proto_tx(void *modemptr, dmr_packet_t *packet)
     }
     */
     if (dmr_mmdvm_send(modem, packet) != 0) {
-        dmr_log_error("mmdvm: send: %s", dmr_error_get());   
+        dmr_log_error("mmdvm: send: %s", dmr_error_get());
     }
 }
 
@@ -441,7 +441,7 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
         case DMR_MMDVM_DMR_LOST2:
             ts = (modem->buffer[3] & DMR_MMDVM_DMR_TS) > 0 ? DMR_TS2 : DMR_TS1;
             dmr_log_debug("mmdvm: DMR lost %u", dmr_ts_name(ts));
-            
+
             // Expire our last packet received and run the timeout handler.
             modem->dmr_ts[ts].last_packet_received.tv_sec = 0;
             break;
@@ -622,7 +622,7 @@ int dmr_mmdvm_send(dmr_mmdvm_t *modem, dmr_packet_t *packet)
         //modem->last_mode = DMR_MMDVM_MODE_INVALID;
         break;
     */
-        
+
     default:
         if (packet->data_type == DMR_DATA_TYPE_TERMINATOR_WITH_LC && (modem->flags & DMR_MMDVM_HAS_DMR_EOT)) {
             buf[0] = DMR_MMDVM_FRAME_START;
@@ -817,17 +817,17 @@ bool dmr_mmdvm_set_config(dmr_mmdvm_t *modem)
     };
 
     if (modem->config.rx_invert)
-        buffer[3] |= 0b001;
+        buffer[3] |= 0x01;
     if (modem->config.tx_invert)
-        buffer[3] |= 0b010;
+        buffer[3] |= 0x02;
     if (modem->config.ptt_invert)
-        buffer[3] |= 0b100;
+        buffer[3] |= 0x04;
     if (modem->config.enable_dstar)
-        buffer[4] |= 0b001;
+        buffer[4] |= 0x01;
     if (modem->config.enable_dmr)
-        buffer[4] |= 0b010;
+        buffer[4] |= 0x02;
     if (modem->config.enable_ysf)
-        buffer[4] |= 0b100;
+        buffer[4] |= 0x04;
 
     return dmr_serial_write(modem->fd, &buffer, 10) == 10;
 }

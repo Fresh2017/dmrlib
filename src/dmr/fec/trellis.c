@@ -110,13 +110,13 @@ int dmr_trellis_rate_34_decode(uint8_t bytes[18], dmr_packet_t *packet)
 	memset(info, 0, sizeof(info));
 	for (i = 0; i < 144; i += 3) {
 		o = i / 3;
-		if ((tribits[o] & 0b100) > 0) {
+		if ((tribits[o] & 0x04) > 0) {
 			bits[i + 0] = true;
 		}
-		if ((tribits[o] & 0b010) > 0) {
+		if ((tribits[o] & 0x02) > 0) {
 			bits[i + 1] = true;
 		}
-		if ((tribits[o] & 0b001) > 0) {
+		if ((tribits[o] & 0x01) > 0) {
 			bits[i + 2] = true;
 		}
 	}

@@ -563,7 +563,7 @@ def configure(args):
         return False
 
     for var in ('CC', 'CROSS_COMPILE', 'CFLAGS', 'LDFLAGS'):
-        log('env: {0}={1}'.format(var, os.environ.get(var, ''))
+        log('env: {0}={1}'.format(var, os.environ.get(var, '')))
 
     if not check_compiler(os.environ.get('CC')):
         return False

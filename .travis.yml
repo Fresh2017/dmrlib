@@ -53,6 +53,7 @@ cache: apt
 before_install:
   - echo "LUA=$LUA, OSX=$OSX"
   - if [ "$LUA" != "x" ]; then source .travis/setenv_lua.sh; fi
+  - if [ "$OSX" != "x" ]; then brew update; fi
   - if [ "$OSX" != "x" ]; then brew install lua libpcap python talloc portaudio; fi
   - if [ "$OSX" != "x" ]; then pip install --upgrade pip; fi
   - if [ "$OSX" != "x" ]; then pip install Jinja2; fi

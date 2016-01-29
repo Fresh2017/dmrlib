@@ -46,6 +46,7 @@ addons:
       - mingw32
       - mingw32-runtime
       - python-jinja2
+      - wine
 
 cache: apt
 

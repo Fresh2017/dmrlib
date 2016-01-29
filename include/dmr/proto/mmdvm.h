@@ -6,6 +6,7 @@
 #ifndef _DMR_PROTO_MMDVM
 #define _DMR_PROTO_MMDVM
 
+#include <dmr/config.h>
 #include <dmr/platform.h>
 
 #include <inttypes.h>
@@ -23,7 +24,10 @@
 #include <dmr/thread.h>
 #include <dmr/proto.h>
 #include <dmr/thread.h>
-#include <dmr/serial.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 #define DMR_MMDVM_BAUD_RATE     115200
 
@@ -132,12 +136,12 @@ typedef struct __attribute__((packed)) {
 
 typedef struct {
     dmr_proto_t       proto;
-    dmr_serial_t      fd;
     dmr_mmdvm_model_t model;
     uint16_t          flags;
     int               error;
     long              baud;
     char              *port;
+    void              *serial;      /* internal serial port struct */
     uint8_t           buffer[200];  /* receive buffer */
     dmr_packet_t      **queue;      /* send buffer */
     size_t            queue_size;
@@ -181,19 +185,23 @@ typedef struct {
     dmr_ts_t last_dmr_ts;
 } dmr_mmdvm_t;
 
-extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, dmr_mmdvm_model_t model);
-extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
-extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
-extern int dmr_mmdvm_send(dmr_mmdvm_t *modem, dmr_packet_t *packet);
-extern int dmr_mmdvm_queue(dmr_mmdvm_t *modem, dmr_packet_t *packet_out);
-extern dmr_packet_t *dmr_mmdvm_queue_shift(dmr_mmdvm_t *modem);
-extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, struct timeval *timeout, int retries);
-extern bool dmr_mmdvm_get_status(dmr_mmdvm_t *modem);
-extern bool dmr_mmdvm_get_version(dmr_mmdvm_t *modem);
-extern bool dmr_mmdvm_set_config(dmr_mmdvm_t *modem);
-extern bool dmr_mmdvm_set_mode(dmr_mmdvm_t *modem, uint8_t mode);
-extern bool dmr_mmdvm_set_rf_config(dmr_mmdvm_t *modem, uint32_t rx_freq, uint32_t tx_freq);
-extern int dmr_mmdvm_free(dmr_mmdvm_t *modem);
-extern int dmr_mmdvm_close(dmr_mmdvm_t *modem);
+DMR_API extern dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, dmr_mmdvm_model_t model);
+DMR_API extern int dmr_mmdvm_sync(dmr_mmdvm_t *modem);
+DMR_API extern int dmr_mmdvm_poll(dmr_mmdvm_t *modem);
+DMR_API extern int dmr_mmdvm_send(dmr_mmdvm_t *modem, dmr_packet_t *packet);
+DMR_API extern int dmr_mmdvm_queue(dmr_mmdvm_t *modem, dmr_packet_t *packet);
+DMR_API extern dmr_packet_t *dmr_mmdvm_queue_shift(dmr_mmdvm_t *modem);
+DMR_API extern dmr_mmdvm_response_t dmr_mmdvm_get_response(dmr_mmdvm_t *modem, uint8_t *length, unsigned int timeout_ms, int retries);
+DMR_API extern bool dmr_mmdvm_get_status(dmr_mmdvm_t *modem);
+DMR_API extern bool dmr_mmdvm_get_version(dmr_mmdvm_t *modem);
+DMR_API extern bool dmr_mmdvm_set_config(dmr_mmdvm_t *modem);
+DMR_API extern bool dmr_mmdvm_set_mode(dmr_mmdvm_t *modem, uint8_t mode);
+DMR_API extern bool dmr_mmdvm_set_rf_config(dmr_mmdvm_t *modem, uint32_t rx_freq, uint32_t tx_freq);
+DMR_API extern int dmr_mmdvm_free(dmr_mmdvm_t *modem);
+DMR_API extern int dmr_mmdvm_close(dmr_mmdvm_t *modem);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif // _DMR_PROTO_MMDVM

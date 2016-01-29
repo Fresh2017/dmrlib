@@ -27,7 +27,7 @@ ssize_t socket_recv4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t *port)
     socklen_t silen = sizeof(si);
     ssize_t r;
 
-    if ((r = recvfrom(fd, buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
+    if ((r = recvfrom(fd, (char *)buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
         return __winsock_errno(-1);
     }
     if (ip != NULL) {
@@ -49,7 +49,7 @@ ssize_t socket_recv6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port,
     socklen_t silen = sizeof(si);
     ssize_t r;
     byte_zero(&si, silen);
-    if ((r = recvfrom(fd, buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
+    if ((r = recvfrom(fd, (char *)buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
         return __winsock_errno(-1);
     }
 

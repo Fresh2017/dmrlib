@@ -8,10 +8,12 @@ from __future__ import print_function
 import atexit
 import argparse
 import datetime
+import errno
 import tempfile
 import os
 import pickle
 import shlex
+import socket
 import subprocess
 import sys
 from functools import wraps
@@ -52,6 +54,7 @@ required_headers = (
     'sys/param.h',
 )
 optional_headers = (
+    'errno.h',
     'libgen.h',
     'arpa/inet.h',
     'net/ethernet.h',
@@ -78,36 +81,44 @@ optional_binaries = (
     ('pkg-config', ('--version',)),
 )
 
+_test = lambda x: os.path.join('test', x)
 optional_compiles = (
     # Compiler specific
-    ('mingw',           os.path.join('test', 'have_mingw.c'), []),
-    ('inline',          os.path.join('test', 'have_inline.c'), []),
-    ('restrict',        os.path.join('test', 'have_restrict.c'), []),
-    ('binary literals', os.path.join('test', 'have_binary_literals.c'), []),
+    ('mingw',                _test('have_mingw.c'), []),
+    ('inline',               _test('have_inline.c'), []),
+    ('restrict',             _test('have_restrict.c'), []),
+    ('binary literals',      _test('have_binary_literals.c'), []),
+    ('visibility attribute', _test('have_visibility_attribute.c'), []),
+    ('visibility declspec',  _test('have_visibility_declspec.c'), []),
     # Libc
-    ('libc ipv6',       os.path.join('test', 'have_libc_ipv6.c'), []),
-    ('libc scope_id',   os.path.join('test', 'have_libc_scope_id.c'), []),
+    ('libc ipv6',            _test('have_libc_ipv6.c'), []),
+    ('libc scope_id',        _test('have_libc_scope_id.c'), []),
     # Functions
-    ('if_indextoname',  os.path.join('test', 'have_if_indextoname.c'), []),
-    ('getline',         os.path.join('test', 'have_getline.c'), []),
-    ('strtok_r',        os.path.join('test', 'have_strtok_r.c'), []),
+    ('if_indextoname',       _test('have_if_indextoname.c'), []),
+    ('getline',              _test('have_getline.c'), []),
+    ('strtok_r',             _test('have_strtok_r.c'), []),
     # Types
-    ('socklen_t',       os.path.join('test', 'have_socklen_t.c'), []),
+    ('socklen_t',            _test('have_socklen_t.c'), []),
     # Multiplexing
-    ('epoll',           os.path.join('test', 'have_epoll.c'), []),
-    ('/dev/epoll',      os.path.join('test', 'have_dev_epoll.c'), []),
-    ('kqueue',          os.path.join('test', 'have_kqueue.c'), []),
-    ('poll',            os.path.join('test', 'have_poll.c'), []),
-    ('select',          os.path.join('test', 'have_select.c'), []),
+    ('epoll',                _test('have_epoll.c'), []),
+    ('/dev/epoll',           _test('have_dev_epoll.c'), []),
+    ('kqueue',               _test('have_kqueue.c'), []),
+    ('poll',                 _test('have_poll.c'), []),
+    ('select',               _test('have_select.c'), []),
 )
 required_compiles = ()
 
 generated_files = (
-    os.path.join('include', 'dmr', 'config.h'),
-    os.path.join('include', 'dmr', 'version.h'),
-    os.path.join('src', 'cmd', 'noisebridge', 'version.h'),
-    os.path.join('src', 'common', 'config.h'),
+    'include/dmr/config.h',
+    'include/dmr/version.h',
+    'src/cmd/noisebridge/version.h',
+    'src/common/config.h',
 )
+
+if sys.platform == 'win32':
+    option_defaults += (
+        ('with-mingw', 'MinGW root', 'path', ''),
+    )
 
 
 CONFIG_CACHE = {}
@@ -125,6 +136,13 @@ def env_name(name):
     for char in '/-. ':
         name = name.replace(char, '_')
     return name.strip('_').upper()
+
+
+def hostname():
+    try:
+        return os.uname()[1]
+    except AttributeError:
+        return socket.gethostname()
 
 
 def log(*args):
@@ -145,9 +163,10 @@ def cache(key):
     def decorate(func):
         @wraps(func)
         def _decorated(name, *args, **kwargs):
+            cache_key = (hostname(), key, name)
             global CONFIG_CACHE
             try:
-                if CONFIG_CACHE[(key, name)]:
+                if CONFIG_CACHE[cache_key]:
                     echo('checking {0} {1}... yes (cached)\n'.format(
                         key, name))
                     return True
@@ -156,7 +175,7 @@ def cache(key):
 
             result = func(name, *args, **kwargs)
             if result is True:
-                CONFIG_CACHE[(key, name)] = True
+                CONFIG_CACHE[cache_key] = True
             return result
         return _decorated
     return decorate
@@ -197,7 +216,11 @@ def _test_call_code(args):
 
 
 def _test_call(args):
-    code = _test_call_code(args)
+    try:
+        code = _test_call_code(args)
+    except WindowsError:
+        code = errno.errorcode
+
     if code > 0:
         log('failed with exit code {0}'.format(code))
         echo('no\n')
@@ -267,20 +290,37 @@ def check_platform(args):
             echo(' - Homebrew, see http://brew.sh/\n')
             echo(' - MacPorts, see https://www.macports.org/\n')
 
+        # Prefer package manager, but we also ship libraries
+        env_append('CFLAGS', '-Isupport/darwin/include')
+        env_append('LDFLAGS', '-Lsupport/darwin/lib')
+
     elif args.platform in ('win32', 'win64'):
+        if not args.with_mingw:
+            echo('no\n')
+            echo('please specify the MinGW installation path with --with-mingw=path\n')
+            return False
+
         os.environ['BINEXT'] = '.exe'
         os.environ['ARLIBPRE'] = 'lib'
         os.environ['ARLIBEXT'] = '.a'
         os.environ['SHLIBPRE'] = ''
         os.environ['SHLIBEXT'] = '.dll'
-        env_append('CFLAGS', '-I' + os.path.join('support', 'windows', 'wpcap', 'Include'))
-        env_append('LDFLAGS', '-L' + os.path.join('support', 'windows', 'wpcap', 'Lib'))
+        env_append('CFLAGS', '-Isupport/windows/include')
+        env_append('CFLAGS', '-I' + os.path.join(args.with_mingw, 'include', 'ddk'))
+        env_append('LDFLAGS', '-Lsupport/windows/lib')
         os.environ['LIBPCAP_NAME'] = 'wpcap'
 
-        required_headers += ('windows.h',)
+        required_headers += (
+            'windows.h',
+            # These come from the Windows Driver Kit (WDK)
+            'usbioctl.h',
+            'usbiodef.h',
+        )
         required_libraries += (
-            ('ws2_32', 'winsock2.h'),
-            ('wpcap',  ('pcap.h', 'Packet32.h')),
+            ('ws2_32',   'winsock2.h'),
+            ('hid',      ('usbioctl.h', 'usbiodef.h')),
+            ('setupapi', 'windows.h'),
+            ('wpcap',    ('pcap.h', 'Packet32.h')),
         )
 
     else:
@@ -291,29 +331,36 @@ def check_platform(args):
 
 
 @cache('binary')
-def check_binary(binary, args=(), optional=False):
+def check_binary(binary, binary_args=(), optional=False):
     echo('checking binary {0}... '.format(binary))
     name = env_name(binary)
-    if _test_call((binary,) + args):
+    if _test_call((binary,) + binary_args):
         return True
     return False
 
 
 def check_compiler(binary):
     echo('checking compiler {0}... '.format(binary))
-    with tempfile.NamedTemporaryFile(suffix='check-compiler.c') as temp:
-        temp.write('int main() { return 0; }\n\n')
-        temp.flush()
-        temp.seek(0)
-        log('test program ({0}):\n{1}\n'.format(binary, temp.read()))
+    try:
+        fd, temp = tempfile.mkstemp(suffix='check-compiler.c')
+        dest = os.path.splitext(temp)[0] + os.environ['BINEXT']
+        fp = os.fdopen(fd, 'w+')
+        fp.write('int main() { return 0; }\n\n')
+        fp.flush()
+        fp.seek(0)
+        log('test program ({0}):\n{1}\n'.format(binary, fp.read()))
+        fp.close()
         if _test_call([
                 binary,
                 '-o',
-                temp.name + '.o',
-                temp.name,
+                dest,
+                temp,
             ]):
             os.environ['CC'] = binary
             return True
+    finally:
+        _unlink(temp)
+        _unlink(dest)
 
 
 @cache('for')
@@ -323,18 +370,18 @@ def check_compile(description, filename, libs=[]):
     fd, temp = tempfile.mkstemp(suffix='check-compile.o')
     os.close(fd)
     try:
-        args = [
+        call_args = [
             os.environ['CC'],
             '-o',
             temp,
             filename
         ] + shlex.split(os.environ.get('CFLAGS', ''))
         for lib in libs:
-            args.append('-l{0}'.format(lib))
+            call_args.append('-l{0}'.format(lib))
 
         name = env_name(description)
         os.environ['HAVE_{0}'.format(name)] = '0'
-        code = _test_call_code(args)
+        code = _test_call_code(call_args)
         if code == 0:
             # Compilation success, now run
             code = _test_call_code([temp])
@@ -352,94 +399,109 @@ def check_compile(description, filename, libs=[]):
 @cache('define')
 def check_define(define, headers=[], libs=[]):
     echo('checking define {0}... '.format(define))
-    with tempfile.NamedTemporaryFile(suffix='check-define.c') as temp:
-        temp.write('#include <stdlib.h>\n')
+    try:
+        fd, temp = tempfile.mkstemp(suffix='check-compiler.c')
+        dest = os.path.splitext(temp)[0] + os.environ['BINEXT']
+        fp = os.fdopen(fd, 'w+')
+        fp.write('#include <stdlib.h>\n')
         for header in headers:
-            temp.write('#include <{0}>\n'.format(header))
-        temp.write('int main(int argc, char **argv) {\n')
-        temp.write('#if defined({0})\n'.format(define))
-        temp.write('    return 0;\n')
-        temp.write('#else\n')
-        temp.write('    return 1;\n')
-        temp.write('#endif\n')
-        temp.write('}\n')
-        temp.seek(0)
-        log('test program:\n{0}\n'.format(temp.read()))
-        args = [
+            fp.write('#include <{0}>\n'.format(header))
+        fp.write('int main(int argc, char **argv) {\n')
+        fp.write('#if defined({0})\n'.format(define))
+        fp.write('    return 0;\n')
+        fp.write('#else\n')
+        fp.write('    return 1;\n')
+        fp.write('#endif\n')
+        fp.write('}\n')
+        fp.flush()
+        fp.seek(0)
+        log('test program:\n{0}\n'.format(fp.read()))
+        fp.close()
+
+        call_args = [
             os.environ['CC'],
             '-o',
-            temp.name + '.o',
-            temp.name,
+            dest,
+            temp,
         ] + shlex.split(os.environ.get('CFLAGS', ''))
+
         for lib in libs:
-            args.append('-l{0}'.format(lib))
+            call_args.append('-l{0}'.format(lib))
 
-        try:
-            code = _test_call_code(args)
+        code = _test_call_code(call_args)
+        if code == 0:
+            # Compilation success, now run
+            code = _test_call_code([dest])
             if code == 0:
-                # Compilation success, now run
-                code = _test_call_code([temp.name + '.o'])
-                if code == 0:
-                    echo('yes\n')
-                    return True
+                echo('yes\n')
+                return True
 
-            echo('no\n')
-            log('failed with exit code {0}'.format(code))
-            return False
-        finally:
-            _unlink(temp.name + '.o')
+        echo('no\n')
+        log('failed with exit code {0}'.format(code))
+        return False
+    finally:
+        _unlink(temp)
+        _unlink(dest)
 
 
 @cache('header')
-def check_header(header, optional=False):
+def check_header(header):
     echo('checking header {0}... '.format(header))
-    with tempfile.NamedTemporaryFile(suffix='check-header.c') as temp:
-        temp.write('#include <{0}>\n'.format(header))
-        temp.write('int main() { return 0; }\n\n')
-        temp.seek(0)
-        log('test program:\n{0}\n'.format(temp.read()))
-        args = [
+    try:
+        fd, temp = tempfile.mkstemp(suffix='check-compiler.c')
+        dest = os.path.splitext(temp)[0] + os.environ['BINEXT']
+        fp = os.fdopen(fd, 'w+')
+        fp.write('#include <{0}>\n'.format(header))
+        fp.write('int main(int argc, char **argv) { return 0; }\n\n')
+        fp.flush()
+        fp.seek(0)
+        log('test program:\n{0}\n'.format(fp.read()))
+        fp.close()
+
+        call_args = [
             os.environ['CC'],
             '-o',
-            temp.name + '.o',
-            temp.name,
+            dest,
+            temp,
         ] + shlex.split(os.environ.get('CFLAGS', ''))
-
-        name = header.upper().replace('.', '_').replace('/', '_')
-        try:
-            if _test_call(args):
-                return True
-
-            return optional
-        finally:
-            _unlink(temp.name + '.o')
+        return _test_call(call_args)
+    finally:
+        _unlink(temp)
+        _unlink(dest)
 
 
 @cache('library')
 def check_library(name, headers):
     echo('checking library {0}... '.format(name))
-    with tempfile.NamedTemporaryFile(suffix='check-library.c') as temp:
+    try:
+        fd, temp = tempfile.mkstemp(suffix='check-compiler.c')
+        dest = os.path.splitext(temp)[0] + os.environ['BINEXT']
+        fp = os.fdopen(fd, 'w+')
+
         headers = headers or []
         if not isinstance(headers, (list, tuple)):
             headers = (headers,)
         for header in headers:
-            temp.write('#include <{0}>\n'.format(header))
-        temp.write('int main() { return 0; }\n\n')
-        temp.seek(0)
-        log('test program:\n{0}\n'.format(temp.read()))
-        args = [
+            fp.write('#include <{0}>\n'.format(header))
+        fp.write('int main(int argc, char **argv) { return 0; }\n\n')
+        fp.flush()
+        fp.seek(0)
+        log('test program:\n{0}\n'.format(fp.read()))
+        fp.close()
+
+        call_args = [
             os.environ['CC'],
             '-l{0}'.format(name),
             '-o',
-            temp.name + '.o',
-            temp.name,
+            dest,
+            temp,
         ]
-        args.extend(shlex.split(os.environ.get('CFLAGS', '')))
-        args.extend(shlex.split(os.environ.get('LDFLAGS', '')))
-        try:
-            return _test_call(args)
-        finally:
-            _unlink(temp.name + '.o')
+        call_args.extend(shlex.split(os.environ.get('CFLAGS', '')))
+        call_args.extend(shlex.split(os.environ.get('LDFLAGS', '')))
+        return _test_call(call_args)
+    finally:
+        _unlink(dest)
+        _unlink(temp)
 
 
 def check_pkg_config(package):
@@ -507,9 +569,9 @@ def configure(args):
     if not check_compiler(os.environ.get('CC')):
         return False
 
-    for binary, args in optional_binaries:
+    for binary, binary_args in optional_binaries:
         have(binary, 0)
-        if check_binary(binary, args):
+        if check_binary(binary, binary_args):
             have(binary, 1)
 
     for header in required_headers:
@@ -542,9 +604,10 @@ def configure(args):
         have(name, True)
 
     lua_version = None
+    lua_versions = ('lua5.3', 'lua53', 'lua5.2', 'lua52', 'lua')
     os.environ['LUA_USE_PKG_CONFIG'] = '0'
     if os.environ.get('HAVE_PKG_CONFIG', '') == '1':
-        for version in ('lua5.3', 'lua5.2', 'lua'):
+        for version in lua_versions:
             if check_pkg_config(version):
                 lua_version = version
                 os.environ['LUA_USE_PKG_CONFIG'] = '1'
@@ -552,10 +615,11 @@ def configure(args):
                 break
 
     if lua_version is None:
-        for version in ('lua5.3', 'lua5.2', 'lua'):
+        for version in lua_versions:
             if check_library(version, ('lua.h',)):
                 lua_version = version
                 have(version, 1)
+                break
 
     if lua_version is None:
         echo('no suitable lua version could be found\n')

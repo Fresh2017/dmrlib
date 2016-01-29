@@ -29,7 +29,7 @@ ssize_t socket_send4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t port)
     si.sin_family = AF_INET;
     uint16_pack((uint8_t *) &si.sin_port, port);
     *((uint32_t *)&si.sin_addr) = *((uint32_t *)ip);
-    return __winsock_errno(sendto(fd, buf, len, 0, (void *)&si, sizeof(si)));
+    return __winsock_errno(sendto(fd, (const char *)buf, len, 0, (void *)&si, sizeof(si)));
 }
 
 ssize_t socket_send6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t port, uint32_t scope_id)
@@ -62,7 +62,7 @@ ssize_t socket_send6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t port, 
 #else
     si.sin6_scope_id = 0;
 #endif
-    return __winsock_errno(sendto(fd, buf, len, 0, (void *)&si, sizeof(si)));
+    return __winsock_errno(sendto(fd, (const char *)buf, len, 0, (void *)&si, sizeof(si)));
 #else
     errno = EPROTONOSUPPORT;
     return -1;

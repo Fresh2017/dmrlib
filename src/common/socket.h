@@ -7,14 +7,31 @@
 #include <stdbool.h>
 #include "common/config.h"
 #include "common/byte.h"
-#if defined(__MINGW32__)
+#include "common/platform.h"
+#if defined(PLATFORM_WINDOWS)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #endif
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
+
+#if defined(PLATFORM_WINDOWS)
+
+#if !defined(WIN32_LEAN_AND_MEAN)
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#define __winsock_errno(x) winsock2errno(x)
+#define __winsock_init()
+
+#else // PLATFORM_WINDOWS
+
+int __winsock_errno(long error);
+void __winsock_init(void);
+
+#endif // PLATFORM_WINDOWS
 
 #if !defined(EAFNOSUPPORT)
 #define EAFNOSUPPORT EINVAL
@@ -89,7 +106,7 @@ ssize_t     socket_send6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t po
 
 #define isip4mapped(ip) (byte_equal((uint8_t *)(ip), (uint8_t *)ip6mappedv4prefix, 12))
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
 

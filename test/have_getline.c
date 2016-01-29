@@ -5,10 +5,10 @@
 int main()
 {
     ssize_t count = 0;
-    size_t n = 0;
-    char **lineptr = NULL;
-    FILE *stream = NULL;
+    size_t n = 1024;
+    char line[1024] = { 0, };
+    FILE *stream = fopen(__FILE__, "r");
 
-    count = getline(lineptr, &n, stream);
+    count = getline(&line, &n, stream);
     return 0;
 }

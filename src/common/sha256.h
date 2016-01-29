@@ -6,7 +6,7 @@
 #ifndef _SHA256_H
 #define _SHA256_H
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -25,7 +25,7 @@ void sha256_init(sha256_t *p);
 void sha256_update(sha256_t *p, const uint8_t *data, size_t size);
 void sha256_final(sha256_t *p, uint8_t *digest);
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
 

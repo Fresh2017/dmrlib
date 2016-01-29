@@ -1,8 +1,9 @@
-#ifdef __MINGW32__
+#include "common/platform.h"
+
+#if defined(PLATFORM_WINDOWS)
 #include <stdlib.h>
 #include <stdbool.h>
 #include <winsock2.h>
-#include "common/platform.h"
 
 static bool __winsock_init_done = false;
 
@@ -20,8 +21,11 @@ void __winsock_init(void)
     }
     __winsock_init_done = true;
 }
-#else
+
+#else // PLATFORM_WINDOWS
+
 void __winsock_init(void) {
     (void)0;
 }
-#endif // __MINGW32__
+
+#endif // PLATFORM_WINDOWS

@@ -4,7 +4,7 @@
 #ifndef __ROTATE_DEFS_H
 #define __ROTATE_DEFS_H
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -21,7 +21,7 @@ extern "C" {
 
 #endif
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif
 

@@ -65,12 +65,6 @@ endif
 
 UNAME := $(shell uname -s)
 
-ifeq ($(UNAME),Darwin)
-# Facilitate Homebrew (http://brew.sh/)
-CFLAGS   += -I/usr/local/include
-LDFLAGS  += -L/usr/local/lib
-endif
-
 ifeq ($(V),1)
 MKDIR_P = mkdir -p -v
 RM 		= rm -rv
@@ -78,6 +72,7 @@ else
 MKDIR_P	= mkdir -p
 RM 		= rm -r
 endif
+
 ifeq ($(OS),Windows)
 setlocal enableextensions
 MKDIR_P = md
@@ -97,8 +92,6 @@ CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
 CFLAGS  += -Iinclude -Isrc
 {% if env.HAVE_MINGW != '1' -%}
 CFLAGS  += -fPIC
-CFLAGS  += -Isupport/windows/wpcap/Include
-LDFLAGS += -Lsupport/windows/wpcap/Lib
 {% endif -%}
 {% if args.with_debug -%}
 CFLAGS  += -g
@@ -106,12 +99,20 @@ CFLAGS  += -g
 CFLAGS  += -O2
 {% endif -%}
 LDFLAGS ?= {{ env.LDFLAGS }}
+LDFLAGS += -L.
 
 COMMON_SOURCES 		 = $(wildcard src/common/**/*.c src/common/*.c)
 COMMON_OBJECTS 		 = $(patsubst %.c,%.o,$(COMMON_SOURCES))
 COMMON_DEPS 		 = $(patsubst %.c,%.d,$(COMMON_SOURCES))
 COMMON_CFLAGS 		 = $(CFLAGS)
 COMMON_ARCHIVE 		 = $(ARLIBPRE)common$(ARLIBEXT)
+COMMON_LIBS 		 = -ltalloc
+{% if args.with_mingw -%}
+COMMON_LIBS 		+= -lhid -lsetupapi -lws2_32
+{%- endif %}
+ifeq ($(UNAME),Darwin)
+COMMON_LIBS 		+= -framework IOKit -framework CoreFoundation
+endif
 
 {% if args.with_mbelib -%}
 MBELIB_SOURCES       = $(wildcard src/mbelib/*.c)
@@ -129,7 +130,7 @@ DMRLIB_DEPS          = $(patsubst %.c,%.d,$(DMRLIB_SOURCES))
 DMRLIB_TARGET 		 = $(SHLIBPRE)dmr$(SHLIBEXT)
 DMRLIB_CFLAGS        = $(CFLAGS)
 DMRLIB_LDFLAGS       = $(LDFLAGS) -shared -Lsrc/mbelib
-DMRLIB_LIBS 		+= $(COMMON_ARCHIVE)
+DMRLIB_LIBS 		+= $(COMMON_ARCHIVE) $(COMMON_LIBS)
 DMRLIB_LIBS 		+= {% if args.with_mbelib %} -lmbe{% endif %} -lpthread -ltalloc
 ifeq ($(UNAME),Linux)
 DMRLIB_LIBS         += -lrt
@@ -153,7 +154,7 @@ NOISEBRIDGE_OBJECTS  = $(patsubst %.c,%.o,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_DEPS     = $(patsubst %.c,%.d,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_TARGET   = noisebridge$(BINEXT)
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
-NOISEBRIDGE_LDFLAGS  = $(LDFLAGS) -Lsrc/dmr
+NOISEBRIDGE_LDFLAGS  = $(LDFLAGS)
 NOISEBRIDGE_LIBS     = -ldmr -lpthread -ltalloc
 
 {% if env.LUA_USE_PKG_CONFIG == '1' -%}
@@ -165,6 +166,14 @@ NOISEBRIDGE_LIBS	+= -l{{ env.LUA_VERSION }}
 {% if args.with_mbelib and env.HAVE_LIBPORTAUDIO == '1' %}
 NOISEBRIDGE_LIBS 	+= -lportaudio
 {% endif -%}
+
+SERIALDUMP_SOURCES   = $(wildcard src/cmd/serialdump/*.c)
+SERIALDUMP_OBJECTS   = $(patsubst %.c,%.o,$(SERIALDUMP_SOURCES))
+SERIALDUMP_DEPS 	 = $(patsubst %.c,%.d,$(SERIALDUMP_SOURCES))
+SERIALDUMP_TARGET    = serialdump$(BINEXT)
+SERIALDUMP_CFLAGS 	 = $(CFLAGS)
+SERIALDUMP_LDFLAGS 	 = $(LDFLAGS)
+SERIALDUMP_LIBS      = $(COMMON_ARCHIVE) $(COMMON_LIBS)
 
 TEST_SOURCES 		 = $(wildcard test/test_*.c)
 TEST_OBJECTS 		 = $(patsubst %.c,%.o,$(TEST_SOURCES))
@@ -324,7 +333,7 @@ clean-dmrdump:
 
 
 #
-# bin/noisebridge
+# noisebridge
 #
 
 build-noisebridge: $(COMMON_ARCHIVE) $(NOISEBRIDGE_TARGET)
@@ -348,6 +357,29 @@ install-noisebridge: $(NOISEBRIDGE_TARGET)
 
 clean-noisebridge:
 	$(Q)for file in $(NOISEBRIDGE_TARGET) $(NOISEBRIDGE_OBJECTS) $(NOISEBRIDGE_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
+
+#
+# serialdump
+#
+
+build-serialdump: $(COMMON_ARCHIVE) $(SERIALDUMP_TARGET)
+
+$(SERIALDUMP_TARGET): $(SERIALDUMP_OBJECTS)
+	$(QLD) $(SERIALDUMP_LDFLAGS) -o $@ $^ $(SERIALDUMP_LIBS)
+
+src/cmd/serialdump/%.o: src/cmd/serialdump/%.c
+src/cmd/serialdump/%.o: src/cmd/serialdump/%.c src/cmd/serialdump/%.d
+	$(QCC) -c $(SERIALDUMP_CFLAGS) -o $@ $<
+
+src/cmd/serialdump/%.d: src/cmd/serialdump/%.c
+	$(QMM) -MM $(DEPFLAGS) $(SERIALDUMP_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
+
+ifneq ($(MAKECMDGOALS),clean)
+-include $(patsubst %.o,%.d,$(SERIALDUMP_OBJECTS))
+endif
+
+clean-serialdump:
+	$(Q)for file in $(SERIALDUMP_TARGET) $(SERIALDUMP_OBJECTS) $(SERIALDUMP_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
 #
 # tests

@@ -54,4 +54,4 @@ script:
   - ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)
   - make
   - make install PREFIX=./dist
-  - [ $MAKE_TEST -eq 1 ] && LD_LIBRARY_PATH=dist/lib make test
+  - test $MAKE_TEST -eq 1 && LD_LIBRARY_PATH=dist/lib make test

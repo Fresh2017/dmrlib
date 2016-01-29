@@ -9,6 +9,7 @@ env:
     - LUAROCKS=2.3.0
     - CFLAGS=-Iinstall/lua/include
     - LDFLAGS=-Linstall/lua/lib
+    - MAKE_TEST=1
 
 matrix:
   include:
@@ -21,7 +22,7 @@ matrix:
     - env: LUA=lua5.3
       os: linux
       compiler: gcc
-    - env: LUA=lua5.2 CROSS_COMPILE=i586-mingw32msvc-
+    - env: LUA=lua5.2 CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
       os: linux
       compiler: gcc
     - env: LUA=lua5.2 OSX=10.10
@@ -45,10 +46,12 @@ addons:
 cache: apt
 
 before_install:
-  - source .travis/setenv_lua.sh
+  - [ -z "$OSX" ] && source .travis/setenv_lua.sh
+  - [ -n "$OSX" ] && brew install python
+  - [ -n "$OSX" ] && pip install Jinja2
 
 script:
-  - ./configure --with-debug || (cat config.log && false)
+  - ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)
   - make
   - make install PREFIX=./dist
-  - LD_LIBRARY_PATH=dist/lib make test
+  - [ $MAKE_TEST -eq 1 ] && LD_LIBRARY_PATH=dist/lib make test

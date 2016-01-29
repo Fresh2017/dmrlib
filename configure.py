@@ -34,6 +34,7 @@ option_defaults = (
     ('builddir',      'Build directory',       'path',     '{pwd}/build'),
     ('with-debug',    'Enable debug features', 'bool',     False),
     ('with-mbelib',   'Enable mbelib support', 'bool',     False),
+    ('with-mingw',    'MinGW root',            'path',     ''),
 )
 
 os.environ.setdefault('CROSS_COMPILE', '')
@@ -114,12 +115,6 @@ generated_files = (
     'src/cmd/noisebridge/version.h',
     'src/common/config.h',
 )
-
-if sys.platform == 'win32':
-    option_defaults += (
-        ('with-mingw', 'MinGW root', 'path', ''),
-    )
-
 
 CONFIG_CACHE = {}
 LOG_FD = None

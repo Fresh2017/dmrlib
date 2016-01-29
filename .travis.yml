@@ -2,10 +2,11 @@ language: c
 
 sudo: false
 
-
 env:
   global:
     - CC=$CC
+    - CROSS_COMPILE=""
+    - CONFIGURE_ARGS=""
     - CFLAGS=-Iinstall/lua/include
     - LDFLAGS=-Linstall/lua/lib
     - MAKE_TEST=1
@@ -54,7 +55,8 @@ before_install:
   - if [ "$OSX" != "x" ]; then pip install Jinja2; fi
 
 script:
-  - ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)
+  - echo "CROSS_COMPILE=$CROSS_COMPILE, CC=$CC, CONFIGURE_ARGS=$CONFIGURE_ARGS"
+  - CROSS_COMPILE="$CROSS_COMPILE" CC="$CC" ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)
   - make
   - make install PREFIX=./dist
   - if [ $MAKE_TEST -eq 1 ]; then LD_LIBRARY_PATH=dist/lib make test; fi

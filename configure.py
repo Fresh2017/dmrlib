@@ -12,6 +12,7 @@ import errno
 import tempfile
 import os
 import pickle
+import platform as pyplatform
 import shlex
 import socket
 import subprocess
@@ -140,6 +141,10 @@ def hostname():
         return socket.gethostname()
 
 
+def uname():
+    return ' '.join(pyplatform.uname())
+
+
 def log(*args):
     global LOG_FD
     LOG_FD.write('{0} {1}\n'.format(
@@ -236,16 +241,17 @@ def _unlink(filename):
 def check_platform(args):
     global required_headers
     global required_libraries
+    global platform
 
-    echo('checking platform... {}... '.format(sys.platform))
-    if args.platform in ('darwin', 'linux'):
+    echo('checking platform... {}... '.format(platform))
+    if platform in ('darwin', 'linux'):
         required_libraries += (
             ('pthread', 'pthread.h'),
             ('pcap',    'pcap.h'),
         )
         os.environ['LIBPCAP_NAME'] = 'pcap'
 
-    if args.platform == 'linux':
+    if platform == 'linux':
         os.environ['BINEXT'] = ''
         os.environ['ARLIBPRE'] = 'lib'
         os.environ['ARLIBEXT'] = '.a'
@@ -253,7 +259,7 @@ def check_platform(args):
         os.environ['SHLIBEXT'] = '.so'
         echo('ok\n')
 
-    elif args.platform == 'darwin':
+    elif platform == 'darwin':
         os.environ['BINEXT'] = ''
         os.environ['ARLIBPRE'] = 'lib'
         os.environ['ARLIBEXT'] = '.a'
@@ -289,7 +295,7 @@ def check_platform(args):
         env_append('CFLAGS', '-Isupport/darwin/include')
         env_append('LDFLAGS', '-Lsupport/darwin/lib')
 
-    elif args.platform in ('win32', 'win64'):
+    elif platform in ('win32', 'win64'):
         if not args.with_mingw:
             echo('no\n')
             echo('please specify the MinGW installation path with --with-mingw=path\n')
@@ -318,9 +324,10 @@ def check_platform(args):
             ('setupapi', 'windows.h'),
             ('wpcap',    ('pcap.h', 'Packet32.h')),
         )
+        echo('ok\n')
 
     else:
-        echo('not supported\n'.format(sys.platform))
+        echo('not supported\n'.format(platform))
         return False
 
     return True
@@ -608,7 +615,7 @@ def configure(args):
     lua_version = None
     lua_versions = ('lua5.3', 'lua53', 'lua5.2', 'lua52', 'lua')
     os.environ['LUA_USE_PKG_CONFIG'] = '0'
-    if os.environ.get('HAVE_PKG_CONFIG', '') == '1':
+    if os.environ.get('HAVE_PKG_CONFIG', '') == '1' and platform in ('darwin', 'linux'):
         for version in lua_versions:
             if check_pkg_config(version):
                 lua_version = version
@@ -646,6 +653,7 @@ def configure(args):
 
 def run():
     global LOG_FD
+    global platform
 
     parser = argparse.ArgumentParser()
     mapper = {
@@ -674,12 +682,10 @@ def run():
     if args.cross_compile:
         os.environ['CROSS_COMPILE'] = args.cross_compile + '-'
 
+    if args.platform:
+        platform = args.platform
+
     LOG_FD = open('config.log', 'wb')
-    LOG_FD.write('{0} starting {1} {2}\n'.format(
-        datetime.datetime.now(),
-        sys.argv[0],
-        ' '.join(sys.argv[1:]),
-    ))
 
     def _close_log():
         global LOG_FD
@@ -687,12 +693,21 @@ def run():
 
     atexit.register(_close_log)
 
+    log('starting: {0} {1}'.format(
+        sys.argv[0],
+        ' '.join(sys.argv[1:]),
+    ))
+    log('uname: {0}'.format(uname()))
+    log('platform: {0}'.format(platform))
+
     if not cache_load(args):
         echo('configure cache load failed, see config.log for more details\n')
 
     if not configure(args):
         echo('configure failed, see config.log for more details\n')
         return 1
+
+    echo('type "make" to build the software\n')
     return 0
 
 

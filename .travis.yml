@@ -44,6 +44,7 @@ addons:
       - libpcap-dev
       - libbsd-dev
       - mingw32
+      - mingw32-runtime
       - python-jinja2
 
 cache: apt

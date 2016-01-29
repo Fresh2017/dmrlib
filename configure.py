@@ -301,6 +301,7 @@ def check_platform(args):
         os.environ['SHLIBPRE'] = ''
         os.environ['SHLIBEXT'] = '.dll'
         env_append('CFLAGS', '-Isupport/windows/include')
+        env_append('CFLAGS', '-I' + os.path.join(args.with_mingw, 'include'))
         env_append('CFLAGS', '-I' + os.path.join(args.with_mingw, 'include', 'ddk'))
         env_append('LDFLAGS', '-Lsupport/windows/lib')
         os.environ['LIBPCAP_NAME'] = 'wpcap'
@@ -560,6 +561,9 @@ def configure(args):
     # Run checks
     if not check_platform(args):
         return False
+
+    for var in ('CC', 'CROSS_COMPILE', 'CFLAGS', 'LDFLAGS'):
+        log('{0}={1}'.format(var, os.environ.get(var, ''))
 
     if not check_compiler(os.environ.get('CC')):
         return False

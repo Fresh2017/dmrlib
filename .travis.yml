@@ -46,9 +46,9 @@ addons:
 cache: apt
 
 before_install:
-  - [ -z "$OSX" ] && source .travis/setenv_lua.sh
-  - [ -n "$OSX" ] && brew install python
-  - [ -n "$OSX" ] && pip install Jinja2
+  - test -z "$OSX" && source .travis/setenv_lua.sh
+  - test -n "$OSX" && brew install python
+  - test -n "$OSX" && pip install Jinja2
 
 script:
   - ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)

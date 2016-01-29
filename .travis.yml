@@ -6,12 +6,12 @@ sudo: false
 env:
   global:
     - CC=$CC
-    - LUAROCKS=2.3.0
     - CFLAGS=-Iinstall/lua/include
     - LDFLAGS=-Linstall/lua/lib
     - MAKE_TEST=1
-    - LUA=
-    - OSX=
+    - LUA=x
+    - LUAROCKS=2.3.0
+    - OSX=x
 
 matrix:
   include:
@@ -27,11 +27,11 @@ matrix:
     - env: LUA= CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
       os: linux
       compiler: gcc
-    - env: LUA= OSX=10.10
+    - env: LUA=x OSX=10.10
       os: osx
       osx_image: xcode7.1
       compiler: clang
-    - env: LUA= OSX=10.11
+    - env: LUA=x OSX=10.11
       os: osx
       osx_image: xcode7.2
       compiler: clang
@@ -48,12 +48,13 @@ addons:
 cache: apt
 
 before_install:
-  - test -n "$LUA" && source .travis/setenv_lua.sh
-  - test -n "$OSX" && brew install lua python
-  - test -n "$OSX" && pip install Jinja2
+  - echo "LUA=$LUA, OSX=$OSX"
+  - if [ "$LUA" != "x" ]; then source .travis/setenv_lua.sh; fi
+  - if [ "$OSX" != "x" ]; then brew install lua python; fi
+  - if [ "$OSX" != "x" ]; then pip install Jinja2; fi
 
 script:
   - ./configure --with-debug $CONFIGURE_ARGS || (cat config.log && false)
   - make
   - make install PREFIX=./dist
-  - test $MAKE_TEST -eq 1 && LD_LIBRARY_PATH=dist/lib make test
+  - if [ $MAKE_TEST -eq 1 ]; then LD_LIBRARY_PATH=dist/lib make test; fi

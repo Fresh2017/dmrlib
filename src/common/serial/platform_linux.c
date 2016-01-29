@@ -230,7 +230,7 @@ int serial_list(serial_t ***list)
         }
 	}
 	closedir(dir);
-
+out:
 	return ret;
 }
 

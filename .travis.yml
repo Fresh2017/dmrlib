@@ -10,6 +10,8 @@ env:
     - CFLAGS=-Iinstall/lua/include
     - LDFLAGS=-Linstall/lua/lib
     - MAKE_TEST=1
+    - LUA=
+    - OSX=
 
 matrix:
   include:
@@ -22,14 +24,14 @@ matrix:
     - env: LUA=lua5.3
       os: linux
       compiler: gcc
-    - env: LUA=lua5.2 CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
+    - env: LUA= CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
       os: linux
       compiler: gcc
-    - env: LUA=lua5.2 OSX=10.10
+    - env: LUA= OSX=10.10
       os: osx
       osx_image: xcode7.1
       compiler: clang
-    - env: LUA=lua5.2 OSX=10.11
+    - env: LUA= OSX=10.11
       os: osx
       osx_image: xcode7.2
       compiler: clang
@@ -46,8 +48,8 @@ addons:
 cache: apt
 
 before_install:
-  - test -z "$OSX" && source .travis/setenv_lua.sh
-  - test -n "$OSX" && brew install python
+  - test -n "$LUA" && source .travis/setenv_lua.sh
+  - test -n "$OSX" && brew install lua python
   - test -n "$OSX" && pip install Jinja2
 
 script:

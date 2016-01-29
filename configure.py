@@ -360,7 +360,7 @@ def check_compiler(binary):
 
 
 @cache('for')
-def check_compile(description, filename, libs=[]):
+def check_compile(args, description, filename, libs=[]):
     echo('checking for {0}... '.format(description))
     log('test program from: {0}\n'.format(filename))
     fd, temp = tempfile.mkstemp(suffix='check-compile.o')
@@ -380,7 +380,10 @@ def check_compile(description, filename, libs=[]):
         code = _test_call_code(call_args)
         if code == 0:
             # Compilation success, now run
-            code = _test_call_code([temp])
+            call_args = [temp]
+            if args.cross_execute:
+                call_args.insert(0, args.cross_execute)
+            code = _test_call_code(call_args)
             if code == 0:
                 echo('yes\n')
                 return True
@@ -595,10 +598,10 @@ def configure(args):
         have('lib' + name, check_library(name, header))
 
     for name, code, libs in optional_compiles:
-        have(name, check_compile(name, code, libs))
+        have(name, check_compile(args, name, code, libs))
 
     for name, code, libs in required_compiles:
-        if not check_compile(name, code, libs):
+        if not check_compile(args, name, code, libs):
             return False
         have(name, True)
 

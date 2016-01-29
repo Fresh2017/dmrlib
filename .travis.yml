@@ -25,7 +25,7 @@ matrix:
     - env: LUA=lua5.3
       os: linux
       compiler: gcc
-    - env: LUA= CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
+    - env: LUA= CROSS_COMPILE=i586-mingw32msvc- CC=i586-mingw32msvc-gcc CONFIGURE_ARGS="--cross-compile=i586-mingw32msvc- --cross-execute=wine --platform=win32 --with-mingw=/usr/i586-mingw32msvc" MAKE_TEST=0
       os: linux
       compiler: gcc
     - env: LUA=x OSX=10.10

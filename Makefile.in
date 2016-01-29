@@ -107,9 +107,9 @@ COMMON_DEPS 		 = $(patsubst %.c,%.d,$(COMMON_SOURCES))
 COMMON_CFLAGS 		 = $(CFLAGS)
 COMMON_ARCHIVE 		 = $(ARLIBPRE)common$(ARLIBEXT)
 COMMON_LIBS 		 = -ltalloc
-{% if args.with_mingw -%}
+{%- if args.with_mingw %}
 COMMON_LIBS 		+= -lhid -lsetupapi -lws2_32
-{%- endif %}
+{% endif %}
 ifeq ($(UNAME),Darwin)
 COMMON_LIBS 		+= -framework IOKit -framework CoreFoundation
 endif

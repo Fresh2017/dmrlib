@@ -154,17 +154,28 @@ def log(*args):
     LOG_FD.flush()
 
 
+XPOS = 0
+
 def echo(*args):
-    sys.stdout.write(' '.join(args))
+    global XPOS
+    data = ' '.join(args)
+    XPOS = XPOS + len(data)
+    sys.stdout.write(data)
     sys.stdout.flush()
 
 
 def echo_yes(word='yes', extra=''):
-    echo('\r\x1b[64C\x1b[1;32m{0}\x1b[0m {1}\n'.format(word, extra))
+    global XPOS
+    xpad = ' ' * max(0, 64 - XPOS)
+    echo('{0}\x1b[1;32m{1}\x1b[0m {2}\r\n'.format(xpad, word, extra))
+    XPOS = 0
 
 
 def echo_no(word='no', extra=''):
-    echo('\r\x1b[64C\x1b[1;31m{0}\x1b[0m {1}\n'.format(word, extra))
+    global XPOS
+    xpad = ' ' * max(0, 64 - XPOS)
+    echo('{0}\x1b[1;31m{1}\x1b[0m {2}\r\n'.format(xpad, word, extra))
+    XPOS = 0
 
 
 def cache(key):

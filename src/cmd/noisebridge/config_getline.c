@@ -36,7 +36,7 @@ size_t getline(char **lineptr, size_t *n, FILE *stream) {
     }
     p = bufptr;
     while(c != EOF) {
-    	if ((p - bufptr) > (size - 1)) {
+    	if (((size_t)(p - bufptr)) > (size - 1)) {
     		size = size + 128;
     		bufptr = realloc(bufptr, size);
     		if (bufptr == NULL) {

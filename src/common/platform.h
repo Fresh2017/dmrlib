@@ -17,6 +17,9 @@ extern "C" {
 #error "Platform not supported"
 #endif
 
+void __winsock_init(void);
+int __winsock_errno(long error);
+
 #if defined(__cplusplus)
 }
 #endif

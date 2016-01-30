@@ -56,7 +56,6 @@ required_headers = (
     'sys/param.h',
 )
 optional_headers = (
-    'errno.h',
     'libgen.h',
     'arpa/inet.h',
     'net/ethernet.h',
@@ -72,6 +71,7 @@ optional_libraries = (
     ('bsd',       'bsd/bsd.h'),
     ('portaudio', 'portaudio.h'),
     ('proc',      'libproc.h'),
+    ('rt',        'time.h'),
 )
 
 optional_defines = (
@@ -159,6 +159,14 @@ def echo(*args):
     sys.stdout.flush()
 
 
+def echo_yes(word='yes', extra=''):
+    echo('\r\x1b[64C\x1b[1;32m{0}\x1b[0m {1}\n'.format(word, extra))
+
+
+def echo_no(word='no', extra=''):
+    echo('\r\x1b[64C\x1b[1;31m{0}\x1b[0m {1}\n'.format(word, extra))
+
+
 def cache(key):
     def decorate(func):
         @wraps(func)
@@ -167,8 +175,8 @@ def cache(key):
             global CONFIG_CACHE
             try:
                 if CONFIG_CACHE[cache_key]:
-                    echo('checking {0} {1}... yes (cached)\n'.format(
-                        key, name))
+                    echo('checking {0} {1}...'.format(key, name))
+                    echo_yes('yes', '(cached)')
                     return True
             except KeyError:
                 pass
@@ -189,10 +197,20 @@ def cache_load(args):
         return True
 
     log('config cache: loading from {0}'.format(args.config_cache))
+    echo('checking configure cache {0}...'.format(args.config_cache))
+    cache_loaded = False
+    try:
+        if os.path.exists(args.config_cache):
+            with open(args.config_cache, 'rb') as fp:
+                CONFIG_CACHE.update(pickle.load(fp))
+                cache_loaded = True
+    except (IOError, OSError):
+        pass
 
-    if os.path.exists(args.config_cache):
-        with open(args.config_cache, 'rb') as fp:
-            CONFIG_CACHE.update(pickle.load(fp))
+    if cache_loaded:
+        echo_yes('ok')
+    else:
+        echo_no()
 
     def _cache_save():
         global CONFIG_CACHE
@@ -223,11 +241,11 @@ def _test_call(args):
 
     if code > 0:
         log('failed with exit code {0}'.format(code))
-        echo('no\n')
+        echo_no()
         return False
     else:
         log('ok')
-        echo('yes\n')
+        echo_yes()
         return True
 
 
@@ -257,7 +275,7 @@ def check_platform(args):
         os.environ['ARLIBEXT'] = '.a'
         os.environ['SHLIBPRE'] = 'lib'
         os.environ['SHLIBEXT'] = '.so'
-        echo('ok\n')
+        echo_yes('ok')
 
     elif platform == 'darwin':
         os.environ['BINEXT'] = ''
@@ -265,13 +283,14 @@ def check_platform(args):
         os.environ['ARLIBEXT'] = '.a'
         os.environ['SHLIBPRE'] = 'lib'
         os.environ['SHLIBEXT'] = '.dylib'
-        echo('ok\n')
+        echo_yes('ok')
         have_pkg_manager = False
 
         if not have_pkg_manager:
             for brew in ('/usr/local', '/opt/brew', '/opt/homebrew'):
                 if os.access(os.path.join(brew, 'bin/brew'), os.X_OK):
-                    echo('enabling Homebrew (http://brew.sh/) support in {0}...\n'.format(brew))
+                    echo('enabling Homebrew support in {0}...'.format(brew))
+                    echo_yes('ok')
                     env_append('CFLAGS', '-I{0}/include'.format(brew))
                     env_append('LDFLAGS', '-L{0}/lib'.format(brew))
                     have_pkg_manager = True
@@ -280,7 +299,8 @@ def check_platform(args):
         if not have_pkg_manager:
             for base in ('/opt/mports', '/opt/macports', '/opt/local'):
                 if os.path.isdir(base):
-                    echo('enabling MacPorts (https://www.macports.org) support in {0}...\n'.format(base))
+                    echo('enabling MacPorts support in {0}...'.format(base))
+                    echo_yes('ok')
                     env_append('CFLAGS', '-I{0}/include'.format(base))
                     env_append('LDFLAGS', '-L{0}/lib'.format(base))
                     have_pkg_manager = True
@@ -297,7 +317,7 @@ def check_platform(args):
 
     elif platform in ('win32', 'win64'):
         if not args.with_mingw:
-            echo('no\n')
+            echo_no()
             echo('please specify the MinGW installation path with --with-mingw=path\n')
             return False
 
@@ -324,7 +344,7 @@ def check_platform(args):
             ('setupapi', 'windows.h'),
             ('wpcap',    ('pcap.h', 'Packet32.h')),
         )
-        echo('ok\n')
+        echo_yes('ok')
 
     else:
         echo('not supported\n'.format(platform))
@@ -392,10 +412,10 @@ def check_compile(description, filename, libs, args):
                 call_args.insert(0, args.cross_execute)
             code = _test_call_code(call_args)
             if code == 0:
-                echo('yes\n')
+                echo_yes()
                 return True
 
-        echo('no\n')
+        echo_no()
         log('failed with exit code {0}'.format(code))
         return False
     finally:
@@ -439,10 +459,10 @@ def check_define(define, headers=[], libs=[]):
             # Compilation success, now run
             code = _test_call_code([dest])
             if code == 0:
-                echo('yes\n')
+                echo_yes()
                 return True
 
-        echo('no\n')
+        echo_no()
         log('failed with exit code {0}'.format(code))
         return False
     finally:
@@ -549,17 +569,24 @@ def check_versions(name):
             os.environ.update(**update)
             echo('{0}... '.format(name))
 
-    echo('done\n')
+    echo_yes('done')
     return True
+
+
+def _optional_library(name):
+    if os.environ.get('HAVE_LIB' + name.upper(), '0') == '1':
+        return '-l' + name
+    return ''
 
 
 def write_generated(args, source, target):
     echo('generating {0}... '.format(target))
     env = Environment(loader=FileSystemLoader('.'), trim_blocks=True)
+    env.filters['optional_library'] = _optional_library
     output = env.get_template(source).render(args=args, env=os.environ)
     with open(target, 'wb') as fp:
         fp.write(output)
-    echo('done\n')
+    echo_yes('done')
     return True
 
 

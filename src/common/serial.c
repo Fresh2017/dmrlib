@@ -352,7 +352,7 @@ int serial_flush(serial_t *port, serial_buffers_t buffers)
 	if (PurgeComm(port->hdl, flags) == 0)
 		RETURN_FAIL("PurgeComm() failed");
 
-	if (buffers & SP_BUF_INPUT)
+	if (buffers & SERIAL_BUFFER_INPUT)
 		TRY(restart_wait(port));
 #else
 	int flags = 0;

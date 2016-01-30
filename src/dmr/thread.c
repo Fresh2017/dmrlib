@@ -26,6 +26,7 @@ freely, subject to the following restrictions:
 #include <talloc.h>
 #include "dmr/platform.h"
 #include "dmr/thread.h"
+#include "dmr/type.h"
 
 /* Platform specific includes */
 #if defined(_DMR_THREAD_POSIX_)

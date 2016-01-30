@@ -54,7 +54,7 @@ int serial_write(serial_t *port, const void *buf, size_t len, unsigned int timeo
 				RETURN_FAIL("GetOverlappedResult() failed");
 			}
 		}
-		DEBUG_FMT("write completed, %d/%d bytes written", bytes_written, len);
+		DEBUGF("write completed, %d/%d bytes written", bytes_written, len);
 		RETURN_INT(bytes_written);
 	} else {
 		RETURN_FAIL("WriteFile() failed");

@@ -6,6 +6,61 @@
 #define TIOCINQ 0x541b
 #endif
 
+#if defined(PLATFORM_WINDOWS)
+/** To be called after port receive buffer is emptied. */
+static int restart_wait(serial_t *port)
+{
+	DWORD wait_result;
+
+	if (port->wait_running) {
+		/* Check status of running wait operation. */
+		if (GetOverlappedResult(port->hdl, &port->wait_ovl,
+				&wait_result, FALSE)) {
+			DEBUG("previous wait completed");
+			port->wait_running = FALSE;
+		} else if (GetLastError() == ERROR_IO_INCOMPLETE) {
+			DEBUG("previous wait still running");
+			RETURN_OK();
+		} else {
+			RETURN_FAIL("GetOverlappedResult() failed");
+		}
+	}
+
+	if (!port->wait_running) {
+		/* Start new wait operation. */
+		if (WaitCommEvent(port->hdl, &port->events,
+				&port->wait_ovl)) {
+			DEBUG("new wait returned, events already pending");
+		} else if (GetLastError() == ERROR_IO_PENDING) {
+			DEBUG("new wait running in background");
+			port->wait_running = TRUE;
+		} else {
+			RETURN_FAIL("WaitCommEvent() failed");
+		}
+	}
+
+	RETURN_OK();
+}
+
+/* Restart wait operation if buffer was emptied. */
+static int restart_wait_if_needed(serial_t *port, unsigned int bytes_read)
+{
+	DWORD errors;
+	COMSTAT comstat;
+
+	if (bytes_read == 0)
+		RETURN_OK();
+
+	if (ClearCommError(port->hdl, &errors, &comstat) == 0)
+		RETURN_FAIL("ClearCommError() failed");
+
+	if (comstat.cbInQue == 0)
+		TRY(restart_wait(port));
+
+	RETURN_OK();
+}
+#endif
+
 int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 {
 	CHECK_OPEN_PORT();

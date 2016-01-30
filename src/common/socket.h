@@ -17,22 +17,6 @@
 extern "C" {
 #endif
 
-#if defined(PLATFORM_WINDOWS)
-
-#if !defined(WIN32_LEAN_AND_MEAN)
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#define __winsock_errno(x) winsock2errno(x)
-#define __winsock_init()
-
-#else // PLATFORM_WINDOWS
-
-int __winsock_errno(long error);
-void __winsock_init(void);
-
-#endif // PLATFORM_WINDOWS
-
 #if !defined(EAFNOSUPPORT)
 #define EAFNOSUPPORT EINVAL
 #endif

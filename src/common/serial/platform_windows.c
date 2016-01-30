@@ -379,7 +379,7 @@ static void get_usb_details(serial_t *port, DEVINST dev_inst_match)
 	return;
 }
 
-int serial_port_details(serial_t *port)
+int serial_details(serial_t *port)
 {
 	/*
 	 * Description limited to 127 char, anything longer
@@ -510,7 +510,7 @@ int serial_port_details(serial_t *port)
 	RETURN_OK();
 }
 
-int serial_port_list(serial_t ***list)
+int serial_list(serial_t ***list)
 {
 	HKEY key;
 	TCHAR *value, *data;
@@ -567,7 +567,7 @@ int serial_port_list(serial_t ***list)
 			strcpy(name, data);
 #endif
 			DEBUGF("found port %s", name);
-			if (!(*list = serial_port_list_append(*list, name))) {
+			if (!(*list = serial_list_append(*list, name))) {
 				SET_ERROR(ret, ENOMEM, "list append failed");
 				TALLOC_FREE(name);
 				goto out;

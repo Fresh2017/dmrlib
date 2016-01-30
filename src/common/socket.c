@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <talloc.h>
 #include "common/socket.h"
+#include "common/platform.h"
 
 socket_t *socket_new(uint8_t v, uint32_t scope_id)
 {

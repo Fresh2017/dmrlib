@@ -7,6 +7,7 @@ extern "C" {
 
 #include <sys/time.h>
 #include <inttypes.h>
+#include <dmr/platform.h>
 
 uint32_t dmr_time_since(struct timeval tv);
 uint32_t dmr_time_ms_since(struct timeval tv);

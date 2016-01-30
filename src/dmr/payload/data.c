@@ -212,3 +212,4 @@ uint8_t dmr_data_block_size(dmr_data_rate_t rate, bool confirmed)
 	default: 		  	  return 0;
 	}
 }
+

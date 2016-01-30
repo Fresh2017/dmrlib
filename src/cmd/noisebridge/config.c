@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <talloc.h>
 #include <string.h>
-#include <netdb.h>
 #include <dmr/error.h>
 #include "config.h"
 

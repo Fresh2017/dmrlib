@@ -44,3 +44,6 @@ src/cmd/noisebridge/version.h
 src/common/config.h
 Makefile
 config.log
+
+# OS X cruft
+.DS_Store

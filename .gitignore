@@ -43,7 +43,7 @@ include/dmr/version.h
 src/cmd/noisebridge/version.h
 src/common/config.h
 Makefile
-config.log
+wright.log
 
 # OS X cruft
 .DS_Store

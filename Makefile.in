@@ -90,10 +90,10 @@ CFLAGS  ?= {{ env.CFLAGS }}
 CFLAGS  += -Wall -Wextra -ffast-math
 CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
 CFLAGS  += -Iinclude -Isrc
-{% if env.HAVE_MINGW != '1' -%}
+{% if not have('mingw') -%}
 CFLAGS  += -fPIC
 {% endif -%}
-{% if args.with_debug -%}
+{% if with('debug') -%}
 CFLAGS  += -g
 {% else -%}
 CFLAGS  += -O2
@@ -107,14 +107,14 @@ COMMON_DEPS 		 = $(patsubst %.c,%.d,$(COMMON_SOURCES))
 COMMON_CFLAGS 		 = $(CFLAGS)
 COMMON_ARCHIVE 		 = $(ARLIBPRE)common$(ARLIBEXT)
 COMMON_LIBS 		 = -ltalloc
-{% if args.with_mingw %}
+{% if have('mingw') %}
 COMMON_LIBS 		+= -lhid -lsetupapi -lws2_32
 {% endif %}
 ifeq ($(UNAME),Darwin)
 COMMON_LIBS 		+= -framework IOKit -framework CoreFoundation
 endif
 
-{% if args.with_mbelib -%}
+{% if with('mbelib') -%}
 MBELIB_SOURCES       = $(wildcard src/mbelib/*.c)
 MBELIB_OBJECTS       = $(patsubst %.c,%.o,$(MBELIB_SOURCES))
 MBELIB_DEPS          = $(patsubst %.c,%.d,$(MBELIB_SOURCES))
@@ -131,7 +131,7 @@ DMRLIB_TARGET 		 = $(SHLIBPRE)dmr$(SHLIBEXT)
 DMRLIB_CFLAGS        = $(CFLAGS)
 DMRLIB_LDFLAGS       = $(LDFLAGS) -shared -Lsrc/mbelib
 DMRLIB_LIBS 		+= $(COMMON_ARCHIVE) $(COMMON_LIBS)
-DMRLIB_LIBS 		+= -ltalloc {% if args.with_mbelib %}-lmbe{% endif %} {{ 'pthread'|optional_library }} {{ 'rt'|optional_library }}
+DMRLIB_LIBS 		+= -ltalloc {% if with('mbelib') %}-lmbe{% endif %} {{ lib('pthread', 1) }} {{ lib('rt', 1) }}
 
 DMRDUMP_SOURCES      = $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      = $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))
@@ -139,8 +139,8 @@ DMRDUMP_DEPS         = $(patsubst %.c,%.d,$(DMRDUMP_SOURCES))
 DMRDUMP_TARGET 	     = dmrdump$(BINEXT)
 DMRDUMP_CFLAGS       = $(CFLAGS) -D_BSD_SOURCE
 DMRDUMP_LDFLAGS      = $(LDFLAGS) -Lsrc/dmr
-DMRDUMP_LIBS 		 = -ltalloc -ldmr {{ 'pthread'|optional_library }}
-{% if env.HAVE_PCAP_CONFIG == '1' %}
+DMRDUMP_LIBS 		 = -ltalloc -ldmr {{ lib('pthread', 1) }}
+{% if have('pcap-config') -%}
 DMRDUMP_LIBS        += $(shell pcap-config --libs)
 {% else %}
 DMRDUMP_LIBS 		+= -l{{ env.LIBPCAP_NAME }}
@@ -155,14 +155,22 @@ NOISEBRIDGE_DEPS     = $(patsubst %.c,%.d,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_TARGET   = noisebridge$(BINEXT)
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS)
-NOISEBRIDGE_LIBS     = -ldmr -ltalloc {{ 'pthread'|optional_library }} {{ 'bsd'|optional_library }} {{ 'rt'|optional_library }} {{ 'dl'|optional_library }} {{ 'ws2_32'|optional_library }}
-{% if env.LUA_USE_PKG_CONFIG == '1' %}
-NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags {{ env.LUA_VERSION }})
-NOISEBRIDGE_LIBS    += $(shell pkg-config --libs {{ env.LUA_VERSION }})
-{% else %}
-NOISEBRIDGE_LIBS	+= -l{{ env.LUA_VERSION }}
-{% endif %}
-{% if args.with_mbelib %}
+NOISEBRIDGE_LIBS     = -ldmr -ltalloc {{ lib('pthread', 1) }} {{ lib('bsd', 1) }} {{ lib('rt', 1) }} {{ lib('dl', 1) }} {{ lib('ws2_32', 1) }}
+{% set lua = "" %}
+{% for opt in ('lua5.3', 'lua5.2', 'lua') -%}
+	{%- if not lua and have('pkg-config ' + opt) -%}
+		{%- set lua = opt -%}
+NOISEBRIDGE_CFLAGS  += $(shell pkg-config --cflags {{ opt }})
+NOISEBRIDGE_LIBS    += $(shell pkg-config --libs {{ opt }})
+	{%- endif -%}
+{% endfor %}
+{% for opt in ('lua5.3', 'lua53', 'lua5.2', 'lua52', 'lua') %}
+	{%- if not lua and have('lib' + opt) -%}
+		{%- set lua = opt -%}
+NOISEBRIDGE_LIBS    += -l{{ opt }}
+	{%- endif -%}
+{% endfor %}
+{% if with('mbelib') %}
 NOISEBRIDGE_LIBS 	+= -lportaudio
 {% endif %}
 
@@ -180,7 +188,7 @@ TEST_DEPS 			 = $(patsubst %.c,%.d,$(TEST_SOURCES))
 TEST_PROGRAMS 		 = $(patsubst %.c,%.test,$(TEST_SOURCES))
 TEST_CFLAGS 		 = $(CFLAGS)
 TEST_LDFLAGS  		 = $(LDFLAGS) -Lsrc/dmr
-TEST_LIBS     		 = -ldmr {{ 'pthread'|optional_library }} -ltalloc
+TEST_LIBS     		 = -ldmr {{ lib('pthread', 1) }} -ltalloc
 
 UNAME := $(shell uname -s)
 
@@ -188,7 +196,7 @@ all: build
 
 debug: build-debug
 
-build: build-common {% if args.with_mbelib %} build-mbelib{% endif %} build-dmrlib build-cmd
+build: build-common {% if with('mbelib') %} build-mbelib{% endif %} build-dmrlib build-cmd
 
 build-debug: FLAGS += DEBUG=1
 build-debug: build
@@ -197,11 +205,11 @@ install-dir:
 	$(INSTALL) -m0755 -d $(BINDIR)
 	$(INSTALL) -m0755 -d $(LIBDIR)
 
-install: install-dir {% if args.with_mbelib %}install-mbelib {% endif %}install-dmrlib install-cmd
+install: install-dir {% if with('mbelib') %}install-mbelib {% endif %}install-dmrlib install-cmd
 
 test: test-all
 
-clean: clean-common {% if args.with_mbelib %}clean-mbelib {% endif %}clean-dmrlib clean-cmd clean-test
+clean: clean-common {% if with('mbelib') %}clean-mbelib {% endif %}clean-dmrlib clean-cmd clean-test
 
 #
 # common/
@@ -228,7 +236,7 @@ endif
 clean-common:
 	$(Q)for file in $(COMMON_ARCHIVE) $(COMMON_OBJECTS) $(COMMON_DEPS); do if [ -f "$$file" ]; then $(RM) "$$file"; fi; done
 
-{% if args.with_mbelib -%}
+{% if with('mbelib') -%}
 
 #
 # lib/mbelib

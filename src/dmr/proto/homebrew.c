@@ -12,7 +12,9 @@
 #include "dmr/proto.h"
 #include "dmr/proto/homebrew.h"
 #include "dmr/type.h"
+#include "common/byte.h"
 #include "common/sha256.h"
+#include "common/socket.h"
 #include "common/uint.h"
 
 static const char *dmr_homebrew_proto_name = "homebrew";
@@ -625,6 +627,29 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
     packet->meta.stream_id = homebrew->tx[ts].stream_id;
     packet->meta.sequence = homebrew->tx[ts].seq++;
 
+    uint8_t dmrd[53];
+    byte_zero(dmrd, sizeof(dmrd));
+    byte_copy(dmrd, "DMRD", 4);                         /*  0.. 3 (4 bytes) */
+    dmrd[4] = packet->meta.sequence;                    /*  4     (1 byte)  */
+    uint24_pack(dmrd +  5, packet->src_id);             /*  5.. 7 (3 bytes) */
+    uint24_pack(dmrd +  8, packet->dst_id);             /*  8..10 (3 bytes  */
+    uint32_pack(dmrd + 11, packet->repeater_id);        /* 11..14 (4 bytes) */
+    dmrd[15] = (packet->ts & 0x01) | (packet->flco & 0x01) << 1; /* 15 (1 byte) */
+    switch (packet->data_type) {
+    case DMR_DATA_TYPE_VOICE:
+        dmrd[15] |= (packet->meta.voice_frame & 0x0f) << 4;
+        break;
+    case DMR_DATA_TYPE_VOICE_SYNC:
+        dmrd[15] |= 0x04;
+        break;
+    default:
+        dmrd[15] |= 0x0b;
+        dmrd[15] |= (packet->data_type & 0x0f) << 4;
+        break;
+    }
+    uint32_pack(dmrd + 16, packet->meta.stream_id);     /* 16..19 (4 bytes) */
+    byte_copy(dmrd + 20, packet->payload, DMR_PAYLOAD_BYTES); /* 20..52 (33 bytes) */
+    /*
     dmr_homebrew_data_t dmrd;
     memcpy(&dmrd.signature, "DMRD", 4);
     dmrd.sequence = packet->meta.sequence;
@@ -656,11 +681,12 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
         break;
     }
     memcpy(&dmrd.payload, packet->payload, DMR_PAYLOAD_BYTES);
+    */
 
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_packet(packet);
     }
-    int ret = dmr_homebrew_sendraw(homebrew, (uint8_t *)&dmrd, sizeof(dmr_homebrew_data_t));
+    int ret = dmr_homebrew_sendraw(homebrew, dmrd, sizeof(dmr_homebrew_data_t));
 
     /* Book keeping */
     homebrew->tx[ts].data_type = packet->data_type;

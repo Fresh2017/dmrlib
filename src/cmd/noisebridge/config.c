@@ -2,8 +2,16 @@
 #include <stdlib.h>
 #include <talloc.h>
 #include <string.h>
+#include <dmr/config.h>
 #include <dmr/error.h>
 #include "config.h"
+
+#if defined(DMR_HAVE_NETDB_H)
+#include <netdb.h>
+#endif
+#if defined(DMR_PLATFORM_WINDOWS)
+#include <winsock2.h>
+#endif
 
 static config_t *config = NULL;
 

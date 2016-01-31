@@ -51,6 +51,8 @@ def main():
     for key in ('ARFLAGS', 'CFLAGS', 'LDFLAGS'):
         env.merge(parse_flags(os.environ.get(key, ''), origin=key))
 
+    if args.cross_compile:
+        env['CROSS_COMPILE'] = args.cross_compile
     if args.cross_execute:
         env['CROSS_EXECUTE'] = args.cross_execute
     if args.platform:

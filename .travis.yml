@@ -60,7 +60,9 @@ before_install:
 
 script:
   - echo "CROSS_COMPILE=$CROSS_COMPILE, CC=$CC, CONFIGURE_ARGS=$CONFIGURE_ARGS"
-  - CROSS_COMPILE="$CROSS_COMPILE" CC="$CROSS_COMPILE$CC" ./configure --with-debug $CONFIGURE_ARGS || (cat wright.log && false)
+  - CROSS_COMPILE="$CROSS_COMPILE" CC="$CROSS_COMPILE$CC" ./configure --with-debug $CONFIGURE_ARGS
+  - cat wright.log
+  - cat Makefile
   - make CROSS_COMPILE="$CROSS_COMPILE" CC="$CROSS_COMPILE$CC" V=1
   - make CROSS_COMPILE="$CROSS_COMPILE" CC="$CROSS_COMPILE$CC" install PREFIX=./dist
   - if [ $MAKE_TEST -eq 1 ]; then LD_LIBRARY_PATH=dist/lib make test; fi

@@ -1,0 +1,11 @@
+prefix={{ PREFIX }}
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: dmr
+Description: Digital Mobile Radio
+Version: {{ DMRLIB_VERSION }}
+Libs: -L${libdir} -ldmr {{ lib('m', 1)}} {{ lib('rt', 1)}} {{ lib('pthread', 1)}} {{ lib('talloc') }}
+Cflags: -I${includedir}
+URL: https://github.com/pd0mz/dmrlib

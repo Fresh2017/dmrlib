@@ -43,6 +43,7 @@ include/dmr/version.h
 src/cmd/noisebridge/version.h
 src/common/config.h
 Makefile
+dmrlib.pc
 wright.log
 
 # OS X cruft

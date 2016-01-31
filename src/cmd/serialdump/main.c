@@ -6,6 +6,8 @@
 
 int main(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
     serial_t **ports = talloc_zero(NULL, serial_t *);
     size_t i;
     if (serial_list(&ports) != 0) {
@@ -46,4 +48,6 @@ int main(int argc, char **argv)
             break;
         }
     }
+
+    return 0;
 }

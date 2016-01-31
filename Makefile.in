@@ -153,7 +153,7 @@ NOISEBRIDGE_DEPS     = $(patsubst %.c,%.d,$(NOISEBRIDGE_SOURCES))
 NOISEBRIDGE_TARGET   = noisebridge$(BINEXT)
 NOISEBRIDGE_CFLAGS   = $(CFLAGS)
 NOISEBRIDGE_LDFLAGS  = $(LDFLAGS)
-NOISEBRIDGE_LIBS     = -ldmr -ltalloc {{ lib('pthread', 1) }} {{ lib('bsd', 1) }} {{ lib('rt', 1) }} {{ lib('dl', 1) }} {{ lib('ws2_32', 1) }}
+NOISEBRIDGE_LIBS     = -ldmr -ltalloc {{ lib('pthread', 1) }} {{ lib('bsd', 1) }} {{ lib('m', 1) }} {{ lib('rt', 1) }} {{ lib('dl', 1) }} {{ lib('ws2_32', 1) }}
 {% set lua = "" %}
 {% for opt in ('lua5.3', 'lua5.2', 'lua') -%}
 	{%- if not lua and have('pkg-config ' + opt) -%}

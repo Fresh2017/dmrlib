@@ -5,6 +5,8 @@
 #include <dmr/config.h>
 #include <dmr/error.h>
 #include "config.h"
+#include "common/format.h"
+#include "common/scan.h"
 
 #if defined(DMR_HAVE_NETDB_H)
 #include <netdb.h>
@@ -108,25 +110,27 @@ int read_config_homebrew(char *line, char *filename, size_t lineno)
     else CONFIG_FLOAT(proto, "latitude", proto->instance.homebrew.latitude)
     else CONFIG_FLOAT(proto, "longitude", proto->instance.homebrew.longitude)
     else if (!strcmp(k, "host")) {
-        if (proto->instance.homebrew.addr != NULL) {
-            CONFIG_ERROR("duplicate host");
-        }
         char *host = v, *port = NULL;
         host = strtok_r(v, ":", &port);
         if (port == NULL) {
-            proto->instance.homebrew.port = 62030;
+            proto->instance.homebrew.peer_port = 62030;
         } else {
-            proto->instance.homebrew.port = atoi(port);
+            proto->instance.homebrew.peer_port = atoi(port);
         }
-        if (proto->instance.homebrew.port == 0) {
-            proto->instance.homebrew.port = 62030;
+        if (proto->instance.homebrew.peer_port == 0) {
+            proto->instance.homebrew.peer_port = 62030;
         }
         struct hostent *hostent = NULL;
         if ((hostent = gethostbyname(host)) == NULL || hostent->h_length == 0) {
             CONFIG_ERROR("could not resolve %s: %s", host, strerror(errno));
         }
-        proto->instance.homebrew.addr = (struct in_addr *)hostent->h_addr_list[0];
-        dmr_log_trace("noisebridge: %s resolved to %s", host, inet_ntoa(*proto->instance.homebrew.addr));
+        byte_zero(proto->instance.homebrew.peer_ip, sizeof(ip6_t));
+        byte_copy(proto->instance.homebrew.peer_ip, (void *)ip6mappedv4prefix, sizeof(ip6mappedv4prefix));
+        byte_copy(proto->instance.homebrew.peer_ip + sizeof(ip6mappedv4prefix), (void *)hostent->h_addr_list[0], 4);
+        char host_ip[FORMAT_IP6_LEN];
+        byte_zero(host_ip, sizeof(host_ip));
+        format_ip6(host_ip, proto->instance.homebrew.peer_ip);
+        dmr_log_trace("noisebridge: %s resolved to %s", host, host_ip);
     } else {
         CONFIG_ERROR("unknown key \"%s\"", k);
     }

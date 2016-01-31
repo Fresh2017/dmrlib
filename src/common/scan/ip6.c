@@ -12,7 +12,7 @@
 unsigned int scan_ip6(const char *src, ip6_t ip)
 {
     unsigned int i;
-    unsigned int len=0;
+    unsigned int len = 0;
     unsigned long u;
 
     uint8_t suffix[16];

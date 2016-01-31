@@ -1,10 +1,12 @@
+#include "common/format.h"
+#include "common/scan.h"
 #include "config.h"
 
 static void lua_set_fun(lua_State *L, const char *key, void *fun)
 {
     lua_pushstring(L, key);
     lua_pushcfunction(L, fun);
-    lua_settable(L, -3); 
+    lua_settable(L, -3);
 }
 
 static void lua_set_int(lua_State *L, const char *key, int value)
@@ -222,8 +224,10 @@ int init_script(void)
         lua_set_str(L, "name", proto->name);
         switch (proto->type) {
             case DMR_PROTO_HOMEBREW: {
-                lua_set_str(L, "host", inet_ntoa(*proto->instance.homebrew.addr));
-                lua_set_int(L, "port", proto->instance.homebrew.port);
+                char host[FORMAT_IP6_LEN];
+                format_ip6(host, proto->instance.homebrew.peer_ip);
+                lua_set_str(L, "host", host);
+                lua_set_int(L, "port", proto->instance.homebrew.peer_port);
                 lua_set_str(L, "call", proto->instance.homebrew.call);
                 lua_set_int(L, "repeater_id", proto->instance.homebrew.repeater_id);
                 break;

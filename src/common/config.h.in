@@ -8,5 +8,8 @@
 /* #undef {{ key }} */
 {% endif %}{% endfor %}
 
-#endif // _COMMON_CONFIG_H
+#if !defined(HAVE_INLINE)
+#define inline
+#endif
 
+#endif // _COMMON_CONFIG_H

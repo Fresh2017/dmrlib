@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <stddef.h>
 #include "common/platform.h"
+#include "common/format.h"
+#include "common/scan.h"
 #if defined(PLATFORM_WINDOWS)
 #include <windows.h>
 #endif
@@ -28,9 +30,9 @@ extern void (*debug_handler)(const char *fmt, ...);
 
 #define DEBUGF(fmt, ...)      do { \
     if (debug_handler) \
-        debug_handler(fmt "\n", __VA_ARGS__); \
+        debug_handler(fmt "\n", ##__VA_ARGS__); \
 } while(0)
-#define DEBUG(msg)            DEBUGF(msg,NULL)
+#define DEBUG(msg)            DEBUGF(msg)
 #define DEBUG_ERROR(err, msg) DEBUGF("%s returning " #err ": " msg, __func__)
 #define RETURN_CODE(x) do { \
 	DEBUGF("%s returning " #x, __func__); \
@@ -75,6 +77,9 @@ extern void (*debug_handler)(const char *fmt, ...);
     int retval = x; \
     if (retval != 0) RETURN_CODEVAL(retval); \
 } while (0)
+
+char *debugip4(ip4_t ip);
+char *debugip6(ip6_t ip);
 
 #if defined(__cplusplus)
 }

@@ -63,5 +63,6 @@ script:
   - cat wright.log
   - cat Makefile
   - make V=1
-  - make install PREFIX=./dist
-  - if [ $MAKE_TEST -eq 1 ]; then LD_LIBRARY_PATH=dist/lib make test; fi
+  - make install DEST=./dist
+  - find dist -ls
+  - if [ $MAKE_TEST -eq 1 ]; then LD_LIBRARY_PATH=. make test; fi

@@ -13,6 +13,8 @@
 #include "dmr/proto/homebrew.h"
 #include "dmr/type.h"
 #include "common/byte.h"
+#include "common/format.h"
+#include "common/scan.h"
 #include "common/sha256.h"
 #include "common/socket.h"
 #include "common/uint.h"
@@ -192,10 +194,34 @@ static void homebrew_proto_tx(void *homebrewptr, dmr_packet_t *packet)
     }
 }
 
-dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer)
+static socket_t *dmr_homebrew_sock(dmr_homebrew_t *homebrew)
 {
-    dmr_log_debug("homebrew: new on port %d to %s:%d",
-        port, inet_ntoa(peer), port);
+    if (homebrew == NULL) {
+        return NULL;
+    }
+    static socket_t sock;
+    sock.v = 6;
+    sock.fd = homebrew->fd;
+    sock.scope_id = 0;
+    return &sock;
+}
+
+static inline char *dmr_homebrew_ip(ip6_t ip)
+{
+    static char host[FORMAT_IP6_LEN];
+    format_ip6(host, ip);
+    return host;
+}
+
+dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, const uint8_t bind_ip[16], uint16_t bind_port)
+{
+    if (peer_ip == NULL || peer_port == 0) {
+        dmr_error(DMR_EINVAL);
+        return NULL;
+    }
+
+    dmr_log_debug("homebrew: new on %s:%u to %s:%u",
+        bind_ip, bind_port, peer_ip, peer_port);
 
     int optval = 1;
     dmr_homebrew_t *homebrew = talloc_zero(NULL, dmr_homebrew_t);
@@ -203,6 +229,19 @@ dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer)
         DMR_OOM();
         return NULL;
     }
+
+    homebrew->peer_port = peer_port;
+    byte_copy(homebrew->peer_ip, (void *)peer_ip, 16);
+    if (bind_ip == NULL) {
+        byte_zero(homebrew->bind_ip, 16);
+        byte_copy(homebrew->bind_ip, (void *)ip6mappedv4prefix, sizeof(ip6mappedv4prefix));
+    } else {
+        byte_copy(homebrew->bind_ip, (void *)bind_ip, 16);
+    }
+    if (bind_port == 0) {
+        bind_port = DMR_HOMEBREW_PORT;
+    }
+    homebrew->bind_port = bind_port;
 
     dmr_homebrew_config_init(&homebrew->config);
 
@@ -241,7 +280,14 @@ dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer)
     }
 
     // Setup file descriptor for UDP socket
-    homebrew->fd = socket(AF_INET, SOCK_DGRAM, 0);
+    socket_t *sock = socket_udp6(0);
+    if (sock == NULL) {
+        dmr_log_critical("homebrew: out of memory");
+        TALLOC_FREE(homebrew);
+        return NULL;
+    }
+
+    homebrew->fd = sock->fd;
     if (homebrew->fd < 0) {
         dmr_error_set(strerror(errno));
         dmr_log_error("homebrew: socket creation failed: %s", strerror(errno));
@@ -259,24 +305,13 @@ dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer)
         dmr_log_error("homebrew: failed to set socket option SO_REUSEPORT: %s", strerror(errno));
     }
 #endif
-
-    homebrew->server.sin_family = AF_INET;
-    homebrew->server.sin_addr.s_addr = INADDR_ANY;
-    homebrew->server.sin_port = htons(port);
-    memset(homebrew->server.sin_zero, 0, sizeof(homebrew->server.sin_zero));
-
-    if (bind(homebrew->fd, (struct sockaddr *)&homebrew->server, sizeof(struct sockaddr_in)) != 0) {
+    if (socket_bind(sock, homebrew->bind_ip, homebrew->bind_port) != 0) {
         dmr_error_set(strerror(errno));
-        dmr_log_error("homebrew: bind to port %d failed: %s", port, strerror(errno));
+        dmr_log_error("homebrew: bind to port %s:%u failed: %s",
+            bind_ip, bind_port, strerror(errno));
         TALLOC_FREE(homebrew);
         return NULL;
     }
-
-    homebrew->remote.sin_family = AF_INET;
-    homebrew->remote.sin_addr.s_addr = peer.s_addr;
-    homebrew->remote.sin_port = htons(port);
-    memset(homebrew->remote.sin_zero, 0, sizeof(homebrew->remote.sin_zero));
-
     return homebrew;
 }
 
@@ -289,8 +324,7 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
     //memset(&buf, 0, 64);
 
     dmr_log_info("homebrew: connecting to repeater at %s:%d as %.*s",
-        inet_ntoa(homebrew->remote.sin_addr),
-        ntohs(homebrew->remote.sin_port),
+        dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port,
         /* no NULL byte at the end */
         8, homebrew->config.repeater_id);
 
@@ -700,17 +734,17 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len)
     if (homebrew == NULL)
         return dmr_error(DMR_EINVAL);
 
-    dmr_log_debug("homebrew: %d bytes to %s:%d", len, inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
+    dmr_log_debug("homebrew: %d bytes to [%s]:%u", len,
+        dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(buf, len);
         dmr_homebrew_dump(buf, len);
     }
-    if (sendto(homebrew->fd, buf, len, 0, (struct sockaddr *)&homebrew->remote, sizeof(homebrew->remote)) != len) {
-        dmr_log_error("homebrew: send to %s:%d failed: %s",
-            inet_ntoa(homebrew->remote.sin_addr),
-            ntohs(homebrew->remote.sin_port),
+    if (socket_send6(homebrew->fd, buf, len, homebrew->peer_ip, homebrew->peer_port, 0) != len) {
+        dmr_log_error("homebrew: send to [%s]:%d failed: %s",
+            dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port,
             strerror(errno));
-        return dmr_error_set("homebrew: sendto(): %s", strerror(errno));
+        return dmr_error_set("homebrew: send(): %s", strerror(errno));
     }
 
     return 0;
@@ -718,12 +752,12 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len)
 
 int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval *timeout)
 {
-    struct sockaddr_in peer;
-    memset(&peer, 0, sizeof(struct sockaddr_in));
-#ifdef DMR_PLATFORM_WINDOWS
-    int peerlen;
-#else
-    socklen_t peerlen = sizeof(peer);
+    if (homebrew == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    socket_t *sock = dmr_homebrew_sock(homebrew);
+    ip6_t peer = { 0, };
+    uint16_t peer_port = 0;
     fd_set rfds;
     int nfds;
     FD_ZERO(&rfds);
@@ -739,16 +773,12 @@ select_again:
         }
         return dmr_error(DMR_EINVAL);
     }
-    if ((*len = recvfrom(homebrew->fd, homebrew->buffer, sizeof(homebrew->buffer), 0, (struct sockaddr *)&peer, &peerlen)) < 0) {
-        dmr_log_error("homebrew: recv from %s:%d failed: %s",
-            inet_ntoa(homebrew->remote.sin_addr),
-            ntohs(homebrew->remote.sin_port),
-            strerror(errno));
-        return dmr_error_set("homebrew: recvfrom(): %s", strerror(errno));
+    if ((*len = socket_recv(sock, homebrew->buffer, sizeof(homebrew->buffer), peer, &peer_port)) < 0) {
+        dmr_log_error("homebrew: recv(): %s", strerror(errno));
+        return dmr_error_set("homebrew: recv(): %s", strerror(errno));
     }
-#endif
-    dmr_log_debug("homebrew: recv %d bytes from %s:%d", *len,
-        inet_ntoa(homebrew->remote.sin_addr), ntohs(homebrew->remote.sin_port));
+    dmr_log_debug("homebrew: recv %d bytes from [%s]:%u", *len,
+        dmr_homebrew_ip(peer), peer_port);
     if (*len > 0 && dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(homebrew->buffer, *len);
         dmr_homebrew_dump(homebrew->buffer, *len);

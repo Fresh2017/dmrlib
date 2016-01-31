@@ -1,5 +1,7 @@
 #include <common/config.h>
 #include <signal.h>
+#include "common/format.h"
+#include "common/scan.h"
 #include "config.h"
 #include "script.h"
 
@@ -137,12 +139,15 @@ int init_proto_homebrew(config_t *config, proto_t *proto)
     DMR_UNUSED(config);
 
     int ret = 0;
-    dmr_log_info("noisebridge: connect to BrandMeister homebrew on %s:%d",
-        inet_ntoa(*proto->instance.homebrew.addr),
-        proto->instance.homebrew.port);
+    char host[FORMAT_IP6_LEN];
+    format_ip6(host, proto->instance.homebrew.peer_ip);
+    dmr_log_info("noisebridge: connect to BrandMeister homebrew on [%s]:%u",
+        host, proto->instance.homebrew.peer_port);
     dmr_homebrew_t *homebrew = dmr_homebrew_new(
-        proto->instance.homebrew.port,
-        *proto->instance.homebrew.addr);
+        proto->instance.homebrew.peer_ip, proto->instance.homebrew.peer_port,
+        NULL, 0);
+        //proto->instance.homebrew.bind_ip,
+        //proto->instance.homebrew.bind_port);
     if (homebrew == NULL) {
         return dmr_error(DMR_ENOMEM);
     }

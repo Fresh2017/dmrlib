@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-#define SCAN_IP4_FMT 20
-#define SCAN_IP6_FMT 40
+#define FORMAT_IP4_LEN 20
+#define FORMAT_IP6_LEN 40
 
 int          scan_fromhex(unsigned char c);
 size_t       scan_ulong(const char *src, unsigned long int *dst);

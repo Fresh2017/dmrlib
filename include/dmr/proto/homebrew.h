@@ -87,7 +87,8 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     dmr_proto_t           proto;
     int                   fd;
-    struct sockaddr_in    server, remote;
+    uint8_t               peer_ip[16], bind_ip[16];
+    uint16_t              peer_port, bind_port;
     dmr_homebrew_auth_t   auth;
     dmr_id_t              id;
     uint8_t               buffer[512];  /* receive buffer */
@@ -115,7 +116,7 @@ typedef struct {
     struct timeval last_ping_sent;
 } dmr_homebrew_t;
 
-extern dmr_homebrew_t *dmr_homebrew_new(int port, struct in_addr peer);
+extern dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, const uint8_t *bind_ip, uint16_t bind_port);
 extern int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret);
 extern void dmr_homebrew_close(dmr_homebrew_t *homebrew);
 extern void dmr_homebrew_free(dmr_homebrew_t *homebrew);

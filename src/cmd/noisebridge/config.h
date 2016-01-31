@@ -13,6 +13,7 @@
 #include <dmr/proto/mmdvm.h>
 #include <dmr/proto/repeater.h>
 #include "common/config.h"
+#include "common/socket.h"
 
 #define NOISEBRIDGE_MAX_PROTOS 16
 
@@ -23,8 +24,10 @@ typedef struct {
     void             *mem;
     union {
         struct {
-            struct in_addr   *addr;
-            int              port;
+            ip6_t            peer_ip;
+            uint16_t         peer_port;
+            ip6_t            bind_ip;
+            uint16_t         bind_port;
             char             *auth;
             char             *call;
             dmr_id_t         repeater_id;

@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-int winsock2errno(long l) {
+int __winsock_errno(long l) {
     long x;
     if (l==-1)
     switch ((x = WSAGetLastError())) {
@@ -67,8 +67,14 @@ void __winsock_init(void)
 
 #else // PLATFORM_WINDOWS
 
-void __winsock_init(void) {
+void __winsock_init(void)
+{
     (void)0;
+}
+
+int __winsock_errno(long err)
+{
+    return err;
 }
 
 #endif // PLATFORM_WINDOWS

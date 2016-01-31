@@ -19,7 +19,6 @@
 #include <sys/time.h>
 #endif
 
-#include <dmr/buffer/ring.h>
 #include <dmr/type.h>
 #include <dmr/thread.h>
 #include <dmr/proto.h>

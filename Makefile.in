@@ -20,11 +20,11 @@ AWK			= awk
 INSTALL 	= install
 PERL 		= perl
 
-BINEXT 		= {{ env.BINEXT }}
-ARLIBPRE    = {{ env.ARLIBPRE }}
-ARLIBEXT    = {{ env.ARLIBEXT }}
-SHLIBPRE    = {{ env.SHLIBPRE }}
-SHLIBEXT    = {{ env.SHLIBEXT }}
+BINEXT 		= {{ BINEXT }}
+ARLIBPRE    = {{ ARLIBPRE }}
+ARLIBEXT    = {{ ARLIBEXT }}
+SHLIBPRE    = {{ SHLIBPRE }}
+SHLIBEXT    = {{ SHLIBEXT }}
 
 ifeq ($(V),)
 Q=
@@ -81,15 +81,14 @@ endif
 .PHONY: all
 
 FLAGS   ?=
-PREFIX  ?= {{ args.prefix }}
+PREFIX  ?= {{ PREFIX }}
 BINDIR  ?= $(PREFIX)/bin
 LIBDIR  ?= $(PREFIX)/lib
-BUILD   ?= {{ args.builddir }}
 
-CFLAGS  ?= {{ env.CFLAGS }}
+CFLAGS  ?= {{ CFLAGS|join(" ") }}
 CFLAGS  += -Wall -Wextra -ffast-math
 CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
-CFLAGS  += -Iinclude -Isrc
+CFLAGS  += -Iinclude -Isrc {% for path in INCLUDES %}-I{{ path }} {% endfor %}
 {% if not have('mingw') -%}
 CFLAGS  += -fPIC
 {% endif -%}
@@ -98,8 +97,8 @@ CFLAGS  += -g
 {% else -%}
 CFLAGS  += -O2
 {% endif -%}
-LDFLAGS ?= {{ env.LDFLAGS }}
-LDFLAGS += -L.
+LDFLAGS ?= {{ LDFLAGS|join(" ") }}
+LDFLAGS += -L. {% for path in LIBPATH %}-L{{ path }} {% endfor %}
 
 COMMON_SOURCES 		 = $(wildcard src/common/**/*.c src/common/*.c)
 COMMON_OBJECTS 		 = $(patsubst %.c,%.o,$(COMMON_SOURCES))
@@ -139,14 +138,13 @@ DMRDUMP_DEPS         = $(patsubst %.c,%.d,$(DMRDUMP_SOURCES))
 DMRDUMP_TARGET 	     = dmrdump$(BINEXT)
 DMRDUMP_CFLAGS       = $(CFLAGS) -D_BSD_SOURCE
 DMRDUMP_LDFLAGS      = $(LDFLAGS) -Lsrc/dmr
-DMRDUMP_LIBS 		 = -ltalloc -ldmr {{ lib('pthread', 1) }}
-{% if have('pcap-config') -%}
+DMRDUMP_LIBS 		 = -ltalloc -ldmr {{ lib('pthread', 1) }} {{ lib('ws2_32', 1) }}
+{% if have('libwpcap') %}
+DMRDUMP_LIBS 	    += -lwpcap
+{% elif have('pcap-config') -%}
 DMRDUMP_LIBS        += $(shell pcap-config --libs)
 {% else %}
-DMRDUMP_LIBS 		+= -l{{ env.LIBPCAP_NAME }}
-{% endif %}
-{% if args.with_mingw %}
-DMRDUMP_LIBS 		+= -lws2_32
+DMRDUMP_LIBS 		+= {{ lib('pcap') }}
 {% endif %}
 
 NOISEBRIDGE_SOURCES  = $(wildcard src/cmd/noisebridge/*.c)

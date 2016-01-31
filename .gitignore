@@ -45,6 +45,7 @@ src/common/config.h
 Makefile
 dmrlib.pc
 wright.log
+wright.cache
 
 # OS X cruft
 .DS_Store

@@ -90,9 +90,8 @@ LIBDIR     ?= $(DEST)$(PREFIX)/lib
 INCLUDEDIR ?= $(DEST)$(PREFIX)/include
 
 CFLAGS  ?= {{ CFLAGS|join(" ") }}
-CFLAGS  += -Wall -Wextra -ffast-math
-CFLAGS  += -D_GNU_SOURCE -D_REENTRANT
-CFLAGS  += -Iinclude -Isrc {% for path in INCLUDES %}-I{{ path }} {% endfor %}
+CFLAGS  += {% for name in DEFINES %}-D{{ name }} {% endfor %}
+CFLAGS  += {% for path in INCLUDES %}-I{{ path }} {% endfor %}
 {% if not have('mingw') -%}
 CFLAGS  += -fPIC
 {% endif -%}
@@ -140,7 +139,7 @@ DMRDUMP_SOURCES      	= $(wildcard src/cmd/dmrdump/*.c)
 DMRDUMP_OBJECTS      	= $(patsubst %.c,%.o,$(DMRDUMP_SOURCES))
 DMRDUMP_DEPS         	= $(patsubst %.c,%.d,$(DMRDUMP_SOURCES))
 DMRDUMP_TARGET 	     	= dmrdump$(BINEXT)
-DMRDUMP_CFLAGS       	= $(CFLAGS) -D_BSD_SOURCE
+DMRDUMP_CFLAGS       	= $(CFLAGS) -D_DEFAULT_SOURCE
 DMRDUMP_LDFLAGS      	= $(LDFLAGS) -Lsrc/dmr
 DMRDUMP_LIBS 		= -ltalloc -ldmr {{ lib('pthread', 1) }} {{ lib('ws2_32', 1) }}
 {% if have('libwpcap') %}

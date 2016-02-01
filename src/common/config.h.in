@@ -12,4 +12,15 @@
 #define inline
 #endif
 
+#if defined(HAVE_STRUCT_TERMIOS) || defined(HAVE_STRUCT_TERMIOS2)
+# define HAVE_TERMIOS 1
+#endif
+
+#if defined(HAVE_STRUCT_TERMIOS_C_ISPEED) && defined(HAVE_STRUCT_TERMIOS_C_OSPEED)
+# define HAVE_TERMIOS_SPEED 1
+#endif
+#if defined(HAVE_STRUCT_TERMIOS2_C_ISPEED) && defined(HAVE_STRUCT_TERMIOS2_C_OSPEED)
+# define HAVE_TERMIOS2_SPEED 1
+#endif
+
 #endif // _COMMON_CONFIG_H

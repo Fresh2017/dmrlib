@@ -341,36 +341,61 @@ dmr_mmdvm_t *dmr_mmdvm_open(char *port, long baud, dmr_mmdvm_model_t model)
 
 
     // Setup serial port
-    modem->serial = talloc_zero(modem, serial_t);
-    if (modem->serial == NULL) {
+    serial_t *serial = talloc_zero(modem, serial_t);
+    if (serial == NULL) {
         dmr_log_critical("mmdvm: out of memory");
         TALLOC_FREE(modem);
         return NULL;
     }
-    serial_t *serial = (serial_t *)modem->serial;
-    if ((modem->error = serial_by_name(port, &serial)) != 0)
+    if ((modem->error = serial_by_name(port, &serial)) != 0) {
+        dmr_log_error("mmdvm: serial by name: %s", strerror(errno));
         goto modem_error;
-    if ((modem->error = serial_open(serial, 'x')) != 0)
+    }
+    if ((modem->error = serial_open(serial, 'x')) != 0) {
+        dmr_log_error("mmdvm: serial open %s failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_baudrate(serial, 115200)) != 0)
+    }
+    dmr_log_info("mmdvm: opened serial port %s", serial->name);
+    if ((modem->error = serial_baudrate(serial, 115200)) != 0) {
+        dmr_log_error("mmdvm: serial set baudrate on %s to 115200 failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_parity(serial, SERIAL_PARITY_NONE)) != 0)
+    }
+    if ((modem->error = serial_parity(serial, SERIAL_PARITY_NONE)) != 0) {
+        dmr_log_error("mmdvm: serial set parity on %s to NONE failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_bits(serial, 8)) != 0)
+    }
+    if ((modem->error = serial_bits(serial, 8)) != 0) {
+        dmr_log_error("mmdvm: serial set bits on %s to 8 failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_stopbits(serial, 1)) != 0)
+    }
+    if ((modem->error = serial_stopbits(serial, 1)) != 0) {
+        dmr_log_error("mmdvm: serial set stopbits on %s to 1 failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_flowcontrol(serial, SERIAL_FLOWCONTROL_NONE)) != 0)
+    }
+    if ((modem->error = serial_flowcontrol(serial, SERIAL_FLOWCONTROL_NONE)) != 0) {
+        dmr_log_error("mmdvm: serial disable flow control on %s failed",
+            serial_name(serial));
         goto modem_error;
-    if ((modem->error = serial_xon_xoff(serial, SERIAL_XON_XOFF_DISABLED)) != 0)
+    }
+    if ((modem->error = serial_xon_xoff(serial, SERIAL_XON_XOFF_DISABLED)) != 0) {
+        dmr_log_error("mmdvm: serial xon/xoff on %s to disabled failed",
+            serial_name(serial));
         goto modem_error;
+    }
 
+    modem->serial = serial;
     goto done;
 
 modem_error:
     if (modem->error != 0) {
         dmr_log_error("mmdvm: open %s failed: %s",
             serial_name(serial), strerror(modem->error));
+        TALLOC_FREE(serial);
         dmr_mmdvm_free(modem);
         return NULL;
     }

@@ -4,6 +4,10 @@
 #include "common/array.h"
 #include "common/serial/internal.h"
 
+#if defined(HAVE_TERMIOS)
+#include "common/serial/termios.h"
+#endif
+
 static const baudrate_t baudrates[] = {
 #if defined(PLATFORM_WINDOWS)
 	/*
@@ -67,6 +71,63 @@ static int restart_wait(serial_t *port)
 }
 #endif
 
+
+#if defined(USE_TERMIOX)
+static int get_flow(int fd, serial_data_t *data)
+{
+	void *termx;
+
+	DEBUG("getting advanced flow control");
+
+	if (!(termx = talloc_size(NULL, get_termiox_size())))
+		RETURN_ERROR(ENOMEM, "termiox malloc failed");
+
+	DEBUGF("ioctl TCGETX on %d", fd);
+	if (ioctl(fd, TCGETX, termx) < 0) {
+		TALLOC_FREE(termx);
+		RETURN_ERRNO("getting termiox failed");
+	}
+
+	get_termiox_flow(termx, &data->rts_flow, &data->cts_flow,
+			&data->dtr_flow, &data->dsr_flow);
+
+	TALLOC_FREE(termx);
+
+	RETURN_OK();
+}
+
+static int set_flow(int fd, serial_data_t *data)
+{
+	void *termx;
+
+	DEBUG("getting advanced flow control");
+
+	if (!(termx = talloc_size(NULL, get_termiox_size())))
+		RETURN_ERROR(ENOMEM, "termiox malloc failed");
+
+	DEBUGF("ioctl TCGETX on %d", fd);
+	if (ioctl(fd, TCGETX, termx) < 0) {
+		TALLOC_FREE(termx);
+		RETURN_ERRNO("getting termiox failed");
+	}
+
+	DEBUG("setting advanced flow control");
+
+	set_termiox_flow(termx, data->rts_flow, data->cts_flow,
+			data->dtr_flow, data->dsr_flow);
+
+	DEBUGF("ioctl TCSETX on %d", fd);
+	if (ioctl(fd, TCSETX, termx) < 0) {
+		TALLOC_FREE(termx);
+		RETURN_FAIL("setting termiox failed");
+	}
+
+	TALLOC_FREE(termx);
+
+	RETURN_OK();
+}
+#endif /* USE_TERMIOX */
+
 void serial_free(serial_t *port)
 {
     TALLOC_FREE(port);
@@ -83,7 +144,7 @@ int serial_open(serial_t *port, char mode)
 	if (mode != 'r' && mode != 'w' && mode != 'x')
 		RETURN_ERROR(EINVAL, "invalid mode");
 
-	DEBUGF("opening port %s", port->name);
+	DEBUGF("serial: opening port %s", port->name);
 
 #if defined(PLATFORM_WINDOWS)
 	DWORD desired_access = 0, flags_and_attributes = 0, errors;
@@ -92,7 +153,7 @@ int serial_open(serial_t *port, char mode)
 
 	/* Prefix port name with '\\.\' to work with ports above COM9. */
 	if (!(escaped_port_name = malloc(strlen(port->name) + 5)))
-		RETURN_ERROR(ENOMEM, "escaped port name malloc failed");
+		RETURN_ERROR(ENOMEM, "serial: escaped port name malloc failed");
 	sprintf(escaped_port_name, "\\\\.\\%s", port->name);
 
 	/* Map 'flags' to the OS-specific settings. */
@@ -108,7 +169,7 @@ int serial_open(serial_t *port, char mode)
 	free(escaped_port_name);
 
 	if (port->hdl == INVALID_HANDLE_VALUE)
-		RETURN_FAIL("port CreateFile() failed");
+		RETURN_FAIL("serial: port CreateFile() failed");
 
 	/* All timeouts initially disabled. */
 	port->timeouts.ReadIntervalTimeout = 0;
@@ -119,7 +180,7 @@ int serial_open(serial_t *port, char mode)
 
 	if (SetCommTimeouts(port->hdl, &port->timeouts) == 0) {
 		serial_close(port);
-		RETURN_FAIL("SetCommTimeouts() failed");
+		RETURN_FAIL("serial: SetCommTimeouts() failed");
 	}
 
 	/* Prepare OVERLAPPED structures. */
@@ -129,7 +190,7 @@ int serial_open(serial_t *port, char mode)
 	if ((port->ovl.hEvent = CreateEvent(NULL, TRUE, TRUE, NULL)) \
 			== INVALID_HANDLE_VALUE) { \
 		serial_close(port); \
-		RETURN_FAIL(#ovl "CreateEvent() failed"); \
+		RETURN_FAIL(#ovl "serial: CreateEvent() failed"); \
 	} \
 } while (0)
 
@@ -140,7 +201,7 @@ int serial_open(serial_t *port, char mode)
 	/* Set event mask for RX and error events. */
 	if (SetCommMask(port->hdl, EV_RXCHAR | EV_ERR) == 0) {
 		serial_close(port);
-		RETURN_FAIL("SetCommMask() failed");
+		RETURN_FAIL("serial: SetCommMask() failed");
 	}
 
 	port->writing = FALSE;
@@ -152,7 +213,7 @@ int serial_open(serial_t *port, char mode)
 		serial_close(port);
 		RETURN_CODEVAL(ret);
 	}
-#else
+#else // PLATFORM_WINDOWS
 	int flags_local = O_NONBLOCK | O_NOCTTY;
 
 	/* Map 'flags' to the OS-specific settings. */
@@ -163,12 +224,14 @@ int serial_open(serial_t *port, char mode)
 	else if (mode == 'w')
 		flags_local |= O_WRONLY;
 
+	DEBUGF("serial: open %s with %#02x",
+		port->name, flags_local);
+
 	if ((port->fd = open(port->name, flags_local)) < 0)
-		RETURN_FAIL("open() failed");
+		RETURN_ERROR(errno, "serial: open() failed");
 #endif
 
 	ret = get_config(port, &data, &config);
-
 	if (ret < 0) {
 		serial_close(port);
 		RETURN_CODEVAL(ret);
@@ -541,23 +604,26 @@ static int get_config(serial_t *port, serial_data_t *data, serial_config_t *conf
 			config->xon_xoff = SERIAL_XON_XOFF_DISABLED;
 	}
 
-#else // !_WIN32
+#else // PLATFORM_WINDOWS
 
 	if (tcgetattr(port->fd, &data->term) < 0)
-		RETURN_FAIL("tcgetattr() failed");
+		RETURN_ERRNO("tcgetattr() failed");
 
 	if (ioctl(port->fd, TIOCMGET, &data->controlbits) < 0)
-		RETURN_FAIL("TIOCMGET ioctl failed");
+		RETURN_ERRNO("TIOCMGET ioctl failed");
 
 #ifdef USE_TERMIOX
 	int ret = get_flow(port->fd, data);
 
-	if (ret == SERIAL_ERR_FAIL && errno == EINVAL)
+	if (ret == EINVAL) {
+		DEBUG("TERMIOX not supported by device");
 		data->termiox_supported = 0;
-	else if (ret < 0)
+	} else if (ret != 0) {
 		RETURN_CODEVAL(ret);
-	else
+	} else {
+		DEBUG("TERMIOX supported by device");
 		data->termiox_supported = 1;
+	}
 #else
 	data->termiox_supported = 0;
 #endif
@@ -694,7 +760,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.Parity = SPACEPARITY;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid parity setting");
+			RETURN_ERROR(EINVAL, "invalid parity setting");
 		}
 	}
 
@@ -708,7 +774,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.StopBits = TWOSTOPBITS;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid stop bit setting");
+			RETURN_ERROR(EINVAL, "invalid stop bit setting");
 		}
 	}
 
@@ -724,7 +790,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid RTS setting");
+			RETURN_ERROR(EINVAL, "invalid RTS setting");
 		}
 	}
 
@@ -737,7 +803,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.fOutxCtsFlow = TRUE;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid CTS setting");
+			RETURN_ERROR(EINVAL, "invalid CTS setting");
 		}
 	}
 
@@ -753,7 +819,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid DTR setting");
+			RETURN_ERROR(EINVAL, "invalid DTR setting");
 		}
 	}
 
@@ -766,7 +832,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.fOutxDsrFlow = TRUE;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid DSR setting");
+			RETURN_ERROR(EINVAL, "invalid DSR setting");
 		}
 	}
 
@@ -789,7 +855,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->dcb.fOutX = TRUE;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid XON/XOFF setting");
+			RETURN_ERROR(EINVAL, "invalid XON/XOFF setting");
 		}
 	}
 
@@ -801,33 +867,36 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 	int controlbits;
 
 	if (config->baudrate >= 0) {
+		DEBUGF("setting baudrate to %d", config->baudrate);
 		for (i = 0; i < BAUDRATES; i++) {
 			if (config->baudrate == baudrates[i].value) {
 				if (cfsetospeed(&data->term, baudrates[i].index) < 0)
-					RETURN_FAIL("cfsetospeed() failed");
+					RETURN_ERRNO("cfsetospeed() failed");
 
 				if (cfsetispeed(&data->term, baudrates[i].index) < 0)
-					RETURN_FAIL("cfsetispeed() failed");
+					RETURN_ERRNO("cfsetispeed() failed");
 				break;
 			}
 		}
 
 		/* Non-standard baud rate */
 		if (i == BAUDRATES) {
+			DEBUG("setting non-standard baudrate");
 #if defined(PLATFORM_DARWIN)
 			/* Set "dummy" baud rate. */
 			if (cfsetspeed(&data->term, B9600) < 0)
-				RETURN_FAIL("cfsetspeed() failed");
+				RETURN_ERRNO("cfsetspeed() failed");
 			baud_nonstd = config->baudrate;
 #elif defined(USE_TERMIOS_SPEED)
 			baud_nonstd = 1;
 #else
-			RETURN_ERROR(ENOTSUP, "Non-standard baudrate not supported");
+			RETURN_ERROR(ENOTSUP, "non-standard baudrate not supported by OS");
 #endif
 		}
 	}
 
 	if (config->bits >= 0) {
+		DEBUG("setting bits");
 		data->term.c_cflag &= ~CSIZE;
 		switch (config->bits) {
 		case 8:
@@ -843,11 +912,12 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->term.c_cflag |= CS5;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid data bits setting");
+			RETURN_ERROR(EINVAL, "invalid data bits setting");
 		}
 	}
 
 	if (config->parity >= 0) {
+		DEBUG("setting parity");
 		data->term.c_iflag &= ~IGNPAR;
 		data->term.c_cflag &= ~(PARENB | PARODD);
 #ifdef CMSPAR
@@ -875,14 +945,15 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 #else
 		case SERIAL_PARITY_MARK:
 		case SERIAL_PARITY_SPACE:
-			RETURN_ERROR(ENOTSUP, "Mark/space parity not supported");
+			RETURN_ERROR(ENOTSUP, "mark/space parity not supported");
 #endif
 		default:
-			RETURN_ERROR(EINVAL, "Invalid parity setting");
+			RETURN_ERROR(EINVAL, "invalid parity setting");
 		}
 	}
 
 	if (config->stopbits >= 0) {
+		DEBUG("setting stopbits");
 		data->term.c_cflag &= ~CSTOPB;
 		switch (config->stopbits) {
 		case 1:
@@ -892,11 +963,12 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->term.c_cflag |= CSTOPB;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid stop bits setting");
+			RETURN_ERROR(EINVAL, "invalid stop bits setting");
 		}
 	}
 
 	if (config->rts >= 0 || config->cts >= 0) {
+		DEBUG("setting RTS/CTS");
 		if (data->termiox_supported) {
 			data->rts_flow = data->cts_flow = 0;
 			switch (config->rts) {
@@ -904,7 +976,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			case SERIAL_RTS_ON:
 				controlbits = TIOCM_RTS;
 				if (ioctl(port->fd, config->rts == SERIAL_RTS_ON ? TIOCMBIS : TIOCMBIC, &controlbits) < 0)
-					RETURN_FAIL("Setting RTS signal level failed");
+					RETURN_ERRNO("setting RTS signal level failed");
 				break;
 			case SERIAL_RTS_FLOW_CONTROL:
 				data->rts_flow = 1;
@@ -945,13 +1017,14 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 					controlbits = TIOCM_RTS;
 					if (ioctl(port->fd, config->rts == SERIAL_RTS_ON ? TIOCMBIS : TIOCMBIC,
 							&controlbits) < 0)
-						RETURN_FAIL("Setting RTS signal level failed");
+						RETURN_ERRNO("setting RTS signal level failed");
 				}
 			}
 		}
 	}
 
 	if (config->dtr >= 0 || config->dsr >= 0) {
+		DEBUG("setting DTR/DSR");
 		if (data->termiox_supported) {
 			data->dtr_flow = data->dsr_flow = 0;
 			switch (config->dtr) {
@@ -959,7 +1032,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			case SERIAL_DTR_ON:
 				controlbits = TIOCM_DTR;
 				if (ioctl(port->fd, config->dtr == SERIAL_DTR_ON ? TIOCMBIS : TIOCMBIC, &controlbits) < 0)
-					RETURN_FAIL("Setting DTR signal level failed");
+					RETURN_ERRNO("setting DTR signal level failed");
 				break;
 			case SERIAL_DTR_FLOW_CONTROL:
 				data->dtr_flow = 1;
@@ -978,12 +1051,13 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 				controlbits = TIOCM_DTR;
 				if (ioctl(port->fd, config->dtr == SERIAL_DTR_ON ? TIOCMBIS : TIOCMBIC,
 						&controlbits) < 0)
-					RETURN_FAIL("Setting DTR signal level failed");
+					RETURN_ERRNO("setting DTR signal level failed");
 			}
 		}
 	}
 
 	if (config->xon_xoff >= 0) {
+		DEBUG("setting XON/XOFF");
 		data->term.c_iflag &= ~(IXON | IXOFF | IXANY);
 		switch (config->xon_xoff) {
 		case SERIAL_XON_XOFF_DISABLED:
@@ -998,23 +1072,23 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 			data->term.c_iflag |= IXON | IXOFF | IXANY;
 			break;
 		default:
-			RETURN_ERROR(EINVAL, "Invalid XON/XOFF setting");
+			RETURN_ERROR(EINVAL, "invalid XON/XOFF setting");
 		}
 	}
 
 	if (tcsetattr(port->fd, TCSANOW, &data->term) < 0)
-		RETURN_FAIL("tcsetattr() failed");
+		RETURN_ERRNO("tcsetattr() failed");
 
 #ifdef __APPLE__
 	if (baud_nonstd != B0) {
 		if (ioctl(port->fd, IOSSIOSPEED, &baud_nonstd) == -1)
-			RETURN_FAIL("IOSSIOSPEED ioctl failed");
+			RETURN_ERRNO("IOSSIOSPEED ioctl failed");
 		/*
 		 * Set baud rates in data->term to correct, but incompatible
 		 * with tcsetattr() value, same as delivered by tcgetattr().
 		 */
 		if (cfsetspeed(&data->term, baud_nonstd) < 0)
-			RETURN_FAIL("cfsetspeed() failed");
+			RETURN_ERRNO("cfsetspeed() failed");
 	}
 #elif defined(__linux__)
 #ifdef USE_TERMIOS_SPEED
@@ -1029,7 +1103,8 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 
 #endif /* !_WIN32 */
 
-	RETURN_OK();
+	DEBUG("set config suceeded");
+	return 0;
 }
 
 int serial_flowcontrol(serial_t *port, serial_flowcontrol_t flowcontrol)

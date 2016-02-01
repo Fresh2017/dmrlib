@@ -1,6 +1,7 @@
 #ifndef _COMMON_SERIAL_H
 #define _COMMON_SERIAL_H
 
+#include "common/config.h"
 #include "common/platform.h"
 
 #include <string.h>
@@ -50,6 +51,13 @@
 
 #if defined(__cplusplus)
 extern "C" {
+#endif
+
+#if defined(TCGETX) && defined(TCSETX) && defined(HAVE_STRUCT_TERMIOX)
+#define USE_TERMIOX 1
+#endif
+#if !defined(TIOCOUTQ) && defined(FIONWRITE)
+#define TIOCOUTQ FIONWRITE
 #endif
 
 typedef enum {

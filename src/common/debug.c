@@ -8,7 +8,6 @@ static void debug_handler_default(const char *fmt, ...)
     va_list args;
 	va_start(args, fmt);
 	if (getenv("COMMON_DEBUG")) {
-		fputs("common: ", stderr);
 		vfprintf(stderr, fmt, args);
 	}
 	va_end(args);

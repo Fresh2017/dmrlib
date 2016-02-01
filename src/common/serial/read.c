@@ -151,7 +151,7 @@ int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 				DEBUG("select() call was interrupted, repeating");
 				continue;
 			} else {
-				RETURN_FAIL("select() failed");
+				RETURN_ERRNO("select() failed");
 			}
 		} else if (result == 0) {
 			/* Timeout has expired. */
@@ -170,7 +170,7 @@ int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 				continue;
 			else
 				/* This is an actual failure. */
-				RETURN_FAIL("read() failed");
+				RETURN_ERRNO("read() failed");
 		}
 
 		bytes_read += result;

@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <string.h>
 #include "common/platform.h"
 #include "common/format.h"
 #include "common/scan.h"
@@ -30,7 +31,7 @@ extern void (*debug_handler)(const char *fmt, ...);
 
 #define DEBUGF(fmt, ...)      do { \
     if (debug_handler) \
-        debug_handler(fmt "\n", ##__VA_ARGS__); \
+        debug_handler("%s[%d](%s): " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__); \
 } while(0)
 #define DEBUG(msg)            DEBUGF(msg)
 #define DEBUG_ERROR(err, msg) DEBUGF("%s returning " #err ": " msg, __func__)
@@ -48,7 +49,12 @@ extern void (*debug_handler)(const char *fmt, ...);
 	} \
 } while (0)
 #define RETURN_OK()           RETURN_CODE(OK)
+#define RETURN_ERRNO(msg, ...) do { \
+	DEBUGF("%s returning %s: " msg, __func__, strerror(errno), ##__VA_ARGS__); \
+	return errno; \
+} while (0)
 #define RETURN_ERROR(err, msg) do { \
+	errno = err; \
 	DEBUG_ERROR(err, msg); \
 	return err; \
 } while (0)

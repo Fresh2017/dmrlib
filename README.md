@@ -15,27 +15,23 @@ licensed HAM radio operators, commercial use is strictly prohibited.**
 
 The following software is required to compile dmrlib:
 
-  * [Python 2.7](http://www.python.org/)
-  * [SConstruct](http://scons.org/)
+  * [Python 2.7](http://www.python.org/) with [Jinja2](http://jinja.pocoo.org/)
   * A suitable compiler, such as [clang](http://clang.llvm.org) or gcc
   * [git](https://git-scm.com)
   * [talloc](https://talloc.samba.org/)
+  * [libpcap](http://www.tcpdump.org)
 
-If you enable the mbelib proto (`--enable-mbe-proto`):
+If you enable the mbelib proto (`--with-mbelib`):
 
   * [PortAudio](http://portaudio.com/)
 
-If you enable the dmrdump utility (`--enable-dmrdump`):
+To compile dmrlib, you run:
 
-  * [libpcap](http://www.tcpdump.org)
-
-To compile dmrlib, you just run scons:
-
-    $ scons
+    $ ./configure && make
 
 To compile dmrlib for debugging:
 
-    $ scons --with-debug
+    $ ./configure --with-debug && make
 
 This should result with libdmr built in the *build* directory.
 
@@ -43,37 +39,32 @@ This should result with libdmr built in the *build* directory.
 
 On Debian (compatible) systems, you need the following packages:
 
-    ~$ sudo apt-get install gcc scons git libtalloc-dev
+    ~$ sudo apt-get install gcc git python-jinja2 libtalloc-dev
 
 For the *mbe proto*:
-
-    ~$ sudo apt-get install libpcap-dev
-
-For the *dmrdump* utility:
 
     ~$ sudo apt-get install portaudio-dev
 
 Now clone the repository and build the software:
 
-    ~$ git clone https://github.com/pd0mz/dmrlib
+    ~$ git clone --recursive https://github.com/pd0mz/dmrlib
     ...
     ~$ cd dmrlib
-    dmrlib$ scons
+    dmrlib$ ./configure
     ...
 
 ## Compiling on OS X
 
 Using [Homebrew](http://brew.sh), you need the following packages:
 
-    ~$ brew install scons talloc
+    ~$ brew install talloc python libpcap
+    ...
+    ~$ pip install Jinja2
+    ...
 
 For the *mbe proto*:
 
     ~$ brew install portaudio
-
-For the *dmrdump* utility:
-
-    ~$ brew install pcap
 
 See [compiling on Linux](#compiling-on-linux) on how to build dmrlib.
 
@@ -83,18 +74,24 @@ Tested to work with the
 [Minimalist GNU for Windows (MinGW)](http://www.mingw.org) compiler. You also
 need to get these packages:
 
-  * [Scons Windows installer](http://www.scons.org/download.php)
   * [Git Windows installer](https://git-scm.com/download/win)
+  * [Python Windows installer](https://www.python.org/downloads/windows/) version 2.7.x
+  * [Jinja2](http://jinja.pocoo.org/)
 
 Make sure you install the Git Bash shell when prompted in the installer.
 
 Start the Git Bash shell, then enter:
 
-    ~$ git clone https://github.com/pd0mz/dmrlib
+    ~$ git clone --recursive https://github.com/pd0mz/dmrlib
     ...
     ~$ cd dmrlib
-    dmrlib$ /c/Python27/Scripts/scons.bat
+    dmrlib$ ./configure
     ...
+
+If configure can't find Python, you can run Wright (our configuration utility) manually:
+
+    ~$ export PYTHONPATH=$(pwd)/site_wright
+    ~$ /c/Python27/pythonw.exe -m wright.main [.. configure flags ..]
 
 # Contributing
 

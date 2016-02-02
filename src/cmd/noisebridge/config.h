@@ -12,6 +12,7 @@
 #endif
 #include <dmr/proto/mmdvm.h>
 #include <dmr/proto/repeater.h>
+#include "http.h"
 #include "common/config.h"
 #include "common/socket.h"
 
@@ -24,9 +25,9 @@ typedef struct {
     void             *mem;
     union {
         struct {
-            ip6_t            peer_ip;
+            uint8_t          *peer_ip;
             uint16_t         peer_port;
-            ip6_t            bind_ip;
+            uint8_t          *bind_ip;
             uint16_t         bind_port;
             char             *auth;
             char             *call;
@@ -59,6 +60,12 @@ typedef struct {
     proto_t         *proto[NOISEBRIDGE_MAX_PROTOS];
     size_t          protos;
     parse_section_t section;
+    struct {
+        bool     enabled;
+        ip6_t    bind;
+        uint16_t port;
+        char     *root;
+    } httpd;
 } config_t;
 
 #if !defined(HAVE_GETLINE)

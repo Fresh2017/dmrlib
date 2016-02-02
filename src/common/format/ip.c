@@ -18,6 +18,14 @@ unsigned int format_ip4(char *dst, const ip4_t ip)
     return len - 1;
 }
 
+char *format_ip4s(const ip4_t ip)
+{
+    static char s[FORMAT_IP4_LEN];
+    byte_zero(s, sizeof s);
+    format_ip4(s, ip);
+    return s;
+}
+
 unsigned int format_ip6(char *dst, const ip6_t ip)
 {
     unsigned long len, temp, k, pos0 = 0, len0 = 0, pos1 = 0, compr = 0;
@@ -76,4 +84,12 @@ last:
         }
     }
     return len;
+}
+
+char *format_ip6s(const ip6_t ip)
+{
+    static char s[FORMAT_IP6_LEN];
+    byte_zero(s, sizeof s);
+    format_ip6(s, ip);
+    return s;
 }

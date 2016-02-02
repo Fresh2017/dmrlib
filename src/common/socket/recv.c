@@ -10,7 +10,7 @@
 #include "common/platform.h"
 #include "common/uint.h"
 
-ssize_t socket_recv(socket_t *s, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port)
+ssize_t socket_recv(socket_t *s, void *buf, size_t len, ip6_t ip, uint16_t *port)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -21,13 +21,13 @@ ssize_t socket_recv(socket_t *s, uint8_t *buf, size_t len, ip6_t ip, uint16_t *p
         : socket_recv6(s->fd, buf, len, ip, port, &s->scope_id);
 }
 
-ssize_t socket_recv4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t *port)
+ssize_t socket_recv4(int fd, void *buf, size_t len, ip4_t ip, uint16_t *port)
 {
     struct sockaddr_in si;
     socklen_t silen = sizeof(si);
     ssize_t r;
 
-    if ((r = recvfrom(fd, (char *)buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
+    if ((r = recvfrom(fd, buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
         return __winsock_errno(-1);
     }
     if (ip != NULL) {
@@ -39,7 +39,7 @@ ssize_t socket_recv4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t *port)
     return r;
 }
 
-ssize_t socket_recv6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id)
+ssize_t socket_recv6(int fd, void *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id)
 {
 #if defined(HAVE_LIBC_IPV6)
     struct sockaddr_in6 si;
@@ -49,7 +49,7 @@ ssize_t socket_recv6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port,
     socklen_t silen = sizeof(si);
     ssize_t r;
     byte_zero(&si, silen);
-    if ((r = recvfrom(fd, (char *)buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
+    if ((r = recvfrom(fd, buf, len, 0, (struct sockaddr *)&si, &silen)) < 0) {
         return __winsock_errno(-1);
     }
 

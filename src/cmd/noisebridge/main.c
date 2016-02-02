@@ -6,6 +6,7 @@
 #include <dmr/proto/repeater.h>
 #include "common/serial.h"
 #include "config.h"
+#include "http.h"
 #include "repeater.h"
 #include "script.h"
 
@@ -45,7 +46,7 @@ void show_serial_ports(void)
             int vid = 0, pid = 0;
             serial_usb_vid_pid(port, &vid, &pid);
             dmr_log_info("serial port %s: usb id %04X:%04X (%s)",
-                serial_name(port), vid, pid, serial_usb_product(port));
+                serial_name(port), vid, pid, serial_usb_manufacturer(port));
             break;
         }
         case SERIAL_TRANSPORT_BLUETOOTH: {
@@ -113,6 +114,11 @@ int main(int argc, char **argv)
     if (init_config(filename) != 0) {
         exit(1);
         return 1;
+    }
+
+    if (init_http() != 0) {
+        ret = 1;
+        goto bail;
     }
 
     if (init_script() != 0) {

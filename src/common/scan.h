@@ -3,14 +3,12 @@
 
 #include <inttypes.h>
 #include <stddef.h>
+#include "common/scan.h"
 #include "common/socket.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-#define FORMAT_IP4_LEN 20
-#define FORMAT_IP6_LEN 40
 
 int          scan_fromhex(unsigned char c);
 size_t       scan_ulong(const char *src, unsigned long int *dst);

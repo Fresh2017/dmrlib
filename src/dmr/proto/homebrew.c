@@ -206,13 +206,6 @@ static socket_t *dmr_homebrew_sock(dmr_homebrew_t *homebrew)
     return &sock;
 }
 
-static inline char *dmr_homebrew_ip(ip6_t ip)
-{
-    static char host[FORMAT_IP6_LEN];
-    format_ip6(host, ip);
-    return host;
-}
-
 dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, const uint8_t bind_ip[16], uint16_t bind_port)
 {
     if (peer_ip == NULL || peer_port == 0) {
@@ -220,8 +213,12 @@ dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, 
         return NULL;
     }
 
-    dmr_log_debug("homebrew: new on %s:%u to %s:%u",
-        bind_ip, bind_port, peer_ip, peer_port);
+    if (peer_port == 0)
+        peer_port = DMR_HOMEBREW_PORT;
+
+    dmr_log_debug("homebrew: new on [%s]:%u to [%s]:%u",
+        format_ip6s(bind_ip), bind_port,
+        format_ip6s(peer_ip), peer_port);
 
     int optval = 1;
     dmr_homebrew_t *homebrew = talloc_zero(NULL, dmr_homebrew_t);
@@ -237,9 +234,6 @@ dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, 
         byte_copy(homebrew->bind_ip, (void *)ip6mappedv4prefix, sizeof(ip6mappedv4prefix));
     } else {
         byte_copy(homebrew->bind_ip, (void *)bind_ip, 16);
-    }
-    if (bind_port == 0) {
-        bind_port = DMR_HOMEBREW_PORT;
     }
     homebrew->bind_port = bind_port;
 
@@ -305,7 +299,7 @@ dmr_homebrew_t *dmr_homebrew_new(const uint8_t peer_ip[16], uint16_t peer_port, 
         dmr_log_error("homebrew: failed to set socket option SO_REUSEPORT: %s", strerror(errno));
     }
 #endif
-    if (socket_bind(sock, homebrew->bind_ip, homebrew->bind_port) != 0) {
+    if (socket_bind(sock, NULL, homebrew->bind_port) != 0) {
         dmr_error_set(strerror(errno));
         dmr_log_error("homebrew: bind to port %s:%u failed: %s",
             bind_ip, bind_port, strerror(errno));
@@ -323,8 +317,8 @@ int dmr_homebrew_auth(dmr_homebrew_t *homebrew, const char *secret)
     sha256_t sha256ctx;
     //memset(&buf, 0, 64);
 
-    dmr_log_info("homebrew: connecting to repeater at %s:%d as %.*s",
-        dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port,
+    dmr_log_info("homebrew: connecting to [%s]:%d as %.*s",
+        format_ip6s(homebrew->peer_ip), homebrew->peer_port,
         /* no NULL byte at the end */
         8, homebrew->config.repeater_id);
 
@@ -735,14 +729,14 @@ int dmr_homebrew_sendraw(dmr_homebrew_t *homebrew, uint8_t *buf, ssize_t len)
         return dmr_error(DMR_EINVAL);
 
     dmr_log_debug("homebrew: %d bytes to [%s]:%u", len,
-        dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port);
+        format_ip6s(homebrew->peer_ip), homebrew->peer_port);
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(buf, len);
         dmr_homebrew_dump(buf, len);
     }
     if (socket_send6(homebrew->fd, buf, len, homebrew->peer_ip, homebrew->peer_port, 0) != len) {
         dmr_log_error("homebrew: send to [%s]:%d failed: %s",
-            dmr_homebrew_ip(homebrew->peer_ip), homebrew->peer_port,
+            format_ip6s(homebrew->peer_ip), homebrew->peer_port,
             strerror(errno));
         return dmr_error_set("homebrew: send(): %s", strerror(errno));
     }
@@ -762,9 +756,18 @@ int dmr_homebrew_recvraw(dmr_homebrew_t *homebrew, ssize_t *len, struct timeval 
     int nfds;
     FD_ZERO(&rfds);
     FD_SET(homebrew->fd, &rfds);
+    bool select_again_if_no_data = false;
+    if (timeout == NULL) {
+        struct timeval tv = { 1, 0 };
+        timeout = &tv;
+        select_again_if_no_data = true;
+    }
 select_again:
     nfds = select(homebrew->fd + 1, &rfds, NULL, NULL, timeout);
     if (nfds == 0) {
+        if (select_again_if_no_data) {
+            goto select_again;
+        }
         return -1;
     } else if (nfds == -1) {
         dmr_log_debug("homebrew: select: %s", strerror(errno));
@@ -778,7 +781,7 @@ select_again:
         return dmr_error_set("homebrew: recv(): %s", strerror(errno));
     }
     dmr_log_debug("homebrew: recv %d bytes from [%s]:%u", *len,
-        dmr_homebrew_ip(peer), peer_port);
+        format_ip6s(peer), peer_port);
     if (*len > 0 && dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
         dmr_dump_hex(homebrew->buffer, *len);
         dmr_homebrew_dump(homebrew->buffer, *len);

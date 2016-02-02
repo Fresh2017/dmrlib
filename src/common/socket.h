@@ -62,15 +62,22 @@ socket_t   *socket_udp4(void);
 socket_t   *socket_udp6(uint32_t scope_id);
 
 int         socket_bind(socket_t *s, const ip6_t ip, uint16_t port);
+int         socket_close(socket_t *s);
 int         socket_connect(socket_t *s, const ip6_t ip, uint16_t port);
 bool        socket_connected(socket_t *s);
 int         socket_listen(socket_t *s, unsigned int backlog);
-ssize_t     socket_recv(socket_t *s, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port);
-ssize_t     socket_send(socket_t *s, uint8_t *buf, size_t len, ip6_t ip, uint16_t port);
+ssize_t     socket_read(socket_t *s, void *buf, size_t len);
+ssize_t     socket_recv(socket_t *s, void *buf, size_t len, ip6_t ip, uint16_t *port);
+ssize_t     socket_send(socket_t *s, const void *buf, size_t len, ip6_t ip, uint16_t port);
+ssize_t     socket_sendfile(socket_t *s, int in, off_t offset, size_t len);
+int         socket_sendfile_full(socket_t *s, int in, size_t len, size_t *out);
+ssize_t     socket_write(socket_t *s, const void *buf, size_t len);
 
 /* Low level functions */
 int         socket_bind4(int fd, const ip6_t ip, uint16_t port);
 int         socket_bind6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id);
+#define     socket_close4 close
+#define     socket_close6 close
 int         socket_connect4(int fd, const ip4_t ip, uint16_t port);
 int         socket_connect6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id);
 bool        socket_connectedx(int fd);
@@ -83,10 +90,16 @@ int         socket_listenx(int fd, unsigned int backlog);
 #define     socket_listen6 socket_listenx
 int         socket_nodelay(int fd);
 int         socket_nodelay_off(int fd);
-ssize_t     socket_recv4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t *port);
-ssize_t     socket_recv6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id);
-ssize_t     socket_send4(int fd, uint8_t *buf, size_t len, ip4_t ip, uint16_t port);
-ssize_t     socket_send6(int fd, uint8_t *buf, size_t len, ip6_t ip, uint16_t port, uint32_t scope_id);
+#define     socket_read4 read
+#define     socket_read6 read
+ssize_t     socket_recv4(int fd, void *buf, size_t len, ip4_t ip, uint16_t *port);
+ssize_t     socket_recv6(int fd, void *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id);
+ssize_t     socket_send4(int fd, const void *buf, size_t len, ip4_t ip, uint16_t port);
+ssize_t     socket_send6(int fd, const void *buf, size_t len, ip6_t ip, uint16_t port, uint32_t scope_id);
+ssize_t     socket_sendfilex(int fd, int in, off_t offset, size_t len);
+int         socket_sendfilex_full(int fd, int in, size_t len, size_t *out);
+#define     socket_write4 write
+#define     socket_write6 write
 
 #define isip4mapped(ip) (byte_equal((uint8_t *)(ip), (uint8_t *)ip6mappedv4prefix, 12))
 

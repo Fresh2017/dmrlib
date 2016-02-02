@@ -145,7 +145,7 @@ int init_proto_homebrew(config_t *config, proto_t *proto)
         host, proto->instance.homebrew.peer_port);
     dmr_homebrew_t *homebrew = dmr_homebrew_new(
         proto->instance.homebrew.peer_ip, proto->instance.homebrew.peer_port,
-        NULL, 0);
+        proto->instance.homebrew.bind_ip, proto->instance.homebrew.bind_port);
         //proto->instance.homebrew.bind_ip,
         //proto->instance.homebrew.bind_port);
     if (homebrew == NULL) {

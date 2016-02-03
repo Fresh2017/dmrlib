@@ -107,6 +107,7 @@ typedef struct {
         dmr_data_type_t data_type;
         struct timeval  last_voice_packet_sent;
         struct timeval  last_data_packet_sent;
+	struct timeval  last_packet_sent;
     } tx[2];
     struct {
         uint8_t         seq;

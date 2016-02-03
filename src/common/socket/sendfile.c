@@ -4,7 +4,7 @@
 #if defined(PLATFORM_LINUX)
 #include <sys/sendfile.h>
 #include <unistd.h>
-#elif defined(PLATFORM_OSX)
+#elif defined(PLATFORM_DARWIN)
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
@@ -21,7 +21,7 @@ ssize_t socket_sendfilex(int fd, int in, off_t offset, size_t len)
 #if defined(PLATFORM_LINUX)
     off_t off = offset;
     return sendfile(fd, in, &off, len);
-#elif defined(PLATFORM_OSX)
+#elif defined(PLATFORM_DARWIN)
     off_t siz = len;
     return (ssize_t)sendfile(in, fd, offset, &siz, NULL, 0);
 #else

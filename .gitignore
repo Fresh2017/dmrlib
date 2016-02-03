@@ -49,3 +49,6 @@ wright.cache
 
 # OS X cruft
 .DS_Store
+
+# Vim cruft
+*.swp

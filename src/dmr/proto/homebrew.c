@@ -592,9 +592,19 @@ void dmr_homebrew_loop(dmr_homebrew_t *homebrew)
             }
             */
 
+            /* Book keeping */
+            dmr_ts_t ts = packet->ts;
+            homebrew->tx[ts].seq = packet->meta.sequence;
+            homebrew->tx[ts].stream_id = packet->meta.stream_id;
+            homebrew->tx[ts].data_type = packet->data_type;
+            homebrew->tx[ts].src_id = packet->src_id;
+            homebrew->tx[ts].dst_id = packet->dst_id;
+            homebrew->tx[ts].flco = packet->flco;
+            gettimeofday(&homebrew->tx[ts].last_packet_sent, NULL);
+
             /* Not sure why this happens, but on TG dupe streams are sent, one with the
             * stream_id set to the dst_id */
-            if ((packet->dst_id < 0xff && packet->dst_id == packet->meta.stream_id) || packet->dst_id == 204) {
+            if ((packet->dst_id < 0xff && packet->dst_id == packet->meta.stream_id)) {
                 dmr_log_debug("homebrew: ignored stream 0x%08x: bogus", packet->meta.stream_id);
                 TALLOC_FREE(packet);
                 continue;
@@ -718,6 +728,10 @@ int dmr_homebrew_send(dmr_homebrew_t *homebrew, dmr_ts_t ts, dmr_packet_t *packe
 
     /* Book keeping */
     homebrew->tx[ts].data_type = packet->data_type;
+    homebrew->tx[ts].src_id = packet->src_id;
+    homebrew->tx[ts].dst_id = packet->dst_id;
+    homebrew->tx[ts].flco = packet->flco;
+    gettimeofday(&homebrew->tx[ts].last_packet_sent, NULL);
 
     //free(buf);
     return ret;

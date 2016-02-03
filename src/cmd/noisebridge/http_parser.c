@@ -2270,7 +2270,7 @@ http_parse_host_char(enum http_host_state s, const char ch) {
 }
 
 static int
-http_parse_host(const char * buf, struct http_parser_url *u, int found_at) {
+http_parse_host(const char * buf, struct http_url *u, int found_at) {
   assert(u->field_set & (1 << UF_HOST));
   enum http_host_state s;
 
@@ -2351,17 +2351,17 @@ http_parse_host(const char * buf, struct http_parser_url *u, int found_at) {
 }
 
 void
-http_parser_url_init(struct http_parser_url *u) {
+http_url_init(struct http_url *u) {
   memset(u, 0, sizeof(*u));
 }
 
 int
 http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
-                      struct http_parser_url *u)
+                      struct http_url *u)
 {
   enum state s;
   const char *p;
-  enum http_parser_url_fields uf, old_uf;
+  enum http_url_fields uf, old_uf;
   int found_at = 0;
 
   u->port = u->field_set = 0;

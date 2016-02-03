@@ -1,0 +1,29 @@
+import os
+import sys
+
+Import('env')
+
+if sys.platform in ('linux2', 'darwin'):
+    name = 'mmdvmplay'
+
+elif sys.platform == 'win32':
+    name = 'mmdvmplay.exe'
+
+localenv = env.Clone()
+localenv.Append(
+    LIBS=[
+        env['libdmr_name'],
+        'mbe',
+    ],
+    LIBPATH=[
+        '#build/libdmr',
+        '#build/mbelib',
+    ],
+)
+
+src = [
+    'main.c',
+]
+mmdvmplay = localenv.Program(name, src)
+#env.StaticLibrary(name, src)
+Return('mmdvmplay')

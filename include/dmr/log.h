@@ -65,6 +65,7 @@ extern void dmr_log_debug(const char *fmt, ...);
 extern void dmr_log_info(const char *fmt, ...);
 extern void dmr_log_warn(const char *fmt, ...);
 extern void dmr_log_error(const char *fmt, ...);
+#define     dmr_log_errno(msg) dmr_log_error(msg ": %s", strerror(errno))
 extern void dmr_log_critical(const char *fmt, ...);
 extern void dmr_log_message(dmr_log_priority_t priority, const char *fmt, ...);
 extern void dmr_log_messagev(dmr_log_priority_t priority, const char *fmt, va_list ap);

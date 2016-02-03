@@ -66,7 +66,7 @@ typedef unsigned __int64 uint64_t;
 
 typedef struct http_parser http_parser;
 typedef struct http_parser_settings http_parser_settings;
-
+typedef struct http_url http_url;
 
 /* Callbacks should return non-zero to indicate an error. The parser will
  * then halt execution.
@@ -258,7 +258,7 @@ struct http_parser_settings {
 };
 
 
-enum http_parser_url_fields
+enum http_url_fields
   { UF_SCHEMA           = 0
   , UF_HOST             = 1
   , UF_PORT             = 2
@@ -277,7 +277,7 @@ enum http_parser_url_fields
  * because we probably have padding left over), we convert any port to
  * a uint16_t.
  */
-struct http_parser_url {
+struct http_url {
   uint16_t field_set;           /* Bitmask of (1 << UF_*) values */
   uint16_t port;                /* Converted UF_PORT string */
 
@@ -333,13 +333,13 @@ const char *http_errno_name(enum http_errno err);
 /* Return a string description of the given error */
 const char *http_errno_description(enum http_errno err);
 
-/* Initialize all http_parser_url members to 0 */
-void http_parser_url_init(struct http_parser_url *u);
+/* Initialize all http_url members to 0 */
+void http_url_init(http_url *u);
 
 /* Parse a URL; return nonzero on failure */
 int http_parser_parse_url(const char *buf, size_t buflen,
                           int is_connect,
-                          struct http_parser_url *u);
+                          struct http_url *u);
 
 /* Pause or un-pause the parser; a nonzero value pauses */
 void http_parser_pause(http_parser *parser, int paused);

@@ -358,6 +358,7 @@ static int dmr_repeater_voice_call_start(dmr_repeater_t *repeater, dmr_packet_t 
 
     dmr_repeater_timeslot_t rts = repeater->ts[ts];
     rts.voice_frame = 0;
+    (void)rts;
 
     /*
     if (full_lc != NULL) {
@@ -461,7 +462,10 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                     dmr_data_type_name(packet->data_type),
                     proto->name, slot->proto->name);
 
-                if (policy == DMR_ROUTE_PERMIT) {
+                if (policy == DMR_ROUTE_PERMIT_UNMODIFIED) {
+                    dmr_proto_tx(slot->proto, slot->userdata, packet);
+
+                } else if (policy == DMR_ROUTE_PERMIT) {
                     dmr_ts_t ts = packet->ts;
                     dmr_repeater_timeslot_t rts = repeater->ts[ts];
 
@@ -526,8 +530,14 @@ void dmr_repeater_loop(dmr_repeater_t *repeater)
                     }
 
                     dmr_repeater_fix_headers(repeater, packet);
+                    dmr_proto_tx(slot->proto, slot->userdata, packet);
                 }
-                dmr_proto_tx(slot->proto, slot->userdata, packet);
+
+                /* Book keeping */
+                dmr_log_debug("repeater: updating last call on ts %s", dmr_ts_name(packet->ts));
+                repeater->ts[packet->ts].src_id = packet->src_id;
+                repeater->ts[packet->ts].dst_id = packet->dst_id;
+                repeater->ts[packet->ts].last_data_type = packet->data_type;
 
                 /* Clean up our *cloned* packet. */
                 TALLOC_FREE(packet);

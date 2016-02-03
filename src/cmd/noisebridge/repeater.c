@@ -3,6 +3,7 @@
 #include "common/format.h"
 #include "common/scan.h"
 #include "config.h"
+#include "http.h"
 #include "script.h"
 
 #if defined(WITH_MBELIB) && defined(HAVE_LIBPORTAUDIO)
@@ -43,6 +44,11 @@ static dmr_repeater_t *repeater = NULL;
 static dmr_cond_t *active = NULL;
 static dmr_mutex_t *active_lock = NULL;
 static volatile bool stopped = false;
+
+dmr_repeater_t *load_repeater(void)
+{
+    return repeater;
+}
 
 void kill_handler(int sig)
 {
@@ -333,6 +339,7 @@ int loop_repeater(void)
     active = NULL;
     dmr_mutex_destroy(active_lock);
     active_lock = NULL;
+    stop_http();
 
     config_t *config = load_config();
     uint8_t i;

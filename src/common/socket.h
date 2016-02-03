@@ -72,6 +72,11 @@ ssize_t     socket_send(socket_t *s, const void *buf, size_t len, ip6_t ip, uint
 ssize_t     socket_sendfile(socket_t *s, int in, off_t offset, size_t len);
 int         socket_sendfile_full(socket_t *s, int in, size_t len, size_t *out);
 ssize_t     socket_write(socket_t *s, const void *buf, size_t len);
+int         socket_set_blocking(socket_t *s, int v);
+int         socket_set_ipv6only(socket_t *s, int v);
+int         socket_set_nopipe(socket_t *s, int v);
+int         socket_set_reuseaddr(socket_t *s, int v);
+int         socket_set_reuseport(socket_t *s, int v);
 
 /* Low level functions */
 int         socket_bind4(int fd, const ip6_t ip, uint16_t port);
@@ -102,6 +107,8 @@ int         socket_sendfilex_full(int fd, int in, size_t len, size_t *out);
 #define     socket_write6 write
 
 #define isip4mapped(ip) (byte_equal((uint8_t *)(ip), (uint8_t *)ip6mappedv4prefix, 12))
+
+#define CHECK_SOCKET(s) if (s == NULL) { errno = EINVAL; return -1; }
 
 #if defined(__cplusplus)
 }

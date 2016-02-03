@@ -1,0 +1,284 @@
+<!doctype html>
+<html>
+<head>
+  <title>Noisebridge</title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/bootstrap-material-design.min.css">
+  <link rel="stylesheet" href="/css/ripples.min.css">
+  <!-- Material Design fonts -->
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,400,500,700" type="text/css">
+  <link href="//fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style type="text/css">
+  .table-protocol th {
+    width: 15em;
+  }
+  .table-protocol i {
+    vertical-align: middle;
+  }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+          <span class="sr-only">Toggle navigation</span>
+        </button>
+        <a class="navbar-brand" href="/">Noisebridge</a>
+      </div>
+
+      <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+        <ul class="nav navbar-nav">
+          <li class="active"><a href="/">Status <span class="sr-only">(current)</span></a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-6 col-sm-12 col-xs-12">
+        <div class="panel panel-default" id="ts1">
+          <div class="panel-heading">
+            <h3 class="panel-title">Time slot 1 [<em class="data_type">inactive</em>]</h3>
+          </div>
+          <div class="panel-body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:50%">Source</th><th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="src_id"><addr>0</addr> N0CALL</td>
+                  <td class="dst_id"><addr>0</addr> N0CALL</td>
+                </tr>
+              </tbody>
+            </table>
+            <pre class="log" style="width:100%; height:10ex">
+            </pre>
+          </div>
+        </div>
+        <div class="panel panel-default" id="ts2">
+          <div class="panel-heading">
+            <h3 class="panel-title">Time slot 2 [<em class="data_type">inactive</em>]</h3>
+          </div>
+          <div class="panel-body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:50%">Source</th><th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="src_id"><addr>0</addr> N0CALL</td>
+                  <td class="dst_id"><addr>0</addr> N0CALL</td>
+                </tr>
+              </tbody>
+            </table>
+            <pre class="log" style="width:100%; height:10ex">
+            </pre>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-sm-12 col-xs-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">
+            <h3 class="panel-title">Enabled protocols</h3>
+          </div>
+          <div class="panel-body" id="protocols">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/jquery.min.js"></script>
+  <script src="/js/jquery.eventsource.js"></script>
+  <script src="/js/bootstrap.min.js"></script>
+  <script src="/js/material.min.js"></script>
+  <script src="/js/ripples.min.js"></script>
+  <script>
+$(document).ready(function() {
+  $.material.init();
+  $.ajax('/repeater/config.js', {
+    success: function(config) {
+      var el = $('#protocols').empty();
+      $.each(config.protocols, function(i, proto) {
+        var icon = proto.active
+            ? '<i class="material-icons" title="Active">flash_on</i> '
+            : '<i class="material-icons" title="Disabled">warning</i> ';
+        el.append($('<h4>').html(icon + proto.name));
+        var t = $('<table class="table table-striped table-protocol" />');
+        t.append('<tr><th>Type</th><td>' + proto.type + '</td></tr>');
+        switch (proto.type) {
+          case 'homebrew':
+            t.append('<tr><th>Master</th><td><addr>[' + proto.peer + ']:' + proto.peer_port + '</addr></td></tr>');
+            t.append('<tr><th>Call sign</th><td>' + proto.call + '</td></tr>');
+            t.append('<tr><th>Repeater DMR ID</th><td>' + proto.repeater_id + '</td></tr>');
+            t.append('<tr><th>Color code</th><td>' + proto.color_code + '</td></tr>');
+            break;
+          case 'mmdvm':
+            switch (proto.port_transport) {
+              case 'native':
+                icon = '<i class="material-icons" title="native">import_export</i>';
+                break;
+              case 'bluetooth':
+              case 'usb':
+                icon = '<i class="material-icons" title="' + proto.port_transport + '">' + proto.port_transport + '</i>';
+                break;
+              default:
+                icon = '<i class="material-icons">error</i>';
+            }
+            t.append('<tr><th>Port</th><td>' + proto.port + ' ' + icon + '</td></tr>');
+            $.each(proto, function(key, value) {
+              if (/^(usb|bluetooth)_/.test(key)) {
+                key = key.replace(/^usb_/, 'USB ');
+                key = key.replace(/^bluetooth_/, 'Bluetooth ');
+                key = key.replace('_', ' ');
+                t.append('<tr><th>' + key + '</th><td>' + value + '</td></tr>');
+              }
+            });
+          default:
+            break;
+        }
+        el.append(t);
+      });
+    }
+  });
+
+  window.dataType = {
+    0x00: 'Voice (private)',
+    0x01: 'Voice',
+    0x02: 'inactive',
+    0x03: 'Data',
+    0x04: 'Data',
+    0x05: 'Data',
+    0x06: 'Data',
+    0x07: 'Data',
+    0x08: 'Data',
+    0x09: 'Idle',
+    0x20: 'Voice',
+    0xf0: 'Voice',
+    0xf1: 'Voice'
+  };
+  window.calls = {};
+  window.group = {
+    9:       'Loopback',
+    91:      'World wide',
+    92:      'Europe',
+    204:     'Netherlands',
+    2041:    'Netherlands (North)',
+    2042:    'Netherlands (Center)',
+    2043:    'Netherlands (South)',
+    2044:    'Netherlands (East)',
+    205:     'Netherlands',
+    232:     'Germany',
+    206:     'Belgium',
+    2061:    'Belgium (Flemish)',
+    2062:    'Belgium (Wallon)',
+    2063:    'Belgium (German)',
+    208:     'France',
+		2080:    'France (Paris Île de France)',
+    2081:    'France (Méditerranée)',
+    2082:    'France (Alpes)',
+    2083:    'France (Midi Pyrénées)',
+    2084:    'France (Est (tests))',
+    2085:    'France (Ouest)',
+    2086:    'France (Atlantique)',
+    2087:    'France (Nord)',
+    2088:    'France (Centre)',
+    2089:    'France (Dom Tom)',
+    214:     'Spain',
+    2141:    'Spain (EA1)',
+    2142:    'Spain (EA2)',
+    2143:    'Spain (EA3)',
+    2144:    'Spain (EA4)',
+    2145:    'Spain (EA5)',
+    2146:    'Spain (EA6)',
+    2147:    'Spain (EA7)',
+    2148:    'Spain (EA8)',
+    2149:    'Spain (EA9)',
+    222:     'Italy',
+    232:     'Austria',
+    255:     'Ukrain',
+    2551:    'Ukrain',
+    255997:  'Parrot (Ukrain)',
+    5057:    'GPS',
+    911:     'French (World wide)',
+    921:     'French (Europe)',
+    922:     'Dutch (World wide)',
+    9990:    'Parrot',
+    2049881: 'DStar XRF088A',
+    2049882: 'DStar XRF088B'
+  };
+  $.ajax('/data/users.json', {
+    dataType: 'json',
+    error: function(e) {
+      alert('Failed to load users.json: ' + e);
+    },
+    success: function(data) {
+      $.each(data.users, function(i, user) {
+        calls[user.radio_id] = (user.nickname || user.name) + ' (' + user.callsign + ')';
+      });
+    }
+  });
+
+  var logCall = function(data) {
+    var ts = $('#ts' + (data.ts + 1));
+    var lw = $(ts.find('pre'));
+    var dt = new Date();
+    lw.text(lw.text() + '\n' + dt + ': ' + data.src_id + ' to ' + data.dst_id);
+    lw.scrollTop(lw.prop('scrollHeight'));
+    var src_id = $(ts.find('.src_id'));
+        src_id.text(data.src_id + ' ' + (group[data.src_id] || calls[data.src_id]));
+    var dst_id = $(ts.find('.dst_id'));
+        dst_id.text(data.dst_id + ' ' + (group[data.dst_id] || calls[data.dst_id]));
+    var data_type = $(ts.find('.data_type'));
+        data_type.text(dataType[data.data_type] || 'inactive');
+  };
+
+  var req = new XMLHttpRequest();
+  req.onreadystatechange = function() {
+    var pos = 0;
+    if (this.readyState > 2) {
+      var chunk = this.responseText.substr(pos);
+      $.each(chunk.split(/\n/), function(i, part) {
+        console.log('chunk', part);
+        if (/^\{.*\}$/.test(part)) {
+          var data = $.parseJSON(part);
+          if (data) {
+            logCall(data);
+          }
+        }
+      });
+      pos = this.responseText.length;
+    }
+  }
+  req.open('GET', '/repeater/ts.stream', true);
+  req.send();
+
+  /*
+  $.eventsource({
+    label: "ts",
+    url: "/repeater/ts.stream",
+    dataType: "json",
+    open: function(data) {
+      console.log("ts stream opened", data);
+    },
+    message: function(data) {
+      console.log("ts stream data", data);
+      var ts = $('#ts' + (data.ts + 1));
+      var src_id = $(ts.find('.src_id'));
+          src_id.text(data.src_id);
+      var dst_id = $(ts.find('.dst_id'));
+          dst_id.text(data.src_id);
+    } 
+  });
+  */
+});
+  </script>
+</body>
+</html>

@@ -175,7 +175,7 @@ NOISEBRIDGE_LIBS    	+= -l{{ opt }}
 NOISEBRIDGE_LIBS 	+= -lportaudio
 {% endif %}
 NOISEBRIDGE_LIBS		+= $(COMMON_ARCHIVE) $(COMMON_LIBS)
-NOISEBRIDGE_LIBS    	+= {{ lib('pthread', 1) }} {{ lib('bsd', 1) }} {{ lib('m', 1) }} {{ lib('rt', 1) }} {{ lib('dl', 1) }} {{ lib('ws2_32', 1) }}
+NOISEBRIDGE_LIBS    	+= {{ lib('pthread', 1) }} {{ lib('bsd', 1) }} {{ lib('m', 1) }} {{ lib('rt', 1) }} {{ lib('dl', 1) }} {{ lib('ws2_32', 1) }} {{ lib('magic', 1) }}
 
 SERIALDUMP_SOURCES   	= $(wildcard src/cmd/serialdump/*.c)
 SERIALDUMP_OBJECTS   	= $(patsubst %.c,%.o,$(SERIALDUMP_SOURCES))

@@ -1,0 +1,40 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <title>dmrlib.js test</title>
+  <link rel="stylesheet" href="qunit-1.21.0.css">
+  <script src="jquery.js"></script>
+  <script src="qunit-1.21.0.js"></script>
+  <script src="../dmrlib.js"></script>
+  <script>
+  QUnit.test('dmrlib country', function(assert) {
+    function t(id, expected) {
+      assert.equal(DMR.country(id), expected);
+    }
+    t(204, 'nl');
+    t(2041, 'nl');
+    t(20412, 'nl');
+    t('250', 'ru');
+    t('2501', 'ru');
+    t('25012', 'ru');
+  });
+  QUnit.test('dmrlib countryName', function(assert) {
+    function t(id, expected) {
+      assert.equal(DMR.countryName(id), expected);
+    }
+    t(23512345, 'United Kingdom');
+    t(26262626, 'Germany');
+  });
+  QUnit.test('dmrlib description', function(assert) {
+    function t(id, expected) {
+      assert.equal(DMR.description(id), expected);
+    }
+    t(1, 'Local');
+    t(3100, 'United States (Nation wide)');
+  });
+  </script>
+</head>
+<body>
+  <div id="qunit"></div>
+</body>
+</html>

@@ -180,6 +180,9 @@ typedef struct {
         uint32_t        last_sequence;
         uint8_t         last_voice_frame;
         uint32_t        stream_id;
+        dmr_id_t        last_src_id;
+        dmr_id_t        last_dst_id;
+        dmr_flco_t      last_flco;
     } dmr_ts[3];
     dmr_ts_t last_dmr_ts;
 } dmr_mmdvm_t;

@@ -226,10 +226,10 @@ int init_script(void)
             case DMR_PROTO_HOMEBREW: {
                 char host[FORMAT_IP6_LEN];
                 format_ip6(host, proto->instance.homebrew.peer_ip);
+                lua_set_int(L, "repeater_id", proto->instance.homebrew.repeater_id);
                 lua_set_str(L, "host", host);
                 lua_set_int(L, "port", proto->instance.homebrew.peer_port);
                 lua_set_str(L, "call", proto->instance.homebrew.call);
-                lua_set_int(L, "repeater_id", proto->instance.homebrew.repeater_id);
                 break;
             }
             case DMR_PROTO_MMDVM: {

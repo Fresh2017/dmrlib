@@ -17,7 +17,10 @@ function route(src, dst, packet)
 
     -- All frames to the MMDVM modem should go unmodified
     if dst.type == PROTO_MMDVM then
-        log.debug("route.lua: permit unmodified to MMDVM")
+	if (packet.dst_id >= 200 and packet.dst_id < 300) and packet.rs == TS2 then
+	    log.debug("route.lua: rejecting TG on TS2")
+	    return false
+        end
         -- Permit unmodified
         return true
     end

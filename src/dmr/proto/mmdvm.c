@@ -18,10 +18,12 @@
 
 #include "dmr/error.h"
 #include "dmr/log.h"
+#include "dmr/payload/lc.h"
 #include "dmr/payload/sync.h"
 #include "dmr/proto.h"
 #include "dmr/proto/mmdvm.h"
 #include "dmr/thread.h"
+#include "common/byte.h"
 #include "common/serial.h"
 
 static const char *dmr_mmdvm_proto_name = "mmdvm";
@@ -461,8 +463,93 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
                 dmr_log_debug("mmdvm: voice sync");
                 packet->data_type = DMR_DATA_TYPE_VOICE_SYNC;
             } else if ((modem->buffer[3] & DMR_MMDVM_DMR_DATA_SYNC) > 0) {
-                dmr_log_debug("mmdvm: data sync");
-                packet->data_type = DMR_DATA_TYPE_DATA_HEADER;
+                dmr_log_debug("mmdvm: data sync?");
+                dmr_ts_t ts = DMR_TS1;
+                dmr_sync_pattern_t pattern = dmr_sync_pattern_decode(packet);
+                switch (pattern) {
+                case DMR_SYNC_PATTERN_BS_SOURCED_VOICE:
+                case DMR_SYNC_PATTERN_MS_SOURCED_VOICE:
+                    packet->data_type = DMR_DATA_TYPE_VOICE_SYNC;
+                    packet->meta.voice_frame = 0;
+                    break;
+                default:
+                    if (dmr_slot_type_decode(packet) != 0) {
+                        dmr_log_error("mmdvm: slot type decode failed: %s", dmr_error_get());
+                        break;
+                    }
+                    switch (packet->data_type) {
+                    case DMR_DATA_TYPE_VOICE_LC:
+                        if (modem->dmr_ts[ts].last_data_type == packet->data_type)
+                            break; /* Don't bother to read it again */
+
+                        dmr_full_lc_t lc;
+                        byte_zero(&lc, sizeof lc);
+                        if (dmr_full_lc_decode(&lc, packet) != 0) {
+                            dmr_log_error("mmdvm: full LC decode failed: %s", dmr_error_get());
+                            break;
+                        }
+                        dmr_log_info("mmdvm: link control %u->%u, flco=%s",
+                            lc.src_id, lc.dst_id, dmr_flco_pdu_name(lc.flco_pdu));
+
+                        /* Book keeping, we need this to update the frames that will follow */
+                        modem->dmr_ts[ts].last_src_id = lc.src_id;
+                        modem->dmr_ts[ts].last_dst_id = lc.dst_id;
+                        modem->dmr_ts[ts].last_flco = (lc.flco_pdu == DMR_FLCO_PDU_GROUP)
+                            ? DMR_FLCO_GROUP : DMR_FLCO_PRIVATE;
+                        modem->dmr_ts[ts].stream_id++;
+                        modem->dmr_ts[ts].last_sequence = 0;
+                        break;
+
+                    case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
+                        break;
+                    
+                    case DMR_DATA_TYPE_DATA_HEADER:
+                    case DMR_DATA_TYPE_MBC_HEADER:
+                        /* TODO(pd0mz): parse LC */
+                        /* For now, we are resetting the meta data */
+                        modem->dmr_ts[ts].last_src_id = 0;
+                        modem->dmr_ts[ts].last_dst_id = 0;
+                        break;
+
+                    case DMR_DATA_TYPE_CSBK:
+                    case DMR_DATA_TYPE_MBC_CONTINUATION:
+                    case DMR_DATA_TYPE_RATE12_DATA:
+                    case DMR_DATA_TYPE_RATE34_DATA:
+                    case DMR_DATA_TYPE_IDLE:
+                        /* TODO(pd0mz): handle these types */
+                        /* For now, we are resetting the meta data */
+                        modem->dmr_ts[ts].last_src_id = 0;
+                        modem->dmr_ts[ts].last_dst_id = 0;
+                        dmr_log_warn("mmdvm: sending data is probably broken");
+                        dmr_log_warn("mmdvm: not updating packet meta data for %s frame",
+                            dmr_data_type_name(packet->data_type));
+                        break;
+                    case DMR_DATA_TYPE_INVALID:
+                        if (modem->dmr_ts[ts].last_data_type == DMR_DATA_TYPE_VOICE_SYNC ||
+                            modem->dmr_ts[ts].last_data_type == DMR_DATA_TYPE_VOICE) {
+                            packet->data_type = DMR_DATA_TYPE_VOICE;
+                            packet->meta.voice_frame = (++modem->dmr_ts[ts].last_voice_frame);
+                        } else {
+                            dmr_log_warn("mmdvm: unknown data type!");
+                        }
+                        break;
+                    default:
+                        dmr_log_warn("mmdvm: unsupported data type");
+                        break;
+                    }
+
+                    if (modem->dmr_ts[ts].last_src_id != 0) {
+                        packet->src_id = modem->dmr_ts[ts].last_src_id;
+                        packet->dst_id = modem->dmr_ts[ts].last_dst_id;
+                        packet->meta.sequence = modem->dmr_ts[ts].last_sequence % 0xff;
+                        packet->meta.stream_id = modem->dmr_ts[ts].stream_id;
+                        modem->dmr_ts[ts].last_sequence++;
+                    } else {
+                        dmr_log_warn("mmdvm: can't update %s frame, late entry not supported",
+                            dmr_data_type_name(packet->data_type));
+                    }
+                    break;
+                }
             } else {
                 dmr_log_debug("mmdvm: %s", dmr_data_type_name(modem->buffer[3] & 0x0f));
                 packet->data_type = (modem->buffer[3] & 0x0f);
@@ -505,9 +592,9 @@ int dmr_mmdvm_poll(dmr_mmdvm_t *modem)
             }
             break;
 
-		case DMR_MMDVM_ACK:
+        case DMR_MMDVM_ACK:
             dmr_log_debug("mmdvm: ack");
-			break;
+            break;
 
         case DMR_MMDVM_NAK:
             dmr_log_info("mmdvm: received NAK for command %s (0x%02x), reason: %u",

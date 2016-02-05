@@ -7,29 +7,29 @@
 
 typedef struct {
     bool bits[5];
-} hamming_16_11_error_vector_t;
+} hamming_16_11_error_vector;
 
 static bool hamming_16_11_generator_matrix[] = {
-	1,	0,	0,	1,	1,
-	1,	1,	0,	1,	0,
-	1,	1,	1,	1,	1,
-	1,	1,	1,	0,	0,
-	0,	1,	1,	1,	0,
-	1,	0,	1,	0,	1,
-	0,	1,	0,	1,	1,
-	1,	0,	1,	1,	0,
-	1,	1,	0,	0,	1,
-	0,	1,	1,	0,	1,
-	0,	0,	1,	1,	1,
+    1,  0,  0,  1,  1,
+    1,  1,  0,  1,  0,
+    1,  1,  1,  1,  1,
+    1,  1,  1,  0,  0,
+    0,  1,  1,  1,  0,
+    1,  0,  1,  0,  1,
+    0,  1,  0,  1,  1,
+    1,  0,  1,  1,  0,
+    1,  1,  0,  0,  1,
+    0,  1,  1,  0,  1,
+    0,  0,  1,  1,  1,
 
-	1,	0,	0,	0,	0, // These are used to determine errors in the Hamming checksum bits.
-	0,	1,	0,	0,	0,
-	0,	0,	1,	0,	0,
-	0,	0,	0,	1,	0,
-	0,	0,	0,	0,	1
+    1,  0,  0,  0,  0, // These are used to determine errors in the Hamming checksum bits.
+    0,  1,  0,  0,  0,
+    0,  0,  1,  0,  0,
+    0,  0,  0,  1,  0,
+    0,  0,  0,  0,  1
 };
 
-static void dmr_vbptc_16_11_parity_bits(bool *bits, hamming_16_11_error_vector_t *error_vector)
+static void dmr_vbptc_16_11_parity_bits(bool *bits, hamming_16_11_error_vector *error_vector)
 {
     if (bits == NULL || error_vector == NULL)
         return;
@@ -41,7 +41,7 @@ static void dmr_vbptc_16_11_parity_bits(bool *bits, hamming_16_11_error_vector_t
     error_vector->bits[4] = (bits[0] ^ bits[2] ^ bits[5] ^ bits[6] ^ bits[8] ^ bits[9] ^ bits[10]);
 }
 
-static int8_t dmr_vbptc_16_11_error_position(hamming_16_11_error_vector_t *error_vector)
+static int8_t dmr_vbptc_16_11_error_position(hamming_16_11_error_vector *error_vector)
 {
     if (error_vector == NULL)
         return -1;
@@ -60,7 +60,7 @@ static int8_t dmr_vbptc_16_11_error_position(hamming_16_11_error_vector_t *error
     return -1;
 }
 
-static bool dmr_vbptc_16_11_check_row(bool *bits, hamming_16_11_error_vector_t *error_vector)
+static bool dmr_vbptc_16_11_check_row(bool *bits, hamming_16_11_error_vector *error_vector)
 {
     if (bits == NULL || error_vector == NULL)
         return false;
@@ -74,9 +74,9 @@ static bool dmr_vbptc_16_11_check_row(bool *bits, hamming_16_11_error_vector_t *
     return true;
 }
 
-bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
+bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11 *vbptc)
 {
-    hamming_16_11_error_vector_t error_vector = { .bits = {0, } };
+    hamming_16_11_error_vector error_vector = { .bits = {0, } };
     uint8_t row, col;
     int8_t error = -1;
     uint8_t errors = 0;
@@ -125,10 +125,10 @@ bool dmr_vbptc_16_11_check_and_repair(dmr_vbptc_16_11_t *vbptc)
     return res;
 }
 
-dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
+dmr_vbptc_16_11 *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
 {
     dmr_log_trace("VBPTC(16,11): new with parent %p", parent);
-    dmr_vbptc_16_11_t *vbptc = talloc_zero(parent, dmr_vbptc_16_11_t);
+    dmr_vbptc_16_11 *vbptc = talloc_zero(parent, dmr_vbptc_16_11);
     if (vbptc == NULL)
         return NULL;
 
@@ -142,7 +142,7 @@ dmr_vbptc_16_11_t *dmr_vbptc_16_11_new(uint8_t rows, void *parent)
     return vbptc;
 }
 
-void dmr_vbptc_16_11_free(dmr_vbptc_16_11_t *vbptc)
+void dmr_vbptc_16_11_free(dmr_vbptc_16_11 *vbptc)
 {
     dmr_log_trace("VBPTC(16,11): free %p", vbptc);
     if (vbptc == NULL)
@@ -151,7 +151,7 @@ void dmr_vbptc_16_11_free(dmr_vbptc_16_11_t *vbptc)
     talloc_free(vbptc);
 }
 
-void dmr_vbptc_16_11_wipe(dmr_vbptc_16_11_t *vbptc)
+void dmr_vbptc_16_11_wipe(dmr_vbptc_16_11 *vbptc)
 {
     if (vbptc == NULL)
         return;
@@ -162,7 +162,7 @@ void dmr_vbptc_16_11_wipe(dmr_vbptc_16_11_t *vbptc)
         memset(vbptc->matrix, 0, sizeof(bool) * vbptc->rows * 16);
 }
 
-static size_t dmr_vbptc_16_11_matrix_free(dmr_vbptc_16_11_t *vbptc)
+static size_t dmr_vbptc_16_11_matrix_free(dmr_vbptc_16_11 *vbptc)
 {
     if (vbptc == NULL)
         return 0;
@@ -170,7 +170,7 @@ static size_t dmr_vbptc_16_11_matrix_free(dmr_vbptc_16_11_t *vbptc)
     return (vbptc->rows * 16) - (vbptc->col * vbptc->rows + vbptc->row);
 }
 
-int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
+int dmr_vbptc_16_11_add(dmr_vbptc_16_11 *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || vbptc->matrix == NULL || bits == NULL)
         return dmr_error(DMR_EINVAL);
@@ -193,7 +193,7 @@ int dmr_vbptc_16_11_add(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
     return 0;
 }
 
-int dmr_vbptc_16_11_get_fragment(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t offset, uint16_t len)
+int dmr_vbptc_16_11_get_fragment(dmr_vbptc_16_11 *vbptc, bool *bits, uint16_t offset, uint16_t len)
 {
     if (vbptc == NULL || vbptc->matrix == NULL || bits == NULL)
         return dmr_error(DMR_EINVAL);
@@ -216,7 +216,7 @@ int dmr_vbptc_16_11_get_fragment(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t 
     return 0;
 }
 
-int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
+int dmr_vbptc_16_11_decode(dmr_vbptc_16_11 *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || bits == NULL || vbptc->rows == 0)
         return dmr_error(DMR_EINVAL);
@@ -234,7 +234,7 @@ int dmr_vbptc_16_11_decode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
     return 0;
 }
 
-int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
+int dmr_vbptc_16_11_encode(dmr_vbptc_16_11 *vbptc, bool *bits, uint16_t len)
 {
     if (vbptc == NULL || bits == NULL || len == 0)
         return dmr_error(DMR_EINVAL);
@@ -242,7 +242,7 @@ int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
     dmr_vbptc_16_11_wipe(vbptc);
     size_t bitlen = min(len, dmr_vbptc_16_11_matrix_free(vbptc));
     uint8_t col, row;
-    hamming_16_11_error_vector_t parity_bits;
+    hamming_16_11_error_vector parity_bits;
 
     for (col = 0; col < bitlen; col++) {
         vbptc->matrix[vbptc->col + vbptc->row * 16] = bits[col];
@@ -255,7 +255,7 @@ int dmr_vbptc_16_11_encode(dmr_vbptc_16_11_t *vbptc, bool *bits, uint16_t len)
     // Calculating Hamming(16, 11) parities
     for (row = 0; row < vbptc->rows - 1; row++) {
         dmr_vbptc_16_11_parity_bits(&vbptc->matrix[row * 16], &parity_bits);
-        memcpy(&vbptc->matrix[row * 16 + 11], parity_bits.bits, sizeof(hamming_16_11_error_vector_t));
+        memcpy(&vbptc->matrix[row * 16 + 11], parity_bits.bits, sizeof(hamming_16_11_error_vector));
     }
 
     for (col = 0; col < 16; col++) {

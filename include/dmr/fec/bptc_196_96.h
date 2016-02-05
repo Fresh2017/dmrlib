@@ -12,10 +12,10 @@ extern "C" {
 typedef struct {
 	bool raw[196];
 	bool deinterleaved_bits[196];
-} dmr_bptc_196_96_t;
+} dmr_bptc_196_96;
 
-int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12]);
-int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12]);
+int dmr_bptc_196_96_decode(dmr_packet packet, dmr_bptc_196_96 *bptc, uint8_t data[12]);
+int dmr_bptc_196_96_encode(dmr_packet packet, dmr_bptc_196_96 *bptc, uint8_t data[12]);
 
 #ifdef __cplusplus
 }

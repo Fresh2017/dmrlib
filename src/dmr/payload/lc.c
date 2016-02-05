@@ -21,33 +21,33 @@ uint8_t dmr_crc_mask_lc[] = {
 };
 
 // Parse a packed Link Control message and checks/corrects the Reed-Solomon check data.
-int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
+int dmr_full_lc_decode(dmr_packet packet, dmr_full_lc *lc, dmr_data_type data_type)
 {
-    if (packet == NULL || lc == NULL || packet->data_type >= DMR_DATA_TYPE_INVALID)
+    if (packet == NULL || lc == NULL || data_type >= DMR_DATA_TYPE_INVALID)
         return dmr_error(DMR_EINVAL);
 
     uint8_t bytes[12];
     memset(bytes, 0, sizeof(bytes));
 
     // BPTC(196, 96) decode data
-    dmr_bptc_196_96_t *bptc = talloc_zero(NULL, dmr_bptc_196_96_t);
+    dmr_bptc_196_96 *bptc = talloc_zero(NULL, dmr_bptc_196_96);
     if (bptc == NULL) {
         dmr_log_error("lc: BPTC(196,96) init failed: out of memory");
         return dmr_error(DMR_ENOMEM);
     }
 
     dmr_log_trace("lc: decoding BPTC(196, 96)");
-    if (dmr_bptc_196_96_decode(bptc, packet, bytes) != 0) {
+    if (dmr_bptc_196_96_decode(packet, bptc, bytes) != 0) {
         dmr_log_error("lc: BPTC(196,96) decode failed: %s", dmr_error_get());
         return dmr_error(DMR_LASTERROR);
     }
 
     dmr_log_trace("LC: apply CRC mask %#02x for data type %s",
-        dmr_crc_mask_lc[packet->data_type],
-        dmr_data_type_name(packet->data_type));
-    bytes[9]  ^= dmr_crc_mask_lc[packet->data_type];
-    bytes[10] ^= dmr_crc_mask_lc[packet->data_type];
-    bytes[11] ^= dmr_crc_mask_lc[packet->data_type];
+        dmr_crc_mask_lc[data_type],
+        dmr_data_type_name(data_type));
+    bytes[9]  ^= dmr_crc_mask_lc[data_type];
+    bytes[10] ^= dmr_crc_mask_lc[data_type];
+    bytes[11] ^= dmr_crc_mask_lc[data_type];
 
     dmr_log_trace("lc: performing Reed-Solomon(12, 9, 4) check on data");
     if (dmr_rs_12_9_4_decode(bytes) != 0) {
@@ -59,10 +59,10 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
         dmr_rs_12_9_4_encode(bytes);
         dmr_log_debug("LC: parities calculated locally:");
         dmr_dump_hex(bytes, 12);
-        dmr_log_trace("LC: apply CRC mask %#02x", dmr_crc_mask_lc[packet->data_type]);
-        bytes[9]  ^= dmr_crc_mask_lc[packet->data_type];
-        bytes[10] ^= dmr_crc_mask_lc[packet->data_type];
-        bytes[11] ^= dmr_crc_mask_lc[packet->data_type];
+        dmr_log_trace("LC: apply CRC mask %#02x", dmr_crc_mask_lc[data_type]);
+        bytes[9]  ^= dmr_crc_mask_lc[data_type];
+        bytes[10] ^= dmr_crc_mask_lc[data_type];
+        bytes[11] ^= dmr_crc_mask_lc[data_type];
         dmr_dump_hex(bytes, 12);
 #endif
         return -1;
@@ -85,7 +85,7 @@ int dmr_full_lc_decode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     return 0;
 }
 
-int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12])
+int dmr_full_lc_encode_bytes(dmr_full_lc *lc, uint8_t bytes[12])
 {
     if (lc == NULL || bytes == NULL)
         return dmr_error(DMR_EINVAL);
@@ -116,15 +116,15 @@ int dmr_full_lc_encode_bytes(dmr_full_lc_t *lc, uint8_t bytes[12])
     return 0;
 }
 
-int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
+int dmr_full_lc_encode(dmr_packet packet, dmr_full_lc *lc, dmr_data_type data_type)
 {
     if (packet == NULL || lc == NULL)
         return dmr_error(DMR_EINVAL);
 
-    if (packet->data_type != DMR_DATA_TYPE_VOICE_LC &&
-        packet->data_type != DMR_DATA_TYPE_TERMINATOR_WITH_LC) {
+    if (data_type != DMR_DATA_TYPE_VOICE_LC &&
+        data_type != DMR_DATA_TYPE_TERMINATOR_WITH_LC) {
         dmr_log_error("lc: unsupported LC type %s",
-            dmr_data_type_name(packet->data_type));
+            dmr_data_type_name(data_type));
         return -1;
     }
 
@@ -138,25 +138,25 @@ int dmr_full_lc_encode(dmr_full_lc_t *lc, dmr_packet_t *packet)
     if (dmr_full_lc_encode_bytes(lc, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
 
-    dmr_log_trace("LC: apply CRC mask %#02x", dmr_crc_mask_lc[packet->data_type]);
-    bytes[9]  ^= dmr_crc_mask_lc[packet->data_type];
-    bytes[10] ^= dmr_crc_mask_lc[packet->data_type];
-    bytes[11] ^= dmr_crc_mask_lc[packet->data_type];
+    dmr_log_trace("LC: apply CRC mask %#02x", dmr_crc_mask_lc[data_type]);
+    bytes[9]  ^= dmr_crc_mask_lc[data_type];
+    bytes[10] ^= dmr_crc_mask_lc[data_type];
+    bytes[11] ^= dmr_crc_mask_lc[data_type];
 
     // BPTC(196, 96) encode data
-    dmr_bptc_196_96_t bptc;
+    dmr_bptc_196_96 bptc;
     dmr_log_trace("lc: encoding BPTC(196, 96)");
-    if (dmr_bptc_196_96_encode(&bptc, packet, bytes) != 0)
+    if (dmr_bptc_196_96_encode(packet, &bptc, bytes) != 0)
         return dmr_error(DMR_LASTERROR);
 
     if (dmr_log_priority() <= DMR_LOG_PRIORITY_DEBUG) {
-        dmr_dump_hex(packet->payload, DMR_PAYLOAD_BYTES);
+        dmr_dump_hex(packet, DMR_PACKET_LEN);
     }
 
     return 0;
 }
 
-char *dmr_flco_pdu_name(dmr_flco_pdu_t flco_pdu)
+char *dmr_flco_pdu_name(dmr_flco_pdu flco_pdu)
 {
     switch (flco_pdu) {
     case DMR_FLCO_PDU_GROUP:

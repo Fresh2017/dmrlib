@@ -6,11 +6,8 @@
 #include <stddef.h>
 #include <dmr/bits/b.h>
 
-#define DMR_PAYLOAD_BYTES           33
-#define DMR_PAYLOAD_BITS            (DMR_PAYLOAD_BYTES*8)
-
-#define DMR_PAYLOAD_SLOT_TYPE_HALF  10
-#define DMR_PAYLOAD_SLOT_TYPE_BITS  (DMR_PAYLOAD_SLOT_TYPE_HALF*2)
+#define DMR_SLOT_TYPE_HALF  10
+#define DMR_SLOT_TYPE_BITS  (DMR_SLOT_TYPE_HALF * 2)
 
 #define HEXDUMP_COLS                16
 

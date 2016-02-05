@@ -13,7 +13,7 @@ extern "C" {
 #include <inttypes.h>
 #include <dmr/packet.h>
 
-extern int dmr_trellis_rate_34_decode(uint8_t bytes[18], dmr_packet_t *packet);
+extern int dmr_trellis_rate_34_decode(dmr_packet packet, uint8_t bytes[18]);
 
 #ifdef __cplusplus
 }

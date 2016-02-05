@@ -5,22 +5,22 @@
 #include "dmr/log.h"
 #include "dmr/thread.h"
 
-static _dmr_thread_local dmr_error_t error;
-static const char *dmr_error_enomem      = "out of memory";
-static const char *dmr_error_einval      = "invalid argument";
-static const char *dmr_error_ewrite      = "write failed";
-static const char *dmr_error_eread       = "read failed";
-static const char *dmr_error_unsupported = "not supported";
-static const char *dmr_error_unknown     = "unkonwn error";
+DMR_PRV static _dmr_thread_local dmr_error_t error;
+DMR_PRV static const char *dmr_error_enomem      = "out of memory";
+DMR_PRV static const char *dmr_error_einval      = "invalid argument";
+DMR_PRV static const char *dmr_error_ewrite      = "write failed";
+DMR_PRV static const char *dmr_error_eread       = "read failed";
+DMR_PRV static const char *dmr_error_unsupported = "not supported";
+DMR_PRV static const char *dmr_error_unknown     = "unkonwn error";
 
-int _dmr_error_set(const char *msg, dmr_log_priority_t priority)
+DMR_API int _dmr_error_set(const char *msg, dmr_log_priority_t priority)
 {
     error.priority = priority;
     strcpy(error.msg, msg);
     return -1;
 }
 
-int dmr_error(dmr_errno err)
+DMR_API int dmr_error(dmr_errno err)
 {
     error.no = err;
 
@@ -42,7 +42,7 @@ int dmr_error(dmr_errno err)
     }
 }
 
-int dmr_error_set(const char *fmt, ...)
+DMR_API int dmr_error_set(const char *fmt, ...)
 {
     va_list ap;
 
@@ -56,14 +56,14 @@ int dmr_error_set(const char *fmt, ...)
     return -1;
 }
 
-const char *dmr_error_get(void)
+DMR_API const char *dmr_error_get(void)
 {
     if (strlen(error.msg) == 0)
         return "no error";
     return error.msg;
 }
 
-void dmr_error_clear(void)
+DMR_API void dmr_error_clear(void)
 {
     memset(error.msg, 0, DMR_ERR_MAX_STRLEN);
 }

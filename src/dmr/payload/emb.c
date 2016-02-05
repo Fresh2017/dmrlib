@@ -8,17 +8,17 @@
 #include "dmr/fec/qr_16_7.h"
 #include "dmr/fec/vbptc_16_11.h"
 
-int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet)
+int dmr_emb_decode(dmr_packet packet, dmr_emb *emb)
 {
     if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
     uint8_t emb_bytes[2];
     memset(emb_bytes, 0, sizeof(emb_bytes));
-    emb_bytes[0]  = (packet->payload[13] << 4) & 0xf0;
-    emb_bytes[0] |= (packet->payload[14] >> 4) & 0x0f;
-    emb_bytes[1]  = (packet->payload[18] << 4) & 0xf0;
-    emb_bytes[1] |= (packet->payload[19] >> 4) & 0x0f;
+    emb_bytes[0]  = (packet[13] << 4) & 0xf0;
+    emb_bytes[0] |= (packet[14] >> 4) & 0x0f;
+    emb_bytes[1]  = (packet[18] << 4) & 0xf0;
+    emb_bytes[1] |= (packet[19] >> 4) & 0x0f;
     dmr_log_trace("emb: bytes: %02x %02x", emb_bytes[0], emb_bytes[1]);
     if (!dmr_qr_16_7_decode(emb_bytes)) {
         dmr_log_debug("emb: qr_16_7 checksum failed");
@@ -33,15 +33,15 @@ int dmr_emb_decode(dmr_emb_t *emb, dmr_packet_t *packet)
     return 0;
 }
 
-int dmr_emb_bytes_decode(uint8_t bytes[4], dmr_packet_t *packet)
+int dmr_emb_bytes_decode(dmr_packet packet, uint8_t bytes[4])
 {
     if (bytes == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-    bytes[0]  = (packet->payload[14] << 4) & 0xf0;
-    bytes[0] |= (packet->payload[15] >> 4) & 0x0f;
-    bytes[1]  = (packet->payload[15] << 4) & 0xf0;
-    bytes[1] |= (packet->payload[16] >> 4) & 0x0f;
+    bytes[0]  = (packet[14] << 4) & 0xf0;
+    bytes[0] |= (packet[15] >> 4) & 0x0f;
+    bytes[1]  = (packet[15] << 4) & 0xf0;
+    bytes[1] |= (packet[16] >> 4) & 0x0f;
     return 0;
 }
 
@@ -55,7 +55,7 @@ bool dmr_emb_null(uint8_t bytes[4])
     return true;
 }
 
-int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
+int dmr_emb_encode(dmr_packet packet, dmr_emb *emb)
 {
     if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
@@ -67,26 +67,26 @@ int dmr_emb_encode(dmr_emb_t *emb, dmr_packet_t *packet)
     emb_bytes[1]  = 0; // Will be calculated
     dmr_qr_16_7_encode(emb_bytes);
 
-    packet->payload[13] = (packet->payload[13] & 0xf0U) | (emb_bytes[0] >> 4);
-    packet->payload[14] = (packet->payload[14] & 0x0fU) | (emb_bytes[0] << 4);
-    packet->payload[18] = (packet->payload[18] & 0xf0U) | (emb_bytes[1] >> 4);
-    packet->payload[19] = (packet->payload[19] & 0x0fU) | (emb_bytes[1] << 4);
+    packet[13] = (packet[13] & 0xf0U) | (emb_bytes[0] >> 4);
+    packet[14] = (packet[14] & 0x0fU) | (emb_bytes[0] << 4);
+    packet[18] = (packet[18] & 0xf0U) | (emb_bytes[1] >> 4);
+    packet[19] = (packet[19] & 0x0fU) | (emb_bytes[1] << 4);
     return 0;
 }
 
-dmr_emb_signalling_lc_bits_t *dmr_emb_signalling_lc_interlave(dmr_emb_signalling_lc_bits_t *emb_bits)
+dmr_emb_signalling_lc_bits *dmr_emb_signalling_lc_interlave(dmr_emb_signalling_lc_bits *emb_bits)
 {
     if (emb_bits == NULL)
         return NULL;
 
-    dmr_emb_signalling_lc_bits_t *interleaved = talloc(emb_bits, dmr_emb_signalling_lc_bits_t);
+    dmr_emb_signalling_lc_bits *interleaved = talloc(emb_bits, dmr_emb_signalling_lc_bits);
     if (interleaved == NULL)
         return NULL;
 
     bool *bits = (bool *)interleaved;
     uint8_t i, j;
 
-    for (i = 0, j = 0; i < sizeof(dmr_emb_signalling_lc_bits_t); i++) {
+    for (i = 0, j = 0; i < sizeof(dmr_emb_signalling_lc_bits); i++) {
         switch (i) {
         case 32:
             bits[i] = emb_bits->checksum[0];
@@ -112,7 +112,7 @@ dmr_emb_signalling_lc_bits_t *dmr_emb_signalling_lc_interlave(dmr_emb_signalling
     return interleaved;
 }
 
-static int dmr_emb_encode_signalling_lc_bytes(uint8_t *bytes, dmr_emb_signalling_lc_bits_t *emb_bits)
+static int dmr_emb_encode_signalling_lc_bytes(uint8_t *bytes, dmr_emb_signalling_lc_bits *emb_bits)
 {
     if (bytes == NULL || emb_bits == NULL)
         return dmr_error(DMR_EINVAL);
@@ -130,7 +130,7 @@ static int dmr_emb_encode_signalling_lc_bytes(uint8_t *bytes, dmr_emb_signalling
     return 0;
 }
 
-int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signalling_lc_bits_t *emb_bits, dmr_data_type_t data_type)
+int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc *lc, dmr_emb_signalling_lc_bits *emb_bits, dmr_data_type data_type)
 {
     if (emb_bits == NULL || lc == NULL || data_type >= DMR_DATA_TYPE_INVALID)
         return dmr_error(DMR_EINVAL);
@@ -142,27 +142,27 @@ int dmr_emb_encode_signalling_lc_from_full_lc(dmr_full_lc_t *lc, dmr_emb_signall
     return dmr_emb_encode_signalling_lc_bytes(bytes, emb_bits);
 }
 
-int dmr_emb_encode_signalling_lc(dmr_emb_signalling_lc_bits_t *emb_bits, dmr_packet_t *packet)
+int dmr_emb_encode_signalling_lc(dmr_packet packet, dmr_emb_signalling_lc_bits *emb_bits, dmr_lc *lc)
 {
-    if (emb_bits == NULL || packet == NULL)
+    if (emb_bits == NULL || packet == NULL || lc == NULL)
         return dmr_error(DMR_EINVAL);
 
     uint8_t bytes[9];
     memset(bytes, 0, sizeof(bytes));
-    if (packet->flco == DMR_FLCO_PRIVATE) {
+    if (lc->flco == DMR_FLCO_PRIVATE) {
         bytes[0] = 3;
     }
-    bytes[3] = packet->dst_id >> 16;
-    bytes[4] = packet->dst_id >> 8;
-    bytes[5] = packet->dst_id;
-    bytes[6] = packet->src_id >> 16;
-    bytes[7] = packet->src_id >> 8;
-    bytes[8] = packet->src_id;
+    bytes[3] = lc->dst_id >> 16;
+    bytes[4] = lc->dst_id >> 8;
+    bytes[5] = lc->dst_id;
+    bytes[6] = lc->src_id >> 16;
+    bytes[7] = lc->src_id >> 8;
+    bytes[8] = lc->src_id;
 
     return dmr_emb_encode_signalling_lc_bytes(bytes, emb_bits);
 }
 
-char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss)
+char *dmr_emb_lcss_name(dmr_emb_lcss lcss)
 {
     switch (lcss) {
     case DMR_EMB_LCSS_SINGLE_FRAGMENT:
@@ -178,7 +178,7 @@ char *dmr_emb_lcss_name(dmr_emb_lcss_t lcss)
     }
 }
 
-int dmr_emb_lcss_fragment_encode(dmr_emb_t *emb, dmr_vbptc_16_11_t *vbptc, uint8_t fragment, dmr_packet_t *packet)
+int dmr_emb_lcss_fragment_encode(dmr_packet packet, dmr_emb *emb, dmr_vbptc_16_11 *vbptc, uint8_t fragment)
 {
     if (emb == NULL || packet == NULL)
         return dmr_error(DMR_EINVAL);
@@ -194,11 +194,11 @@ int dmr_emb_lcss_fragment_encode(dmr_emb_t *emb, dmr_vbptc_16_11_t *vbptc, uint8
     }
     dmr_bits_to_bytes(bits, sizeof(bits), lc_bytes, sizeof(lc_bytes));
 
-    packet->payload[14] = (packet->payload[14] & 0xf0) | (lc_bytes[0]         >> 4);
-    packet->payload[15] = (lc_bytes[0]  << 4)          | (lc_bytes[1]         >> 4);
-    packet->payload[16] = (lc_bytes[1]  << 4)          | (lc_bytes[2]         >> 4);
-    packet->payload[17] = (lc_bytes[2]  << 4)          | (lc_bytes[3]         >> 4);
-    packet->payload[18] = (lc_bytes[3]  << 4)          | (packet->payload[18] >> 4);
+    packet[14] = (packet[14] & 0xf0) | (lc_bytes[0] >> 4);
+    packet[15] = (lc_bytes[0]  << 4) | (lc_bytes[1] >> 4);
+    packet[16] = (lc_bytes[1]  << 4) | (lc_bytes[2] >> 4);
+    packet[17] = (lc_bytes[2]  << 4) | (lc_bytes[3] >> 4);
+    packet[18] = (lc_bytes[3]  << 4) | (packet[18]  >> 4);
 
-    return dmr_emb_encode(emb, packet);
+    return dmr_emb_encode(packet, emb);
 }

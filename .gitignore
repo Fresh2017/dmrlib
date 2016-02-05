@@ -44,11 +44,10 @@ src/cmd/noisebridge/version.h
 src/common/config.h
 Makefile
 dmrlib.pc
-wright.log
 wright.cache
 
-# OS X cruft
+# Misc
 .DS_Store
-
-# Vim cruft
+*.log
 *.swp
+*.pcap

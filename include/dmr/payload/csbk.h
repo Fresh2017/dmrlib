@@ -12,19 +12,20 @@ extern "C" {
 #include <dmr/type.h>
 #include <dmr/fec/bptc_196_96.h>
 
-#define DMR_CSBK_OUTBOUND_ACTIVATION                 0b00111000
-#define DMR_CSBK_UNIT_TO_UNIT_VOICE_SERVICE_REQUEST  0b00000100
-#define DMR_CSBK_UNIT_TO_UNIT_VOICE_SERVICE_RESPONSE 0b00000101
-#define DMR_CSBK_NEGATIVE_ACKNOWLEDGE_RESPONSE       0b00100100
-#define DMR_CSBK_PREAMBLE                            0b00111101
-typedef uint8_t dmr_csbk_opcode_t;
+typedef enum {
+    DMR_CSBK_OUTBOUND_ACTIVATION                 = 0b00111000,
+    DMR_CSBK_UNIT_TO_UNIT_VOICE_SERVICE_REQUEST  = 0b00000100,
+    DMR_CSBK_UNIT_TO_UNIT_VOICE_SERVICE_RESPONSE = 0b00000101,
+    DMR_CSBK_NEGATIVE_ACKNOWLEDGE_RESPONSE       = 0b00100100,
+    DMR_CSBK_PREAMBLE                            = 0b00111101
+} dmr_csbk_opcode;
 
 typedef struct {
-    uint16_t          crc;
-    bool              last;
-    dmr_csbk_opcode_t opcode;
-    dmr_id_t          src_id;
-    dmr_id_t          dst_id;
+    uint16_t        crc;
+    bool            last;
+    dmr_csbk_opcode opcode;
+    dmr_id          src_id;
+    dmr_id          dst_id;
     union {
         struct {
             uint8_t service_options;
@@ -44,10 +45,10 @@ typedef struct {
 			uint8_t csbk_blocks_to_follow;
         } preamble;
     } data;
-} dmr_csbk_t;
+} dmr_csbk;
 
-extern int dmr_csbk_decode(dmr_csbk_t *csbk, dmr_packet_t *packet);
-extern char *dmr_csbk_opcode_name(dmr_csbk_opcode_t opcode);
+extern int dmr_csbk_decode(dmr_csbk *csbk, dmr_packet *packet);
+extern char *dmr_csbk_opcode_name(dmr_csbk_opcode opcode);
 
 #ifdef __cplusplus
 }

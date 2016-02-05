@@ -5,14 +5,14 @@
 #ifndef _DMR_ERROR_H
 #define _DMR_ERROR_H
 
+#include <errno.h>
+#include <stdarg.h>
+#include <dmr/config.h>
+#include <dmr/log.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <errno.h>
-#include <stdarg.h>
-
-#include <dmr/log.h>
 
 #define DMR_ERR_MAX_STRLEN  128
 #define DMR_ERR_MAX_ARGS    5

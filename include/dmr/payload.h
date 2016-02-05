@@ -12,26 +12,26 @@ extern "C" {
 #include <dmr/type.h>
 
 typedef struct {
-    uint8_t bytes[DMR_PAYLOAD_BYTES];
-    bool    bits[DMR_PAYLOAD_BITS]; // See DMR AI spec. page 85.
-} dmr_payload_t;
+    uint8_t bytes[DMR_PACKET_LEN];
+    bool    bits[DMR_PACKET_BITS]; // See DMR AI spec. page 85.
+} dmr_payload;
 
 typedef struct {
 	bool bits[72];
-} dmr_payload_ambe_frame_bits_t;
+} dmr_payload_ambe_frame_bits;
 
 typedef union {
 	struct {
 		bool bits[108*2];
 	} raw;
 	struct {
-		dmr_payload_ambe_frame_bits_t frames[3];
+		dmr_payload_ambe_frame_bits frames[3];
 	} ambe_frames;
-} dmr_payload_voice_bits_t;
+} dmr_payload_voice_bits;
 
 typedef struct {
-	uint8_t bytes[sizeof(dmr_payload_voice_bits_t)/8];
-} dmr_payload_voice_bytes_t;
+	uint8_t bytes[sizeof(dmr_payload_voice_bits) / 8];
+} dmr_payload_voice_bytes;
 
 #ifdef __cplusplus
 }

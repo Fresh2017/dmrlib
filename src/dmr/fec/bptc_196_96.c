@@ -7,7 +7,7 @@
 #include "dmr/fec/hamming.h"
 
 #if defined(DMR_DEBUG_BPTC)
-static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
+static void bptc_196_96_dump(dmr_bptc_196_96 *bptc)
 {
 	uint8_t row, col;
 
@@ -45,16 +45,16 @@ static void bptc_196_96_dump(dmr_bptc_196_96_t *bptc)
 }
 #endif // DMR_DEBUG
 
-int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12])
+int dmr_bptc_196_96_decode(dmr_packet packet, dmr_bptc_196_96 *bptc, uint8_t data[12])
 {
 	if (bptc == NULL || packet == NULL || data == NULL)
 		return dmr_error(DMR_EINVAL);
 
 	dmr_log_trace("BPTC(196,96): decode");
 	uint8_t row, col, i;
-	bool bits[DMR_PAYLOAD_BITS], data_bits[96];
+	bool bits[DMR_PACKET_BITS], data_bits[96];
 
-	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
+	dmr_bytes_to_bits(packet, DMR_PACKET_LEN, bits, DMR_PACKET_BITS);
 	memcpy(bptc->raw +  0, bits +   0, 98);
 	memcpy(bptc->raw + 98, bits + 166, 98);
 	//dmr_dump_hex(packet->payload, 96/8);
@@ -109,14 +109,14 @@ int dmr_bptc_196_96_decode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 	return 0;
 }
 
-int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_t data[12])
+int dmr_bptc_196_96_encode(dmr_packet packet, dmr_bptc_196_96 *bptc, uint8_t data[12])
 {
 	if (bptc == NULL || packet == NULL || data == NULL)
 		return dmr_error(DMR_EINVAL);
 
 	dmr_log_trace("BPTC(196,96): encode");
 	uint8_t row, col, i;
-	bool data_bits[96], bits[DMR_PAYLOAD_BITS], hc[15];
+	bool data_bits[96], bits[DMR_PACKET_BITS], hc[15];
 
 	dmr_bytes_to_bits(data, 12, data_bits, 96);
 	memset(bptc->deinterleaved_bits, 0, sizeof(bptc->deinterleaved_bits));
@@ -160,7 +160,7 @@ int dmr_bptc_196_96_encode(dmr_bptc_196_96_t *bptc, dmr_packet_t *packet, uint8_
 
 	memcpy(bits +   0, bptc->raw +  0, 98);
 	memcpy(bits + 166, bptc->raw + 98, 98);
-	dmr_bits_to_bytes(bits, DMR_PAYLOAD_BITS, packet->payload, DMR_PAYLOAD_BYTES);
+	dmr_bits_to_bytes(bits, DMR_PACKET_BITS, packet, DMR_PACKET_LEN);
 
 	return 0;
 }

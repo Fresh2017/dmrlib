@@ -36,14 +36,14 @@ static uint8_t rate_34_interleaving_schedule[98] = {
 	0x5e, 0x5f
 };
 
-int dmr_trellis_rate_34_decode(uint8_t bytes[18], dmr_packet_t *packet)
+int dmr_trellis_rate_34_decode(dmr_packet packet, uint8_t bytes[18])
 {
 	if (packet == NULL || bytes == NULL)
 		return dmr_error(DMR_EINVAL);
 
 	/* Convert payload to bits and extract info bits */
-	bool bits[DMR_PAYLOAD_BITS], info[196];
-	dmr_bytes_to_bits(packet->payload, DMR_PAYLOAD_BYTES, bits, DMR_PAYLOAD_BITS);
+	bool bits[DMR_PACKET_BITS], info[196];
+	dmr_bytes_to_bits(packet, DMR_PACKET_LEN, bits, DMR_PACKET_BITS);
 	memcpy(info +  0, bits +   0, 98);
 	memcpy(info + 98, bits + 166, 98);
 

@@ -9,17 +9,18 @@
 #include "dmr/payload/lc.h"
 #include "dmr/payload/sync.h"
 #include "dmr/fec/golay_20_8.h"
+#include "common/byte.h"
 
-static char *flco_name[] = {
+DMR_PRV static char *flco_name[] = {
     "group",
     "unit to unit",
     "invalid",
     NULL
 };
 
-static struct {
-    dmr_fid_t fid;
-    char      *name;
+DMR_PRV static struct {
+    dmr_fid fid;
+    char    *name;
 } fid_name[] = {
     { DMR_FID_ETSI, "ETSI"                                      },
     { 0x01,         "RESERVED"                                  },
@@ -45,7 +46,7 @@ static struct {
     { 0,            NULL                                        }
 };
 
-static char *ts_name[] = {
+DMR_PRV static char *ts_name[] = {
     "TS1",
     "TS2",
     "invalid",
@@ -53,39 +54,18 @@ static char *ts_name[] = {
 };
 
 #define PACKET_DUMP_COLS 11
-void dmr_dump_packet(dmr_packet_t *packet)
+DMR_API void dmr_dump_packet(dmr_packet packet)
 {
-    if (packet == NULL) {
-        dmr_log_error("dump: packet is NULL");
-        return;
-    }
-
-    char buf[8];
-    memset(buf, 0, sizeof(buf));
-    if (packet->data_type == DMR_DATA_TYPE_VOICE) {
-        sprintf(buf, "%c", 'A' + (char)packet->meta.voice_frame);
-    } else {
-        sprintf(buf, "%d", packet->data_type);
-    }
-    dmr_log_debug("packet: [%lu->%lu] via %lu, seq 0x%02x, slot %d, flco %s (%d), data type %s (%s), stream id 0x%08lx:",
-        packet->src_id,
-        packet->dst_id,
-        packet->repeater_id,
-        packet->meta.sequence,
-        packet->ts,
-        dmr_flco_name(packet->flco),
-        packet->flco,
-        dmr_data_type_name_short(packet->data_type),
-        buf,
-        packet->meta.stream_id);
-
-    dmr_sync_pattern_t pattern = dmr_sync_pattern_decode(packet);
-    if (packet->data_type < DMR_DATA_TYPE_INVALID) {
+    dmr_sync_pattern pattern = dmr_sync_pattern_decode(packet);
+    if (pattern != DMR_SYNC_PATTERN_UNKNOWN) {
         dmr_log_debug("packet: sync pattern: %s", dmr_sync_pattern_name(pattern));
     }
 
-    size_t i, j, len = DMR_PAYLOAD_BYTES;
-    char *mem = (char *)packet->payload;
+    dmr_data_type data_type;
+    dmr_slot_type_decode(packet, NULL, &data_type);
+
+    size_t i, j, len = DMR_PACKET_LEN;
+    char *mem = (char *)packet;
     for(i = 0; i < len + ((len % PACKET_DUMP_COLS) ? (PACKET_DUMP_COLS - len % PACKET_DUMP_COLS) : 0); i++) {
         /* print offset */
         if (i % PACKET_DUMP_COLS == 0) {
@@ -94,7 +74,7 @@ void dmr_dump_packet(dmr_packet_t *packet)
 
         bool print_hex = true;
         if (pattern == DMR_SYNC_PATTERN_UNKNOWN) {
-            switch (packet->data_type) {
+            switch (data_type) {
             /* highlight emb bits and emb lc */
             case DMR_DATA_TYPE_VOICE:
                 switch (i) {
@@ -154,7 +134,7 @@ void dmr_dump_packet(dmr_packet_t *packet)
 
         if (print_hex) {
             /* print hex data */
-            if (i < DMR_PAYLOAD_BYTES) {
+            if (i < DMR_PACKET_LEN) {
                 printf("%02x ", mem[i] & 0xff);
             } else { /* end of block, just aligning for ASCII dump */
                 printf("   ");
@@ -178,50 +158,114 @@ void dmr_dump_packet(dmr_packet_t *packet)
         }
     }
 
-    if (packet->data_type == DMR_DATA_TYPE_VOICE_LC) {
-        dmr_full_lc_t full_lc;
-        if (dmr_full_lc_decode(&full_lc, packet) != 0) {
+}
+
+DMR_API void dmr_dump_parsed_packet(dmr_parsed_packet *parsed)
+{
+    if (parsed == NULL) {
+        dmr_log_error("dump: parsed is NULL");
+        return;
+    }
+
+    char buf[8];
+    memset(buf, 0, sizeof(buf));
+    if (parsed->data_type == DMR_DATA_TYPE_VOICE) {
+        sprintf(buf, "%c", 'A' + (char)parsed->voice_frame);
+    } else {
+        sprintf(buf, "%d", parsed->data_type);
+    }
+    dmr_log_debug("packet: [%lu->%lu] via %lu, seq 0x%02x, slot %d, flco %s (%d), data type %s (%s), stream id 0x%08lx:",
+        parsed->src_id,
+        parsed->dst_id,
+        parsed->repeater_id,
+        parsed->sequence,
+        parsed->ts,
+        dmr_flco_name(parsed->flco),
+        parsed->flco,
+        dmr_data_type_name_short(parsed->data_type),
+        buf,
+        parsed->stream_id);
+
+    if (parsed->data_type == DMR_DATA_TYPE_VOICE_LC) {
+        dmr_full_lc full_lc;
+        if (dmr_full_lc_decode(parsed->packet, &full_lc, parsed->data_type) != 0) {
             dmr_log_error("full LC decode failed: %s", dmr_error_get());
             return;
         }
         dmr_log_info("full LC: flco=%d, %u->%u\n",
             full_lc.flco_pdu, full_lc.src_id, full_lc.dst_id);
     }
+    dmr_dump_packet(parsed->packet);
 
     fflush(stdout);
 }
 
-
-dmr_packet_t *dmr_packet_decode(uint8_t *buf, size_t len)
+dmr_parsed_packet *dmr_packet_decode(dmr_packet packet)
 {
-    dmr_packet_t *packet;
-    if (len != DMR_PAYLOAD_BYTES) {
-        dmr_log_error("dmr: can't decode packet of %d bytes, need %d", len, DMR_PAYLOAD_BYTES);
-        return NULL;
-    }
-
-    packet = talloc_zero(NULL, dmr_packet_t);
-    if (packet == NULL) {
+    dmr_parsed_packet *parsed;
+    if ((parsed = talloc_zero(NULL, dmr_parsed_packet)) == NULL) {
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
-    memcpy(packet->payload, buf, DMR_PAYLOAD_BYTES);
-    return packet;
+    byte_copy(parsed->packet, packet, DMR_PACKET_LEN);
+
+    dmr_sync_pattern pattern = dmr_sync_pattern_decode(packet);
+    switch (pattern) {
+    case DMR_SYNC_PATTERN_BS_SOURCED_DATA:
+    case DMR_SYNC_PATTERN_MS_SOURCED_DATA:
+        parsed->data_type = DMR_DATA_TYPE_DATA_HEADER;
+        break;
+
+    case DMR_SYNC_PATTERN_BS_SOURCED_VOICE:
+    case DMR_SYNC_PATTERN_MS_SOURCED_VOICE:
+        parsed->data_type = DMR_DATA_TYPE_VOICE_SYNC;
+        parsed->voice_frame = 0;
+        break;
+
+    case DMR_SYNC_PATTERN_DIRECT_DATA_TS1:
+        parsed->data_type = DMR_DATA_TYPE_DATA_HEADER;
+        parsed->ts = DMR_TS1;
+        break;
+
+    case DMR_SYNC_PATTERN_DIRECT_DATA_TS2:
+        parsed->data_type = DMR_DATA_TYPE_DATA_HEADER;
+        parsed->ts = DMR_TS2;
+        break;
+
+    case DMR_SYNC_PATTERN_DIRECT_VOICE_TS1:
+        parsed->data_type = DMR_DATA_TYPE_VOICE_SYNC;
+        parsed->ts = DMR_TS1;
+        break;
+
+    case DMR_SYNC_PATTERN_DIRECT_VOICE_TS2:
+        parsed->data_type = DMR_DATA_TYPE_VOICE_SYNC;
+        parsed->ts = DMR_TS2;
+        break;
+
+    case DMR_SYNC_PATTERN_UNKNOWN:
+    default:
+        parsed->data_type = DMR_DATA_TYPE_INVALID;
+        dmr_slot_type_decode(packet, &parsed->color_code, &parsed->data_type);
+        break;
+    }
+
+    parsed->parsed = true;
+    return parsed;
 }
 
-int dmr_payload_bits(dmr_packet_t *packet, void *bits)
+DMR_API int dmr_payload_bits(dmr_packet packet, void *bits)
 {
     if (packet == NULL || bits == NULL)
         return dmr_error(DMR_EINVAL);
 
-    bool data[33 * 8];
-    dmr_bytes_to_bits(packet->payload, 33, data, sizeof(data));
+    bool data[DMR_PACKET_BITS];
+    dmr_bytes_to_bits(packet, DMR_PACKET_LEN, data, sizeof(data));
     memcpy(bits + 0 , &data[0],   98);
     memcpy(bits + 98, &data[166], 98);
     return 0;
 }
 
-char *dmr_fid_name(dmr_fid_t fid)
+DMR_API char *dmr_fid_name(dmr_fid fid)
 {
     uint8_t i;
     for (i = 0; fid_name[i].name != NULL; i++) {
@@ -231,19 +275,19 @@ char *dmr_fid_name(dmr_fid_t fid)
     return NULL;
 }
 
-char *dmr_flco_name(dmr_flco_t flco)
+DMR_API char *dmr_flco_name(dmr_flco flco)
 {
     flco = min(flco, DMR_FLCO_INVALID);
     return flco_name[flco];
 }
 
-char *dmr_ts_name(dmr_ts_t ts)
+DMR_API char *dmr_ts_name(dmr_ts ts)
 {
     ts = min(ts, DMR_TS_INVALID);
     return ts_name[ts];
 }
 
-char *dmr_data_type_name(dmr_data_type_t data_type)
+DMR_API char *dmr_data_type_name(dmr_data_type data_type)
 {
     switch (data_type) {
     case DMR_DATA_TYPE_VOICE_PI:
@@ -276,7 +320,7 @@ char *dmr_data_type_name(dmr_data_type_t data_type)
     }
 }
 
-char *dmr_data_type_name_short(dmr_data_type_t data_type)
+char *dmr_data_type_name_short(dmr_data_type data_type)
 {
     switch (data_type) {
     case DMR_DATA_TYPE_VOICE_PI:
@@ -309,7 +353,7 @@ char *dmr_data_type_name_short(dmr_data_type_t data_type)
     }
 }
 
-int dmr_slot_type_decode(dmr_packet_t *packet)
+DMR_API int dmr_slot_type_decode(dmr_packet packet, dmr_color_code *color_code, dmr_data_type *data_type)
 {
     dmr_log_trace("packet: slot type decode");
     if (packet == NULL)
@@ -318,52 +362,56 @@ int dmr_slot_type_decode(dmr_packet_t *packet)
     uint8_t bytes[3];
     memset(bytes, 0, sizeof(bytes));
     /* See Table E.1: Transmit bit order for BPTC general data burst with SYNC */
-    bytes[0]  = (packet->payload[12] << 2) & B11111100;
-    bytes[0] |= (packet->payload[13] >> 6) & B00000011;
-    bytes[1]  = (packet->payload[13] << 2) & B11000000;
-    bytes[1] |= (packet->payload[19] << 2) & B11110000;
-    bytes[1] |= (packet->payload[20] >> 6) & B00000011;
-    bytes[2]  = (packet->payload[20] << 2) & B11110000;
+    bytes[0]  = (packet[12] << 2) & B11111100;
+    bytes[0] |= (packet[13] >> 6) & B00000011;
+    bytes[1]  = (packet[13] << 2) & B11000000;
+    bytes[1] |= (packet[19] << 2) & B11110000;
+    bytes[1] |= (packet[20] >> 6) & B00000011;
+    bytes[2]  = (packet[20] << 2) & B11110000;
 
     uint8_t code = dmr_golay_20_8_decode(bytes);
     dmr_log_debug("packet: slot type Golay(20, 8) code: 0x%02x%02x%02x -> 0x%02x",
         bytes[0], bytes[1], bytes[2], code);
-    packet->color_code = (code & B11110000) >> 4;
-    packet->data_type  = (code & B00001111);
-
-    dmr_log_debug("packet: data type decoded as %s (%d), color code %d",
-        dmr_data_type_name(packet->data_type), packet->data_type,
-        packet->color_code);
+    
+    if (color_code) {
+        *color_code = (code & B11110000) >> 4;
+        dmr_log_debug("packet: color code %d", *color_code);
+    }
+    if (data_type) {
+        *data_type  = (code & B00001111);
+        dmr_log_debug("packet: data type decoded as %s (%d)",
+            dmr_data_type_name(*data_type), *data_type);
+    }
 
     return 0;
 }
 
-int dmr_slot_type_encode(dmr_packet_t *packet)
+DMR_API int dmr_slot_type_encode(dmr_packet packet, dmr_color_code color_code, dmr_data_type data_type)
 {
     dmr_log_trace("packet: slot type encode");
     if (packet == NULL)
         return dmr_error(DMR_EINVAL);
 
-    if (packet->data_type >= DMR_DATA_TYPE_INVALID) {
+    if (data_type >= DMR_DATA_TYPE_INVALID) {
         dmr_log_debug("packet: can't encode slot type of invalid data type 0x%02x",
-            packet->data_type);
+            data_type);
         return dmr_error(DMR_EINVAL);
     }
-    if (packet->color_code < 1 || packet->color_code > 15) {
+    if (color_code < 1 || color_code > 15) {
         dmr_log_debug("packet: can't encode slot type of invalid color code %d",
-            packet->color_code);
+            color_code);
         return dmr_error(DMR_EINVAL);
     }
 
     uint8_t bytes[3];
     memset(bytes, 0, sizeof(bytes));
-    bytes[0] = (packet->color_code << 4) | (packet->data_type & 0x0f);
+    bytes[0] = (color_code << 4) | (data_type & 0x0f);
     dmr_golay_20_8_encode(bytes);
 
-    packet->payload[12] = (packet->payload[12] & 0xc0) | ((bytes[0] >> 2) & 0x3f);
-    packet->payload[13] = (packet->payload[13] & 0x0f) | ((bytes[0] << 6) & 0xc0) | ((bytes[1] >> 2) & 0x30);
-    packet->payload[19] = (packet->payload[19] & 0xf0) | ((bytes[1] >> 2) & 0x0f);
-    packet->payload[20] = (packet->payload[20] & 0x03) | ((bytes[1] << 6) & 0xc0) | ((bytes[2] >> 2) & 0x3c);
+    packet[12] = (packet[12] & 0xc0) | ((bytes[0] >> 2) & 0x3f);
+    packet[13] = (packet[13] & 0x0f) | ((bytes[0] << 6) & 0xc0) | ((bytes[1] >> 2) & 0x30);
+    packet[19] = (packet[19] & 0xf0) | ((bytes[1] >> 2) & 0x0f);
+    packet[20] = (packet[20] & 0x03) | ((bytes[1] << 6) & 0xc0) | ((bytes[2] >> 2) & 0x3c);
 
     return 0;
 }

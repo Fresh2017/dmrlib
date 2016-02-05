@@ -1,7 +1,7 @@
 #ifndef _COMMON_SERIAL_H
 #define _COMMON_SERIAL_H
 
-#include "common/config.h"
+#include "common.h"
 #include "common/platform.h"
 
 #include <string.h>
@@ -204,10 +204,10 @@ int                serial_flowcontrol(serial_t *port, serial_flowcontrol_t flowc
 int                serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms);
 int 			   serial_read_next(serial_t *port, void *buf, size_t len, unsigned int timeout_ms);
 int                serial_read_nonblock(serial_t *port, void *buf, size_t len);
-int                serial_read_ready(serial_t *port);
+int                serial_read_waiting(serial_t *port);
 int                serial_write(serial_t *port, const void *buf, size_t len, unsigned int timeout_ms);
 int                serial_write_nonblock(serial_t *port, const void *buf, size_t len);
-int                serial_write_ready(serial_t *port);
+int                serial_write_waiting(serial_t *port);
 int                serial_flush(serial_t *port, serial_buffers_t buffers);
 int                serial_drain(serial_t *port);
 void               serial_free(serial_t *port);

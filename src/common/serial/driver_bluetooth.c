@@ -1,7 +1,7 @@
 #include "common/serial.h"
 #include "common/debug.h"
 
-char *serial_bluetooth_address(const serial_t *port)
+PRIVATE char *serial_bluetooth_address(const serial_t *port)
 {
 	if (!port || port->transport != SERIAL_TRANSPORT_BLUETOOTH
 	    || !port->bluetooth_address)

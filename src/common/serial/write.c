@@ -2,7 +2,7 @@
 #include "common/serial.h"
 #include "common/serial/internal.h"
 
-int serial_write(serial_t *port, const void *buf, size_t len, unsigned int timeout_ms)
+PRIVATE int serial_write(serial_t *port, const void *buf, size_t len, unsigned int timeout_ms)
 {
 	CHECK_OPEN_PORT();
 
@@ -131,7 +131,7 @@ int serial_write(serial_t *port, const void *buf, size_t len, unsigned int timeo
 #endif
 }
 
-int serial_write_nonblock(serial_t *port, const void *buf, size_t len)
+PRIVATE int serial_write_nonblock(serial_t *port, const void *buf, size_t len)
 {
 	CHECK_OPEN_PORT();
 

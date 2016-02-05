@@ -1,7 +1,7 @@
 #include "common/serial.h"
 #include "common/debug.h"
 
-int serial_usb_bus_address(const serial_t *port, int *usb_bus, int *usb_address)
+PRIVATE int serial_usb_bus_address(const serial_t *port, int *usb_bus, int *usb_address)
 {
 	if (!port)
 		RETURN_ERROR(EINVAL, "NULL port");
@@ -18,7 +18,7 @@ int serial_usb_bus_address(const serial_t *port, int *usb_bus, int *usb_address)
 	RETURN_OK();
 }
 
-int serial_usb_vid_pid(const serial_t *port, int *usb_vid, int *usb_pid)
+PRIVATE int serial_usb_vid_pid(const serial_t *port, int *usb_vid, int *usb_pid)
 {
 	if (!port)
 		RETURN_ERROR(EINVAL, "NULL port");
@@ -35,7 +35,7 @@ int serial_usb_vid_pid(const serial_t *port, int *usb_vid, int *usb_pid)
 	RETURN_OK();
 }
 
-char *serial_usb_manufacturer(const serial_t *port)
+PRIVATE char *serial_usb_manufacturer(const serial_t *port)
 {
 	if (!port || port->transport != SERIAL_TRANSPORT_USB || !port->usb_manufacturer)
 		return NULL;
@@ -43,7 +43,7 @@ char *serial_usb_manufacturer(const serial_t *port)
 	RETURN_STRING(port->usb_manufacturer);
 }
 
-char *serial_usb_product(const serial_t *port)
+PRIVATE char *serial_usb_product(const serial_t *port)
 {
 	if (!port || port->transport != SERIAL_TRANSPORT_USB || !port->usb_product)
 		return NULL;
@@ -51,7 +51,7 @@ char *serial_usb_product(const serial_t *port)
 	RETURN_STRING(port->usb_product);
 }
 
-char *serial_usb_serial(const serial_t *port)
+PRIVATE char *serial_usb_serial(const serial_t *port)
 {
 	if (!port || port->transport != SERIAL_TRANSPORT_USB || !port->usb_serial)
 		return NULL;

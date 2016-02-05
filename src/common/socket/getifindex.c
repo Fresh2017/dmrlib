@@ -6,7 +6,7 @@
 #include "common/config.h"
 #include "common/socket.h"
 
-uint32_t socket_getifindex(const char *ifname)
+PRIVATE uint32_t socket_getifindex(const char *ifname)
 {
 #ifdef HAVE_IF_INDEXTONAME
     return if_nametoindex(ifname);

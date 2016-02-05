@@ -1,6 +1,6 @@
 #include "common/scan.h"
 
-unsigned int scan_ip4(const char *src, ip4_t ip)
+PRIVATE unsigned int scan_ip4(const char *src, ip4_t ip)
 {
     unsigned int len;
     unsigned long u;

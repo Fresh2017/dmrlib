@@ -5,7 +5,7 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <stdbool.h>
-#include "common/config.h"
+#include "common.h"
 #include "common/byte.h"
 #include "common/platform.h"
 #if defined(PLATFORM_WINDOWS)
@@ -40,7 +40,18 @@ typedef struct {
 } socket_t;
 
 typedef uint8_t ip4_t[4];
+
+typedef struct {
+	ip4_t 	 ip;
+	uint16_t port;
+} addr4_t;
+
 typedef uint8_t ip6_t[16];
+
+typedef struct {
+	ip6_t 	 ip;
+	uint16_t port;
+} addr6_t;
 
 extern const ip4_t   ip4loopback;
 extern const ip4_t   ip4any;

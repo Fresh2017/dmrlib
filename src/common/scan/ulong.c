@@ -1,6 +1,6 @@
 #include "common/scan.h"
 
-size_t scan_ulong(const char *src, unsigned long int *dst)
+PRIVATE size_t scan_ulong(const char *src, unsigned long int *dst)
 {
     register const char *tmp = src;
     register unsigned long int l=0;

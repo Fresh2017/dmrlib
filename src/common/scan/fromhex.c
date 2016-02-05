@@ -1,6 +1,6 @@
 #include "common/scan.h"
 
-int scan_fromhex(unsigned char c)
+PRIVATE int scan_fromhex(unsigned char c)
 {
     c -= '0';
     if (c <= 9) {

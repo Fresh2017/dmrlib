@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#include "common.h"
 #include "common/platform.h"
 #include "common/format.h"
 #include "common/scan.h"

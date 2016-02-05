@@ -12,7 +12,7 @@
 #include "common/socket.h"
 #include "common/uint.h"
 
-ssize_t socket_send(socket_t *s, const void *buf, size_t len, ip6_t ip, uint16_t port)
+PRIVATE ssize_t socket_send(socket_t *s, const void *buf, size_t len, ip6_t ip, uint16_t port)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -24,7 +24,7 @@ ssize_t socket_send(socket_t *s, const void *buf, size_t len, ip6_t ip, uint16_t
         : socket_send6(s->fd, buf, len, ip, port, s->scope_id);
 }
 
-ssize_t socket_send4(int fd, const void *buf, size_t len, ip4_t ip, uint16_t port)
+PRIVATE ssize_t socket_send4(int fd, const void *buf, size_t len, ip4_t ip, uint16_t port)
 {
     DEBUGF("send4: %u bytes to %s:%u", len, debugip4(ip), port);
     struct sockaddr_in si;
@@ -36,7 +36,7 @@ ssize_t socket_send4(int fd, const void *buf, size_t len, ip4_t ip, uint16_t por
     return __winsock_errno(sendto(fd, (const char *)buf, len, 0, (void *)&si, sizeof(si)));
 }
 
-ssize_t socket_send6(int fd, const void *buf, size_t len, ip6_t ip, uint16_t port, uint32_t scope_id)
+PRIVATE ssize_t socket_send6(int fd, const void *buf, size_t len, ip6_t ip, uint16_t port, uint32_t scope_id)
 {
     DEBUGF("send6: %u bytes to %s:%u.%u", len, debugip6(ip), port, scope_id);
 #if defined(HAVE_LIBC_IPV6)

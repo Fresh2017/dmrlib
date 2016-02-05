@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include "common/socket.h"
 
-ssize_t socket_write(socket_t *s, const void *buf, size_t len)
+PRIVATE ssize_t socket_write(socket_t *s, const void *buf, size_t len)
 {
     if (s == NULL) {
         errno = EINVAL;

@@ -10,7 +10,7 @@
 #define O_NDELAY O_NONBLOCK
 #endif
 
-int socket_nodelay(int fd)
+PRIVATE int socket_nodelay(int fd)
 {
 #ifdef __MINGW32__
     unsigned long i = 0;
@@ -20,7 +20,7 @@ int socket_nodelay(int fd)
 #endif
 }
 
-int socket_nodelay_off(int fd)
+PRIVATE int socket_nodelay_off(int fd)
 {
 #ifdef __MINGW32__
     unsigned long i = 1;

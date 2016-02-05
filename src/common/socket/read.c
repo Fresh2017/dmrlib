@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include "common/socket.h"
 
-ssize_t socket_read(socket_t *s, void *buf, size_t len)
+PRIVATE ssize_t socket_read(socket_t *s, void *buf, size_t len)
 {
     if (s == NULL) {
         errno = EINVAL;

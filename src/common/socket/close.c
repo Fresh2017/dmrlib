@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include "common/socket.h"
 
-int socket_close(socket_t *s)
+PRIVATE int socket_close(socket_t *s)
 {
     if (s == NULL || s->fd < 0) {
         errno = EINVAL;

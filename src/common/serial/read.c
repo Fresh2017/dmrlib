@@ -8,7 +8,7 @@
 
 #if defined(PLATFORM_WINDOWS)
 /** To be called after port receive buffer is emptied. */
-static int restart_wait(serial_t *port)
+PRIVATE static int restart_wait(serial_t *port)
 {
 	DWORD wait_result;
 
@@ -43,7 +43,7 @@ static int restart_wait(serial_t *port)
 }
 
 /* Restart wait operation if buffer was emptied. */
-static int restart_wait_if_needed(serial_t *port, unsigned int bytes_read)
+PRIVATE static int restart_wait_if_needed(serial_t *port, unsigned int bytes_read)
 {
 	DWORD errors;
 	COMSTAT comstat;
@@ -61,7 +61,7 @@ static int restart_wait_if_needed(serial_t *port, unsigned int bytes_read)
 }
 #endif
 
-int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
+PRIVATE int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 {
 	CHECK_OPEN_PORT();
 
@@ -184,7 +184,7 @@ int serial_read(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 #endif
 }
 
-int serial_read_next(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
+PRIVATE int serial_read_next(serial_t *port, void *buf, size_t len, unsigned int timeout_ms)
 {
 	CHECK_OPEN_PORT();
 
@@ -314,7 +314,7 @@ int serial_read_next(serial_t *port, void *buf, size_t len, unsigned int timeout
 #endif
 }
 
-int serial_read_nonblock(serial_t *port, void *buf, size_t len)
+PRIVATE int serial_read_nonblock(serial_t *port, void *buf, size_t len)
 {
 	CHECK_OPEN_PORT();
 
@@ -365,7 +365,7 @@ int serial_read_nonblock(serial_t *port, void *buf, size_t len)
 #endif
 }
 
-int serial_read_waiting(serial_t *port)
+PRIVATE int serial_read_waiting(serial_t *port)
 {
 	CHECK_OPEN_PORT();
 

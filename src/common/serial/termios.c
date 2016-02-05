@@ -6,7 +6,7 @@
 
 #include <linux/termios.h>
 
-unsigned long get_termios_get_ioctl(void)
+PRIVATE unsigned long get_termios_get_ioctl(void)
 {
 #ifdef HAVE_STRUCT_TERMIOS2
 	return TCGETS2;
@@ -15,7 +15,7 @@ unsigned long get_termios_get_ioctl(void)
 #endif
 }
 
-unsigned long get_termios_set_ioctl(void)
+PRIVATE unsigned long get_termios_set_ioctl(void)
 {
 #ifdef HAVE_STRUCT_TERMIOS2
 	return TCSETS2;
@@ -24,7 +24,7 @@ unsigned long get_termios_set_ioctl(void)
 #endif
 }
 
-size_t get_termios_size(void)
+PRIVATE size_t get_termios_size(void)
 {
 #ifdef HAVE_STRUCT_TERMIOS2
 	return sizeof(struct termios2);
@@ -34,7 +34,7 @@ size_t get_termios_size(void)
 }
 
 #if (defined(HAVE_TERMIOS_SPEED) || defined(HAVE_TERMIOS2_SPEED)) && defined(HAVE_BOTHER)
-int get_termios_speed(void *data)
+PRIVATE int get_termios_speed(void *data)
 {
 #ifdef HAVE_STRUCT_TERMIOS2
 	struct termios2 *term = (struct termios2 *) data;
@@ -47,7 +47,7 @@ int get_termios_speed(void *data)
 		return term->c_ispeed;
 }
 
-void set_termios_speed(void *data, int speed)
+PRIVATE void set_termios_speed(void *data, int speed)
 {
 #ifdef HAVE_STRUCT_TERMIOS2
 	struct termios2 *term = (struct termios2 *) data;
@@ -61,12 +61,12 @@ void set_termios_speed(void *data, int speed)
 #endif
 
 #ifdef HAVE_STRUCT_TERMIOX
-size_t get_termiox_size(void)
+PRIVATE size_t get_termiox_size(void)
 {
 	return sizeof(struct termiox);
 }
 
-int get_termiox_flow(void *data, int *rts, int *cts, int *dtr, int *dsr)
+PRIVATE int get_termiox_flow(void *data, int *rts, int *cts, int *dtr, int *dsr)
 {
 	struct termiox *termx = (struct termiox *) data;
 	int flags = 0;
@@ -79,7 +79,7 @@ int get_termiox_flow(void *data, int *rts, int *cts, int *dtr, int *dsr)
 	return flags;
 }
 
-void set_termiox_flow(void *data, int rts, int cts, int dtr, int dsr)
+PRIVATE void set_termiox_flow(void *data, int rts, int cts, int dtr, int dsr)
 {
 	struct termiox *termx = (struct termiox *) data;
 

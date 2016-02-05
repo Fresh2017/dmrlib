@@ -1,6 +1,6 @@
 #include "common/byte.h"
 
-void byte_zero(void *buf, size_t len)
+PRIVATE void byte_zero(void *buf, size_t len)
 {
     register uint8_t *ptr = buf;
     size_t i;

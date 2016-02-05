@@ -5,7 +5,7 @@
 #endif
 #include "common/socket.h"
 
-int socket_listen(socket_t *s, unsigned int backlog)
+PRIVATE int socket_listen(socket_t *s, unsigned int backlog)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -14,7 +14,7 @@ int socket_listen(socket_t *s, unsigned int backlog)
     return socket_listenx(s->fd, backlog);
 }
 
-int socket_listenx(int fd, unsigned int backlog)
+PRIVATE int socket_listenx(int fd, unsigned int backlog)
 {
     return listen(fd, backlog);
 }

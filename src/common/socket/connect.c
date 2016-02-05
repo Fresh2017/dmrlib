@@ -9,7 +9,7 @@
 #include "common/socket.h"
 #include "common/uint.h"
 
-int socket_connect(socket_t *s, const ip6_t ip, uint16_t port)
+PRIVATE int socket_connect(socket_t *s, const ip6_t ip, uint16_t port)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -20,7 +20,7 @@ int socket_connect(socket_t *s, const ip6_t ip, uint16_t port)
         : socket_connect6(s->fd, ip, port, s->scope_id);
 }
 
-int socket_connect4(int fd, const ip4_t ip, uint16_t port)
+PRIVATE int socket_connect4(int fd, const ip4_t ip, uint16_t port)
 {
     struct sockaddr_in si;
     byte_zero(&si, sizeof(si));
@@ -30,7 +30,7 @@ int socket_connect4(int fd, const ip4_t ip, uint16_t port)
     return (__winsock_errno(connect(fd, (struct sockaddr*)&si, sizeof(si))));
 }
 
-int socket_connect6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id)
+PRIVATE int socket_connect6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id)
 {
 #if !defined(HAVE_LIBC_SCOPE_ID)
     (void)scope_id;
@@ -65,7 +65,7 @@ int socket_connect6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id)
 #endif
 }
 
-bool socket_connected(socket_t *s)
+PRIVATE bool socket_connected(socket_t *s)
 {
     if (s == NULL) {
         return false;
@@ -73,7 +73,7 @@ bool socket_connected(socket_t *s)
     return socket_connectedx(s->fd);
 }
 
-bool socket_connectedx(int fd)
+PRIVATE bool socket_connectedx(int fd)
 {
     struct sockaddr si;
     socklen_t sl = sizeof(si);

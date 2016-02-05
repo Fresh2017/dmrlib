@@ -2,14 +2,15 @@
 2010-06-11 : Igor Pavlov : Public domain
 This code is based on public domain code from Wei Dai's Crypto++ library. */
 
-#include "rotate.h"
-#include "sha256.h"
+#include "common/config.h"
+#include "common/rotate.h"
+#include "common/sha256.h"
 
 /* define it for speed optimization */
 //#define _sha256_UNROLL
 //#define _sha256_UNROLL2
 
-void sha256_init(sha256_t *p)
+PRIVATE void sha256_init(sha256_t *p)
 {
   p->state[0] = 0x6a09e667;
   p->state[1] = 0xbb67ae85;
@@ -72,7 +73,7 @@ void sha256_init(sha256_t *p)
 
 #endif
 
-static const uint32_t K[64] = {
+PRIVATE static const uint32_t K[64] = {
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
   0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -91,7 +92,7 @@ static const uint32_t K[64] = {
   0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-static void sha256_transform(uint32_t *state, const uint32_t *data)
+PRIVATE static void sha256_transform(uint32_t *state, const uint32_t *data)
 {
   uint32_t W[16];
   unsigned j;
@@ -146,7 +147,7 @@ static void sha256_transform(uint32_t *state, const uint32_t *data)
 #undef s0
 #undef s1
 
-static void sha256_write_byte_block(sha256_t *p)
+PRIVATE static void sha256_write_byte_block(sha256_t *p)
 {
   uint32_t data32[16];
   unsigned i;
@@ -159,7 +160,7 @@ static void sha256_write_byte_block(sha256_t *p)
   sha256_transform(p->state, data32);
 }
 
-void sha256_update(sha256_t *p, const uint8_t *data, size_t size)
+PRIVATE void sha256_update(sha256_t *p, const uint8_t *data, size_t size)
 {
   uint32_t pos = (uint32_t)p->count & 0x3F;
   while (size > 0)
@@ -175,7 +176,7 @@ void sha256_update(sha256_t *p, const uint8_t *data, size_t size)
   }
 }
 
-void sha256_final(sha256_t *p, uint8_t *digest)
+PRIVATE void sha256_final(sha256_t *p, uint8_t *digest)
 {
   uint64_t len = (p->count << 3);
   uint32_t pos = (uint32_t)p->count & 0x3F;

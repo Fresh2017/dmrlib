@@ -23,4 +23,10 @@
 # define HAVE_TERMIOS2_SPEED 1
 #endif
 
+{% if HAVE_VISIBILITY_ATTRIBUTE -%}
+#define PRIVATE __attribute__((visibility("hidden")))
+{% else -%}
+#define PRIVATE
+{% endif -%}
+
 #endif // _COMMON_CONFIG_H

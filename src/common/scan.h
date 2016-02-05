@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
+#include "common.h"
 #include "common/scan.h"
 #include "common/socket.h"
 

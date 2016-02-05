@@ -14,7 +14,7 @@
 /* The stuff below is not yet available in MinGW apparently. Define it here. */
 
 #ifndef USB_NODE_CONNECTION_INFORMATION_EX
-typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
+PRIVATE typedef struct _USB_NODE_CONNECTION_INFORMATION_EX {
        ULONG ConnectionIndex;
        USB_DEVICE_DESCRIPTOR DeviceDescriptor;
        UCHAR CurrentConfigurationValue;
@@ -60,10 +60,10 @@ CMAPI CONFIGRET WINAPI CM_Get_DevNode_Registry_PropertyA(DEVINST dnDevInst, \
 /* USB path is a string of at most 8 decimal numbers < 128 separated by dots. */
 #define MAX_USB_PATH ((8 * 3) + (7 * 1) + 1)
 
-static void enumerate_hub(serial_t *port, const char *hub_name,
+PRIVATE static void enumerate_hub(serial_t *port, const char *hub_name,
                           const char *parent_path, DEVINST dev_inst);
 
-static char *wc_to_utf8(PWCHAR wc_buffer, ULONG size)
+PRIVATE static char *wc_to_utf8(PWCHAR wc_buffer, ULONG size)
 {
 	WCHAR wc_str[(size / sizeof(WCHAR)) + 1];
 	char *utf8_str;
@@ -91,7 +91,7 @@ static char *wc_to_utf8(PWCHAR wc_buffer, ULONG size)
 	return utf8_str;
 }
 
-static char *get_root_hub_name(HANDLE host_controller)
+PRIVATE static char *get_root_hub_name(HANDLE host_controller)
 {
 	USB_ROOT_HUB_NAME root_hub_name;
 	PUSB_ROOT_HUB_NAME root_hub_name_wc;
@@ -121,7 +121,7 @@ static char *get_root_hub_name(HANDLE host_controller)
 	return root_hub_name_utf8;
 }
 
-static char *get_external_hub_name(HANDLE hub, ULONG connection_index)
+PRIVATE static char *get_external_hub_name(HANDLE hub, ULONG connection_index)
 {
 	USB_NODE_CONNECTION_NAME ext_hub_name;
 	PUSB_NODE_CONNECTION_NAME ext_hub_name_wc;
@@ -156,7 +156,7 @@ static char *get_external_hub_name(HANDLE hub, ULONG connection_index)
 	return ext_hub_name_utf8;
 }
 
-static char *get_string_descriptor(HANDLE hub_device, ULONG connection_index,
+PRIVATE static char *get_string_descriptor(HANDLE hub_device, ULONG connection_index,
                                    UCHAR descriptor_index)
 {
 	char desc_req_buf[sizeof(USB_DESCRIPTOR_REQUEST) +
@@ -183,7 +183,7 @@ static char *get_string_descriptor(HANDLE hub_device, ULONG connection_index,
 	return wc_to_utf8(desc->bString, desc->bLength);
 }
 
-static void enumerate_hub_ports(serial_t *port, HANDLE hub_device,
+PRIVATE static void enumerate_hub_ports(serial_t *port, HANDLE hub_device,
                                 ULONG nb_ports, const char *parent_path, DEVINST dev_inst)
 {
 	char path[MAX_USB_PATH];
@@ -278,7 +278,7 @@ static void enumerate_hub_ports(serial_t *port, HANDLE hub_device,
 	}
 }
 
-static void enumerate_hub(serial_t *port, const char *hub_name,
+PRIVATE static void enumerate_hub(serial_t *port, const char *hub_name,
                           const char *parent_path, DEVINST dev_inst)
 {
 	USB_NODE_INFORMATION hub_info;
@@ -307,7 +307,7 @@ static void enumerate_hub(serial_t *port, const char *hub_name,
 	CloseHandle(hub_device);
 }
 
-static void enumerate_host_controller(serial_t *port,
+PRIVATE static void enumerate_host_controller(serial_t *port,
                                       HANDLE host_controller_device,
                                       DEVINST dev_inst)
 {
@@ -319,7 +319,7 @@ static void enumerate_host_controller(serial_t *port,
 	}
 }
 
-static void get_usb_details(serial_t *port, DEVINST dev_inst_match)
+PRIVATE static void get_usb_details(serial_t *port, DEVINST dev_inst_match)
 {
 	HDEVINFO device_info;
 	SP_DEVINFO_DATA device_info_data;
@@ -379,7 +379,7 @@ static void get_usb_details(serial_t *port, DEVINST dev_inst_match)
 	return;
 }
 
-int serial_details(serial_t *port)
+PRIVATE int serial_details(serial_t *port)
 {
 	/*
 	 * Description limited to 127 char, anything longer
@@ -510,7 +510,7 @@ int serial_details(serial_t *port)
 	RETURN_OK();
 }
 
-int serial_list(serial_t ***list)
+PRIVATE int serial_list(serial_t ***list)
 {
 	HKEY key;
 	TCHAR *value, *data;

@@ -1,6 +1,6 @@
 #include "common/format.h"
 
-size_t format_ulong(char *dst, unsigned long i)
+PRIVATE size_t format_ulong(char *dst, unsigned long i)
 {
     register unsigned long len, tmp, len2;
     /* first count the number of bytes needed */

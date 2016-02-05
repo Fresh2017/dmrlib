@@ -10,7 +10,7 @@
 #include "common/platform.h"
 #include "common/uint.h"
 
-ssize_t socket_recv(socket_t *s, void *buf, size_t len, ip6_t ip, uint16_t *port)
+PRIVATE ssize_t socket_recv(socket_t *s, void *buf, size_t len, ip6_t ip, uint16_t *port)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -21,7 +21,7 @@ ssize_t socket_recv(socket_t *s, void *buf, size_t len, ip6_t ip, uint16_t *port
         : socket_recv6(s->fd, buf, len, ip, port, &s->scope_id);
 }
 
-ssize_t socket_recv4(int fd, void *buf, size_t len, ip4_t ip, uint16_t *port)
+PRIVATE ssize_t socket_recv4(int fd, void *buf, size_t len, ip4_t ip, uint16_t *port)
 {
     struct sockaddr_in si;
     socklen_t silen = sizeof(si);
@@ -39,7 +39,7 @@ ssize_t socket_recv4(int fd, void *buf, size_t len, ip4_t ip, uint16_t *port)
     return r;
 }
 
-ssize_t socket_recv6(int fd, void *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id)
+PRIVATE ssize_t socket_recv6(int fd, void *buf, size_t len, ip6_t ip, uint16_t *port, uint32_t *scope_id)
 {
 #if defined(HAVE_LIBC_IPV6)
     struct sockaddr_in6 si;

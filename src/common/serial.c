@@ -8,7 +8,7 @@
 #include "common/serial/termios.h"
 #endif
 
-static const baudrate_t baudrates[] = {
+PRIVATE static const baudrate_t baudrates[] = {
 #if defined(PLATFORM_WINDOWS)
 	/*
 	 * The baudrates 50/75/134/150/200/1800/230400/460800 do not seem to
@@ -30,13 +30,13 @@ static const baudrate_t baudrates[] = {
 
 #define BAUDRATES ARRAY_SIZE(baudrates)
 
-static int get_config(serial_t *port, serial_data_t *data, serial_config_t *config);
+PRIVATE static int get_config(serial_t *port, serial_data_t *data, serial_config_t *config);
 
-static int set_config(serial_t *port, serial_data_t *data, const serial_config_t *config);
+PRIVATE static int set_config(serial_t *port, serial_data_t *data, const serial_config_t *config);
 
 #if defined(PLATFORM_WINDOWS)
 /** To be called after port receive buffer is emptied. */
-static int restart_wait(serial_t *port)
+PRIVATE static int restart_wait(serial_t *port)
 {
 	DWORD wait_result;
 
@@ -73,7 +73,7 @@ static int restart_wait(serial_t *port)
 
 
 #if defined(USE_TERMIOX)
-static int get_flow(int fd, serial_data_t *data)
+PRIVATE static int get_flow(int fd, serial_data_t *data)
 {
 	void *termx;
 
@@ -96,7 +96,7 @@ static int get_flow(int fd, serial_data_t *data)
 	RETURN_OK();
 }
 
-static int set_flow(int fd, serial_data_t *data)
+PRIVATE static int set_flow(int fd, serial_data_t *data)
 {
 	void *termx;
 
@@ -128,12 +128,12 @@ static int set_flow(int fd, serial_data_t *data)
 }
 #endif /* USE_TERMIOX */
 
-void serial_free(serial_t *port)
+PRIVATE void serial_free(serial_t *port)
 {
     TALLOC_FREE(port);
 }
 
-int serial_open(serial_t *port, char mode)
+PRIVATE int serial_open(serial_t *port, char mode)
 {
 	serial_data_t data;
 	serial_config_t config;
@@ -298,7 +298,7 @@ int serial_open(serial_t *port, char mode)
 	return 0;
 }
 
-int serial_by_name(const char *portname, serial_t **port_ptr)
+PRIVATE int serial_by_name(const char *portname, serial_t **port_ptr)
 {
 	serial_t *port;
 #ifndef NO_PORT_METADATA
@@ -360,7 +360,7 @@ int serial_by_name(const char *portname, serial_t **port_ptr)
 	return 0;
 }
 
-int serial_close(serial_t *port)
+PRIVATE int serial_close(serial_t *port)
 {
 	CHECK_OPEN_PORT();
 
@@ -392,7 +392,7 @@ int serial_close(serial_t *port)
 	RETURN_OK();
 }
 
-int serial_flush(serial_t *port, serial_buffers_t buffers)
+PRIVATE int serial_flush(serial_t *port, serial_buffers_t buffers)
 {
 	CHECK_OPEN_PORT();
 
@@ -433,7 +433,7 @@ int serial_flush(serial_t *port, serial_buffers_t buffers)
 	RETURN_OK();
 }
 
-int serial_drain(serial_t *port)
+PRIVATE int serial_drain(serial_t *port)
 {
 	CHECK_OPEN_PORT();
 
@@ -467,7 +467,7 @@ int serial_drain(serial_t *port)
 #endif
 }
 
-char *serial_name(const serial_t *port)
+PRIVATE char *serial_name(const serial_t *port)
 {
 	if (!port) {
 		return NULL;
@@ -476,7 +476,7 @@ char *serial_name(const serial_t *port)
 }
 
 
-serial_transport_t serial_transport(const serial_t *port)
+PRIVATE serial_transport_t serial_transport(const serial_t *port)
 {
 	if (!port) {
 		DEBUG("NULL port");
@@ -486,7 +486,7 @@ serial_transport_t serial_transport(const serial_t *port)
 	RETURN_INT(port->transport);
 }
 
-char *serial_description(const serial_t *port)
+PRIVATE char *serial_description(const serial_t *port)
 {
 	if (!port || !port->description) {
 		return NULL;
@@ -494,7 +494,7 @@ char *serial_description(const serial_t *port)
 	RETURN_STRING(port->description);
 }
 
-serial_transport_t sp_get_port_transport(const serial_t *port)
+PRIVATE serial_transport_t sp_get_port_transport(const serial_t *port)
 {
 	if (!port) {
 		RETURN_ERROR(SERIAL_TRANSPORT_INVALID, "NULL port");
@@ -503,7 +503,7 @@ serial_transport_t sp_get_port_transport(const serial_t *port)
 }
 
 
-static int get_config(serial_t *port, serial_data_t *data, serial_config_t *config)
+PRIVATE static int get_config(serial_t *port, serial_data_t *data, serial_config_t *config)
 {
     unsigned int i;
 
@@ -712,7 +712,7 @@ static int get_config(serial_t *port, serial_data_t *data, serial_config_t *conf
 	return 0;
 }
 
-static int set_config(serial_t *port, serial_data_t *data, const serial_config_t *config)
+PRIVATE static int set_config(serial_t *port, serial_data_t *data, const serial_config_t *config)
 {
     unsigned int i;
 #if defined(PLATFORM_DARWIN)
@@ -1107,7 +1107,7 @@ static int set_config(serial_t *port, serial_data_t *data, const serial_config_t
 	return 0;
 }
 
-int serial_flowcontrol(serial_t *port, serial_flowcontrol_t flowcontrol)
+PRIVATE int serial_flowcontrol(serial_t *port, serial_flowcontrol_t flowcontrol)
 {
 	serial_data_t data;
 	serial_config_t config;
@@ -1119,7 +1119,7 @@ int serial_flowcontrol(serial_t *port, serial_flowcontrol_t flowcontrol)
 	RETURN_OK();
 }
 
-int serial_config_flowcontrol(serial_config_t *config, serial_flowcontrol_t flowcontrol)
+PRIVATE int serial_config_flowcontrol(serial_config_t *config, serial_flowcontrol_t flowcontrol)
 {
 	if (!config)
 		RETURN_ERROR(EINVAL, "NULL configuration");
@@ -1154,7 +1154,7 @@ int serial_config_flowcontrol(serial_config_t *config, serial_flowcontrol_t flow
 }
 
 #define C(x,type) \
-int serial_##x(serial_t *port, type x) \
+PRIVATE int serial_##x(serial_t *port, type x) \
 { \
 	serial_data_t data; \
 	serial_config_t config; \
@@ -1165,14 +1165,14 @@ int serial_##x(serial_t *port, type x) \
 	RETURN_OK(); \
 } \
 \
-int serial_config_##x(serial_config_t *config, type x) \
+PRIVATE int serial_config_##x(serial_config_t *config, type x) \
 { \
 	if (!config) RETURN_ERROR(EINVAL, "NULL config pointer"); \
 	config->x = x; \
 	RETURN_OK(); \
 } \
 \
-int serial_config_get_##x(serial_config_t *config, type *x) \
+PRIVATE int serial_config_get_##x(serial_config_t *config, type *x) \
 { \
 	if (!config) RETURN_ERROR(EINVAL, "NULL config pointer"); \
 	if (!x) RETURN_ERROR(EINVAL, "NULL result pointer"); \

@@ -1,6 +1,8 @@
 #ifndef _COMMON_PLATFORM_H
 #define _COMMON_PLATFORM_H
 
+#include "common.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

@@ -2,7 +2,7 @@
 #include "common/serial.h"
 #include "common/debug.h"
 
-serial_t **serial_list_append(serial_t **list, const char *portname)
+PRIVATE serial_t **serial_list_append(serial_t **list, const char *portname)
 {
 	void *tmp;
 	unsigned int count;
@@ -25,7 +25,7 @@ fail:
 	return NULL;
 }
 
-void serial_list_free(serial_t **list)
+PRIVATE void serial_list_free(serial_t **list)
 {
 	unsigned int i;
 

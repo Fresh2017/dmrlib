@@ -9,7 +9,7 @@
  *   3. The last two words may be written as IPv4 address
  */
 
-unsigned int scan_ip6(const char *src, ip6_t ip)
+PRIVATE unsigned int scan_ip6(const char *src, ip6_t ip)
 {
     unsigned int i;
     unsigned int len = 0;

@@ -11,12 +11,12 @@
 #include <unistd.h>
 #endif
 
-ssize_t socket_sendfile(socket_t *s, int in, off_t offset, size_t len)
+PRIVATE ssize_t socket_sendfile(socket_t *s, int in, off_t offset, size_t len)
 {
     return socket_sendfilex(s->fd, in, offset, len);
 }
 
-ssize_t socket_sendfilex(int fd, int in, off_t offset, size_t len)
+PRIVATE ssize_t socket_sendfilex(int fd, int in, off_t offset, size_t len)
 {
 #if defined(PLATFORM_LINUX)
     off_t off = offset;
@@ -30,7 +30,7 @@ ssize_t socket_sendfilex(int fd, int in, off_t offset, size_t len)
 #endif
 }
 
-int socket_sendfile_full(socket_t *s, int in, size_t len, size_t *out)
+PRIVATE int socket_sendfile_full(socket_t *s, int in, size_t len, size_t *out)
 {
     if (s == NULL) {
         errno = EINVAL;
@@ -53,7 +53,7 @@ int socket_sendfile_full(socket_t *s, int in, size_t len, size_t *out)
  */
 #define SENDFILE_NOT_SUPPORTED  (errno == ENOTSUP || errno == ENOTSOCK || errno == EOPNOTSUPP)
 
-int socket_sendfilex_full(int fd, int in, size_t len, size_t *out)
+PRIVATE int socket_sendfilex_full(int fd, int in, size_t len, size_t *out)
 {
     off_t offset;
     register ssize_t left;

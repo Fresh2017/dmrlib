@@ -4,7 +4,7 @@
 #include "common/debug.h"
 
 #if defined(PLATFORM_DARWIN)
-int serial_details(serial_t *port)
+PRIVATE int serial_details(serial_t *port)
 {
 	/*
 	 * Description limited to 127 char, anything longer
@@ -175,7 +175,7 @@ int serial_details(serial_t *port)
 	return 0;
 }
 
-int serial_list(serial_t ***list)
+PRIVATE int serial_list(serial_t ***list)
 {
 	CFMutableDictionaryRef classes;
 	io_iterator_t iter;

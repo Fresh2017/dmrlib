@@ -13,7 +13,7 @@
 #include "common/uint.h"
 #include "common/socket.h"
 
-int socket_bind(socket_t *s, const ip6_t ip, uint16_t port)
+PRIVATE int socket_bind(socket_t *s, const ip6_t ip, uint16_t port)
 {
     if (s == NULL) {
         DEBUG("received NULL pointer");
@@ -25,7 +25,7 @@ int socket_bind(socket_t *s, const ip6_t ip, uint16_t port)
         : socket_bind6(s->fd, ip, port, s->scope_id);
 }
 
-int socket_bind4(int fd, const ip4_t ip, uint16_t port)
+PRIVATE int socket_bind4(int fd, const ip4_t ip, uint16_t port)
 {
     struct sockaddr_in si;
     byte_zero(&si, sizeof(si));
@@ -41,7 +41,7 @@ int socket_bind4(int fd, const ip4_t ip, uint16_t port)
     return 0;
 }
 
-int socket_bind6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id)
+PRIVATE int socket_bind6(int fd, const ip6_t ip, uint16_t port, uint32_t scope_id)
 {
 #if defined(HAVE_LIBC_IPV6)
     struct sockaddr_in6 sa;

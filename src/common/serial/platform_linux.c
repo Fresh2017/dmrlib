@@ -4,7 +4,7 @@
 #include "common/debug.h"
 
 #if defined(PLATFORM_LINUX)
-int serial_details(serial_t *port)
+PRIVATE int serial_details(serial_t *port)
 {
     char description[128];
 	int bus, address;
@@ -163,7 +163,7 @@ int serial_details(serial_t *port)
     return 0;
 }
 
-int serial_list(serial_t ***list)
+PRIVATE int serial_list(serial_t ***list)
 {
 	char name[PATH_MAX], target[PATH_MAX];
 	struct dirent entry, *result;

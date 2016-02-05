@@ -18,7 +18,7 @@
 
 #endif
 
-int format_path_canonical(char *dst, size_t len, const char *path)
+PRIVATE int format_path_canonical(char *dst, size_t len, const char *path)
 {
 	if (path == NULL)
 		return -1;
@@ -38,7 +38,7 @@ int format_path_canonical(char *dst, size_t len, const char *path)
     return 0;
 }
 
-char format_path_sep(void)
+PRIVATE char format_path_sep(void)
 {
 	return SEPCHR;
 }
@@ -49,7 +49,7 @@ const char *format_path_ext(const char *path)
 	return ptr;
 }
 
-void format_path_join(char *dst, size_t len, const char *dir, const char *file)
+PRIVATE void format_path_join(char *dst, size_t len, const char *dir, const char *file)
 {
 	if (dir == NULL) {
 		dst = NULL;

@@ -1,6 +1,6 @@
 #include "common/byte.h"
 
-bool byte_equal_safe(uint8_t *a, uint8_t *b, size_t len)
+PRIVATE bool byte_equal_safe(const uint8_t *a, const uint8_t *b, size_t len)
 {
     size_t i;
     uint8_t r = 0;

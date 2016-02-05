@@ -3,7 +3,7 @@
 #include "common/socket.h"
 #include "common/platform.h"
 
-socket_t *socket_new(uint8_t v, uint32_t scope_id)
+PRIVATE socket_t *socket_new(uint8_t v, uint32_t scope_id)
 {
     socket_t *s = talloc_zero(NULL, socket_t);
     if (s != NULL) {
@@ -13,7 +13,7 @@ socket_t *socket_new(uint8_t v, uint32_t scope_id)
     return s;
 }
 
-void socket_free(socket_t *s)
+PRIVATE void socket_free(socket_t *s)
 {
     if (s != NULL && s->fd >= 0) {
         close(s->fd);

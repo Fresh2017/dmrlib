@@ -11,7 +11,7 @@
 #include "common/socket.h"
 #include "common/platform.h"
 
-socket_t *socket_udp4(void)
+PRIVATE socket_t *socket_udp4(void)
 {
     socket_t *s = socket_new4();
     if (s == NULL) {
@@ -32,7 +32,7 @@ socket_t *socket_udp4(void)
     return s;
 }
 
-socket_t *socket_udp6(uint32_t scope_id)
+PRIVATE socket_t *socket_udp6(uint32_t scope_id)
 {
     socket_t *s = socket_new6(scope_id);
     if (s == NULL) {

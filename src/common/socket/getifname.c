@@ -12,9 +12,9 @@
 #define IF_NAMESIZE IFNAMSIZ
 #endif
 
-static char ifname[IF_NAMESIZE];
+PRIVATE static char ifname[IF_NAMESIZE];
 
-const char *socket_getifname(uint32_t _interface) {
+PRIVATE const char *socket_getifname(uint32_t _interface) {
     char *tmp = if_indextoname(_interface, ifname);
     if (tmp != NULL) {
         return tmp;
@@ -23,7 +23,7 @@ const char *socket_getifname(uint32_t _interface) {
     }
 }
 #else // HAVE_IF_INDEXTONAME
-const char *socket_getifname(uint32_t _interface)
+PRIVATE const char *socket_getifname(uint32_t _interface)
 {
     (void)_interface;
     return "[unknown]";

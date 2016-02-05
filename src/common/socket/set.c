@@ -8,7 +8,7 @@
 #include <unistd.h>
 #endif
 
-int socket_set_blocking(socket_t *s, int v)
+PRIVATE int socket_set_blocking(socket_t *s, int v)
 {
     CHECK_SOCKET(s);
 #if defined(HAVE_FCNTL_H)
@@ -30,7 +30,7 @@ int socket_set_blocking(socket_t *s, int v)
 #endif
 }
 
-int socket_set_ipv6only(socket_t *s, int v)
+PRIVATE int socket_set_ipv6only(socket_t *s, int v)
 {
     CHECK_SOCKET(s);
 #if defined(HAVE_SETSOCKOPT) && defined(IPV6_V6ONLY)
@@ -41,7 +41,7 @@ int socket_set_ipv6only(socket_t *s, int v)
 #endif
 }
 
-int socket_set_nopipe(socket_t *s, int v)
+PRIVATE int socket_set_nopipe(socket_t *s, int v)
 {
     CHECK_SOCKET(s);
 #if defined(HAVE_SETSOCKOPT) && defined(SO_NOSIGPIPE)
@@ -52,7 +52,7 @@ int socket_set_nopipe(socket_t *s, int v)
 #endif
 }
 
-int socket_set_reuseaddr(socket_t *s, int v)
+PRIVATE int socket_set_reuseaddr(socket_t *s, int v)
 {
     CHECK_SOCKET(s);
 #if defined(HAVE_SETSOCKOPT) && defined(SO_REUSEADDR)
@@ -63,7 +63,7 @@ int socket_set_reuseaddr(socket_t *s, int v)
 #endif
 }
 
-int socket_set_reuseport(socket_t *s, int v)
+PRIVATE int socket_set_reuseport(socket_t *s, int v)
 {
     CHECK_SOCKET(s);
 #if defined(HAVE_SETSOCKOPT) && defined(SO_REUSEPORT)

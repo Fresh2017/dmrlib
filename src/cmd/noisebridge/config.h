@@ -5,13 +5,12 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <dmr/proto.h>
-#include <dmr/proto/homebrew.h>
+#include <dmr/protocol.h>
+#include <dmr/protocol/homebrew.h>
 #if defined(WITH_MBELIB)
 #include <dmr/proto/mbe.h>
 #endif
-#include <dmr/proto/mmdvm.h>
-#include <dmr/proto/repeater.h>
+#include <dmr/protocol/mmdvm.h>
 #include "http.h"
 #include "common/config.h"
 #include "common/socket.h"
@@ -19,43 +18,48 @@
 #define NOISEBRIDGE_MAX_PROTOS 16
 
 typedef struct {
-    dmr_proto_t      *proto;
-    dmr_proto_type_t type;
-    char             *name;
-    void             *mem;
+    dmr_protocol      protocol;
+    dmr_protocol_type type;
+    char              *name;
+    void              *instance;
+    int               fd;
     union {
         struct {
-            uint8_t          *peer_ip;
-            uint16_t         peer_port;
-            uint8_t          *bind_ip;
-            uint16_t         bind_port;
-            char             *auth;
-            char             *call;
-            dmr_id_t         repeater_id;
-            dmr_color_code_t color_code;
-            uint32_t         rx_freq;
-            uint32_t         tx_freq;
-            uint8_t          tx_power;
-            int              height;
-            float            latitude;
-            float            longitude;
+            //struct addrinfo *peer_addr;
+            uint8_t         peer_ip[16];
+            uint16_t        peer_port;
+            //struct addrinfo *bind_addr;
+            uint8_t         bind_ip[16];
+            uint16_t        bind_port;
+            char            *auth;
+            char            *call;
+            dmr_id          repeater_id;
+            dmr_color_code  color_code;
+            uint32_t        rx_freq;
+            uint32_t        tx_freq;
+            uint8_t         tx_power;
+            int             height;
+            float           latitude;
+            float           longitude;
         } homebrew;
         struct {
             char *device;
             int  quality;
         } mbe;
         struct {
-            char              *port;
-            dmr_mmdvm_model_t model;
+            char            *port;
+            int             baud;
+            dmr_mmdvm_model model;
+            uint32_t        rx_freq;
+            uint32_t        tx_freq;
         } mmdvm;
-    } instance;
+    } settings;
 } proto_t;
 
 typedef int (*parse_section_t)(char *line, char *filename, size_t lineno);
 
 typedef struct {
     char            *filename;
-    char            *script;
     lua_State       *L;
     proto_t         *proto[NOISEBRIDGE_MAX_PROTOS];
     size_t          protos;
@@ -66,6 +70,10 @@ typedef struct {
         uint16_t port;
         char     *root;
     } httpd;
+    struct {
+        char     *script;
+        uint16_t timeout;
+    } repeater;
 } config_t;
 
 #if !defined(HAVE_GETLINE)

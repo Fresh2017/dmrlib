@@ -1,6 +1,8 @@
+#include <dmr/malloc.h>
 #include <dmr/thread.h>
 #include "common/config.h"
 #include "common/format.h"
+#include "common/platform.h"
 #include "common/socket.h"
 #include "common/serial.h"
 #include "config.h"
@@ -16,6 +18,13 @@
 #endif
 #if defined(HAVE_SIGNAL_H)
 #include <signal.h>
+#endif
+#include <sys/socket.h>
+#if defined(PLATFORM_DARWIN)
+#include <sys/types.h>
+#endif
+#if defined(HAVE_NETINET_IN_H)
+#include <netinet/in.h>
 #endif
 
 #define HTTPD_MAX_CLIENTS 128
@@ -39,7 +48,7 @@ typedef struct {
         live_t         type;
         struct timeval last_write;
         struct {
-            dmr_id_t src_id, dst_id;
+            dmr_id src_id, dst_id;
         } ts[2];
     } live;
 	struct {
@@ -375,7 +384,7 @@ static int respond_repeater_config(client_t *client)
         if (proto == NULL)
             continue;
 
-        dmr_proto_t *p = proto->proto;
+        dmr_protocol p = proto->protocol;
            
         if (i > 0) {
             S(",\n    {\n");
@@ -383,23 +392,25 @@ static int respond_repeater_config(client_t *client)
             S("    {\n");
         }
         S("      \"name\": \"%s\",\n", proto->name);
-        S("      \"active\": %s,\n", dmr_proto_is_active(p) ? "true" : "false");
+        S("      \"active\": %s,\n", "true");
         switch (proto->type) {
-        case DMR_PROTO_HOMEBREW:
+        case DMR_PROTOCOL_HOMEBREW:
             S("      \"type\": \"homebrew\",\n");
-            S("      \"peer\": \"%s\",\n", format_ip6s(proto->instance.homebrew.peer_ip));
-            S("      \"peer_port\": %u,\n", proto->instance.homebrew.peer_port);
-            S("      \"call\": \"%s\",\n", proto->instance.homebrew.call);
-            S("      \"repeater_id\": %u,\n", proto->instance.homebrew.repeater_id);
-            S("      \"color_code\": %u\n", proto->instance.homebrew.color_code);
+            S("      \"peer\": \"%s\",\n", format_ip6s(proto->settings.homebrew.peer_ip));
+            S("      \"peer_port\": %u,\n", proto->settings.homebrew.peer_port);
+            S("      \"call\": \"%s\",\n", proto->settings.homebrew.call);
+            S("      \"repeater_id\": %u,\n", proto->settings.homebrew.repeater_id);
+            S("      \"color_code\": %u\n", proto->settings.homebrew.color_code);
             break;
-        case DMR_PROTO_MMDVM:
+        case DMR_PROTOCOL_MMDVM:
             S("      \"type\": \"mmdvm\",\n");
-            S("      \"port\": \"%s\",\n", proto->instance.mmdvm.port);
+            S("      \"port\": \"%s\",\n", proto->settings.mmdvm.port);
+            S("      \"baud\": %d,\n", proto->settings.mmdvm.baud);
+            S("      \"model\": \"%s\",\n", dmr_mmdvm_model_name(proto->settings.mmdvm.model));
 
-            serial_t *port = talloc_zero(NULL, serial_t);
+            serial_t *port = dmr_malloc(serial_t);
             int bus, address, vid, pid;
-            if (serial_by_name(proto->instance.mmdvm.port, &port) == 0) {
+            if (serial_by_name(proto->settings.mmdvm.port, &port) == 0) {
                 switch (serial_transport(port)) {
                 case SERIAL_TRANSPORT_NATIVE:
                     S("      \"port_transport\": \"native\"\n");
@@ -429,20 +440,21 @@ static int respond_repeater_config(client_t *client)
                 default:
                     break;
                 }
-            } else {
-                TALLOC_FREE(port);
             }
             if (port == NULL) {
                 S("      \"port_transport\": \"unknown\"\n");
-            } else {
-                TALLOC_FREE(port);
             }
+            dmr_free(port);
             break;
+
+        /*
         case DMR_PROTO_MBE:
             S("      \"type\": \"mbe\",\n");
             S("      \"device\": \"%s\",\n", proto->instance.mbe.device == NULL ? "" : proto->instance.mbe.device);
             S("      \"quality\": %d\n", proto->instance.mbe.quality);
             break;
+        */
+
         default:
             break;
         }
@@ -466,13 +478,13 @@ static int respond_repeater_config(client_t *client)
 static int respond_client_live_ts_write(client_t *client)
 {
     /* Lookup repeater proto */
-    dmr_repeater_t *repeater = load_repeater();
+    repeater_t *repeater = load_repeater();
     if (repeater == NULL) {
         dmr_log_error("[%s]: no repeater instance found!?", format_ip6s(client->ip));
         return -1;
     }
 
-    dmr_ts_t ts;
+    dmr_ts ts;
     int written = 0;
     char data[HTTPD_MAX_RESPONS];
     size_t pos;
@@ -493,13 +505,11 @@ static int respond_client_live_ts_write(client_t *client)
         S("{");
         S("\"src_id\": %u, ", repeater->ts[ts].src_id);
         S("\"dst_id\": %u, ", repeater->ts[ts].dst_id);
-        S("\"data_type\": %u, ", repeater->ts[ts].last_data_type);
+        S("\"data_type\": %u, ", repeater->ts[ts].data_type);
         S("\"ts\": %u, ", ts);
         S("\"time\": %ld, ", now);
-        if (repeater->ts[ts].voice_call_active) {
-            S("\"time_recv\": %ld", repeater->ts[ts].last_voice_frame_received->tv_sec);
-        } else if (repeater->ts[ts].data_call_active) {
-            S("\"time_recv\": %ld", repeater->ts[ts].last_data_frame_received->tv_sec);
+        if (repeater->ts[ts].state != STATE_IDLE) {
+            S("\"time_recv\": %ld", repeater->ts[ts].last_frame_received.tv_sec);
         }
 
         S("}\n");

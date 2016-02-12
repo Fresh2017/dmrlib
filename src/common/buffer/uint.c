@@ -16,7 +16,7 @@ PRIVATE int BF(type,__VA_ARGS__)(buffer_t *buffer, BT(type) in) \
         if (buffer_grow(buffer, buffer->a + size) == -1) \
             return -1; \
     } \
-    BP(type,__VA_ARGS__)((uint8_t *)(buffer->buf + buffer->pos), in); \
+    BP(type,##__VA_ARGS__)((uint8_t *)(buffer->buf + buffer->pos), in); \
     return 0; \
 }
 

@@ -11,13 +11,25 @@
 #include <dmr/log.h>
 
 /** Allocate a 0-initizialized structure with parent context. */
-#define dmr_palloc(parent,type)     talloc_zero(parent, type)
+#define dmr_palloc(ctx,type)                talloc_zero(ctx,type)
+
+/** Allocate a 0-initizialized untyped buffer with parent context. */
+#define dmr_palloc_size(ctx,size)           talloc_zero_size(ctx,size)
 
 /** Allocate a 0-initizialized structure. */
-#define dmr_malloc(type)            dmr_palloc(NULL, type)
+#define dmr_malloc(type)                    dmr_palloc(NULL,type)
+
+/** Allocate a 0-initizialized untyped buffer. */
+#define dmr_malloc_size(size)               dmr_palloc_size(NULL,size)
+
+/** Resize an untyped buffer with parent context. */
+#define dmr_realloc(ctx,ptr,type,size)      talloc_realloc(ctx, ptr, type, size)
+
+/** Duplicate a string with parent context. */
+#define dmr_strdup(ctx,str)                 talloc_strdup(ctx, str)
 
 /** Free a previously allocated structure. */
-#define dmr_free(var)               TALLOC_FREE(var)
+#define dmr_free(ctx)                       TALLOC_FREE(ctx)
 
 #define DMR_NULL_CHECK(expr)                        \
     if ((expr) == NULL) {                           \

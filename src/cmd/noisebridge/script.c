@@ -74,7 +74,7 @@ static int lua_log_critical(lua_State *L)
     return 0;
 }
 
-int lua_pass_proto(lua_State *L, dmr_proto_t *proto)
+int lua_pass_proto(lua_State *L, proto_t *proto)
 {
     /*
     struct dmr_proto_s {
@@ -100,28 +100,17 @@ int lua_pass_proto(lua_State *L, dmr_proto_t *proto)
     };
     */
 
-    config_t *config = load_config();
-    uint8_t i;
-
     lua_createtable(L, 0, 2);
-    for (i = 0; i < config->protos; i++) {
-        proto_t *p = config->proto[i];
-        if (p->proto == proto) {
-            lua_pushliteral(L, "name");         /* [1] */
-            lua_pushstring(L, p->name);
-            //lua_pushlstring(L, proto->name, strlen(proto->name));
-            lua_rawset(L, -3);
-            break;
-        }
-    }
-
+    lua_pushliteral(L, "name");         /* [1] */
+    lua_pushstring(L, proto->name);
+    lua_rawset(L, -3);
     lua_pushliteral(L, "type");         /* [2] */
     lua_pushinteger(L, proto->type);
     lua_rawset(L, -3);
     return 2;
 }
 
-int lua_pass_packet(lua_State *L, dmr_packet_t *packet)
+int lua_pass_packet(lua_State *L, dmr_parsed_packet *packet)
 {
     /*
     dmr_ts_t         ts;
@@ -164,7 +153,7 @@ int lua_pass_packet(lua_State *L, dmr_packet_t *packet)
     return 7;
 }
 
-void lua_modify_packet(lua_State *L, dmr_packet_t *packet)
+void lua_modify_packet(lua_State *L, dmr_parsed_packet *packet)
 {
     luaL_checktype(L, 1, LUA_TTABLE);
     lua_getfield(L, 1, "ts");
@@ -223,17 +212,16 @@ int init_script(void)
         lua_set_int(L, "type", proto->type);
         lua_set_str(L, "name", proto->name);
         switch (proto->type) {
-            case DMR_PROTO_HOMEBREW: {
-                char host[FORMAT_IP6_LEN];
-                format_ip6(host, proto->instance.homebrew.peer_ip);
-                lua_set_int(L, "repeater_id", proto->instance.homebrew.repeater_id);
-                lua_set_str(L, "host", host);
-                lua_set_int(L, "port", proto->instance.homebrew.peer_port);
-                lua_set_str(L, "call", proto->instance.homebrew.call);
+            case DMR_PROTOCOL_HOMEBREW: {
+                lua_set_int(L, "repeater_id", proto->settings.homebrew.repeater_id);
+                lua_set_str(L, "host", format_ip6s(proto->settings.homebrew.peer_ip));
+                lua_set_int(L, "port", proto->settings.homebrew.peer_port);
+                lua_set_str(L, "call", proto->settings.homebrew.call);
                 break;
             }
-            case DMR_PROTO_MMDVM: {
-                lua_set_str(L, "port", proto->instance.mmdvm.port);
+            case DMR_PROTOCOL_MMDVM: {
+                lua_set_str(L, "port", proto->settings.mmdvm.port);
+                lua_set_int(L, "baud", proto->settings.mmdvm.baud);
                 break;
             }
             default: {
@@ -244,25 +232,25 @@ int init_script(void)
     }
     lua_setglobal(L, "config");
 
-    dmr_log_info("noisebridge: loading script %s", config->script);
-    if (luaL_loadfile(L, config->script) != 0) {
+    dmr_log_info("noisebridge: loading script %s", config->repeater.script);
+    if (luaL_loadfile(L, config->repeater.script) != 0) {
         dmr_log_critical("noisebridge: failed to load %s: %s",
-            config->script, lua_tostring(L, -1));
+            config->repeater.script, lua_tostring(L, -1));
         return -1;
     }
 
     dmr_log_debug("noisebridge: init lua state");
     if (lua_pcall(L, 0, 0, 0) != 0) {
         dmr_log_critical("noisebridge: failed to init %s: %s",
-            config->script, lua_tostring(L, -1));
+            config->repeater.script, lua_tostring(L, -1));
         return -1;
     }
 
-    dmr_log_debug("noisebridge: %s->setup()", config->script);
+    dmr_log_debug("noisebridge: %s->setup()", config->repeater.script);
     lua_getglobal(L, "setup"); /* Call script.lua->setup(), expect no return */
     if (lua_pcall(L, 0, 0, 0) != 0) {
         dmr_log_error("noisebridge: %s->setup() failed: %s",
-            config->script, lua_tostring(L, -1));
+            config->repeater.script, lua_tostring(L, -1));
         return -1;
     }
 

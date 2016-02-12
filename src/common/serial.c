@@ -214,7 +214,7 @@ PRIVATE int serial_open(serial_t *port, char mode)
 		RETURN_CODEVAL(ret);
 	}
 #else // PLATFORM_WINDOWS
-	int flags_local = O_NONBLOCK | O_NOCTTY;
+	int flags_local = O_NDELAY | O_NOCTTY | O_NONBLOCK;
 
 	/* Map 'flags' to the OS-specific settings. */
 	if (mode == 'x')
@@ -229,6 +229,9 @@ PRIVATE int serial_open(serial_t *port, char mode)
 
 	if ((port->fd = open(port->name, flags_local)) < 0)
 		RETURN_ERROR(errno, "serial: open() failed");
+
+    if (fcntl(port->fd, F_SETFL, FNDELAY) == -1)
+        RETURN_ERROR(errno, "serial: fcntl(FNDELAY) failed");
 #endif
 
 	ret = get_config(port, &data, &config);
@@ -277,7 +280,7 @@ PRIVATE int serial_open(serial_t *port, char mode)
 #endif
 	data.term.c_lflag &= ~(ISIG | ICANON | ECHO | IEXTEN);
 	data.term.c_cc[VMIN] = 0;
-	data.term.c_cc[VTIME] = 0;
+	data.term.c_cc[VTIME] = 1;
 
 	/* Ignore modem status lines; enable receiver; leave control lines alone on close. */
 	data.term.c_cflag |= (CLOCAL | CREAD | HUPCL);

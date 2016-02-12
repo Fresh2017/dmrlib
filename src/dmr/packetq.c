@@ -10,7 +10,7 @@ DMR_API dmr_packetq *dmr_packetq_new(void)
     if (q == NULL) {
         return NULL;
     }
-    STAILQ_INIT(&q->head);
+    DMR_TAILQ_INIT(&q->head);
     return q;    
 }
 
@@ -25,7 +25,7 @@ DMR_API int dmr_packetq_add(dmr_packetq *q, dmr_parsed_packet *parsed)
     }
 
     e->parsed = parsed;
-    STAILQ_INSERT_TAIL(&q->head, e, entries);
+    DMR_TAILQ_INSERT_TAIL(&q->head, e, entries);
 
     return 0;
 }
@@ -51,11 +51,11 @@ DMR_API int dmr_packetq_shift(dmr_packetq *q, dmr_parsed_packet **parsed_out)
     if (q == NULL)
         return dmr_error(DMR_EINVAL);
 
-    if (STAILQ_EMPTY(&q->head))
+    if (DMR_TAILQ_EMPTY(&q->head))
         return -1;
 
-    dmr_packetq_entry *e = STAILQ_FIRST(&q->head);
-    STAILQ_REMOVE_HEAD(&q->head, entries);
+    dmr_packetq_entry *e = DMR_TAILQ_FIRST(&q->head);
+    DMR_TAILQ_REMOVE(&q->head, e, entries);
     dmr_parsed_packet *parsed = e->parsed;
     TALLOC_FREE(e);
 
@@ -83,8 +83,8 @@ int dmr_packetq_flush(dmr_packetq *q)
         return dmr_error(DMR_EINVAL);
 
     dmr_packetq_entry *entry, *next;
-    STAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
-        STAILQ_REMOVE(&q->head, entry, dmr_packetq_entry, entries);
+    DMR_TAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
+        DMR_TAILQ_REMOVE(&q->head, entry, entries);
         TALLOC_FREE(entry->parsed);
         TALLOC_FREE(entry);
     }
@@ -97,12 +97,12 @@ DMR_API int dmr_packetq_foreach(dmr_packetq *q, dmr_parsed_packet_cb cb, void *u
     if (q == NULL)
         return dmr_error(DMR_EINVAL);
 
-    if (STAILQ_EMPTY(&q->head))
+    if (DMR_TAILQ_EMPTY(&q->head))
         return 0;
 
     dmr_packetq_entry *entry, *next;
     int ret;
-    STAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
+    DMR_TAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
         if ((ret = cb(entry->parsed, userdata)) != 0)
             return ret;
     }
@@ -114,12 +114,12 @@ DMR_API int dmr_packetq_foreach_packet(dmr_packetq *q, dmr_packet_cb cb, void *u
     if (q == NULL)
         return dmr_error(DMR_EINVAL);
 
-    if (STAILQ_EMPTY(&q->head))
+    if (DMR_TAILQ_EMPTY(&q->head))
         return 0;
 
     dmr_packetq_entry *entry, *next;
     int ret;
-    STAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
+    DMR_TAILQ_FOREACH_SAFE(entry, &q->head, entries, next) {
         if ((ret = cb(entry->parsed->packet, userdata)) != 0)
             return ret;
     }

@@ -22,6 +22,7 @@ extern "C" {
 * proto.h.
 */
 
+#include <dmr/c.h>
 #include <dmr/packet.h>
 #include <dmr/payload.h>
 #include <dmr/payload/emb.h>

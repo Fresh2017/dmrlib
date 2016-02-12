@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <dmr.h>
-#include <dmr/packet.h>
-#include <dmr/proto/repeater.h>
+#include <dmr/id.h>
+#include <dmr/thread.h>
+#include <dmr/thread.h>
 #include "common/serial.h"
 #include "config.h"
 #include "http.h"
@@ -111,27 +112,34 @@ int main(int argc, char **argv)
 
     show_serial_ports();
 
-    if (init_config(filename) != 0) {
+    if ((ret = init_config(filename)) != 0) {
+        dmr_log_critical("noisebridge: init config failed with %d: %s",
+            ret, dmr_error_get());
         exit(1);
         return 1;
     }
 
-    if (init_http() != 0) {
-        ret = 1;
+    if ((ret = init_http()) != 0) {
+        dmr_log_critical("noisebridge: init http failed with %d: %s",
+            ret, dmr_error_get());
         goto bail;
     }
 
-    if (init_script() != 0) {
-        ret = 1;
+    if ((ret = init_script()) != 0) {
+        dmr_log_critical("noisebridge: init script failed with %d: %s",
+            ret, dmr_error_get());
         goto bail;
     }
 
-    if (init_repeater() != 0) {
-        ret = 1;
+    if ((ret = init_repeater()) != 0) {
+        dmr_log_critical("noisebridge: init repeater failed with %d: %s",
+            ret, dmr_error_get());
         goto bail;
     }
 
-    ret = loop_repeater();
+    if ((ret = loop_repeater()) != 0) {
+        dmr_log_critical("noisebridge: loop repeater failed: %s", dmr_error_get());
+    }
 
 bail:
     if (config != NULL) {
@@ -140,6 +148,8 @@ bail:
         }
         talloc_free(config);
     }
+
+    dmr_id_free();
 
     return ret;
 }

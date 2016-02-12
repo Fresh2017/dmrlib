@@ -61,6 +61,7 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
     else
         printf("hex dump of %p+%zu in %s:%zu:\n", mem, len, file, line);
 
+    const char *tmp = mem;
     for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
         /* print offset */
         if (i % HEXDUMP_COLS == 0) {
@@ -69,7 +70,7 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
 
         /* print hex data */
         if (i < len) {
-            printf("%02x ", 0xFF & ((char*)mem)[i]);
+            printf("%02x ", tmp[i] & 0xff);
         } else { /* end of block, just aligning for ASCII dump */
             printf("   ");
         }
@@ -80,8 +81,8 @@ void _dmr_dump_hex(void *mem, size_t len, const char *file, size_t line)
             for (j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
                 if (j >= len - 1) { /* end of block, not really printing */
                     putchar(' ');
-                } else if (isprint(((char*)mem)[j])) { /* printable char */
-                    putchar(0xff & ((char*)mem)[j]);
+                } else if (isprint(tmp[j])) { /* printable char */
+                    putchar(0xff & tmp[j]);
                 } else { /* other char */
                     putchar('.');
                 }

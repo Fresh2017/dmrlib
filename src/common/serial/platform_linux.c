@@ -233,5 +233,4 @@ PRIVATE int serial_list(serial_t ***list)
 out:
 	return ret;
 }
-
-#endif
+#endif // PLATFORM_LINUX

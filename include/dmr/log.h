@@ -12,6 +12,7 @@ extern "C" {
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <dmr/config.h>
 #include <dmr/platform.h>
 
 #define DMR_LOG_MESSAGE_MAX 1024
@@ -57,11 +58,20 @@ extern void dmr_log(const char *fmt, ...);
 #endif
 */
 extern void _dmr_log_trace(const char *fmt, ...);
+#if defined(DMR__TRACE)
 #define dmr_log_trace(fmt, ...) do { \
 	_dmr_log_trace("%s[%d]:", __FILE__, __LINE__); \
 	_dmr_log_trace(fmt, ## __VA_ARGS__ ); \
 } while(0)
-extern void dmr_log_debug(const char *fmt, ...);
+#else
+#define dmr_log_trace(fmt, ...)
+#endif
+extern void _dmr_log_debug(const char *fmt, ...);
+#if defined(DMR_DEBUG)
+#define dmr_log_debug(fmt, ...) _dmr_log_debug(fmt, ##__VA_ARGS__)
+#else
+#define dmr_log_debug(fmt, ...)
+#endif
 extern void dmr_log_info(const char *fmt, ...);
 extern void dmr_log_warn(const char *fmt, ...);
 extern void dmr_log_error(const char *fmt, ...);

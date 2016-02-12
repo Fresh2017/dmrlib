@@ -1,10 +1,33 @@
-# Modules
-script=noisebridge.lua
+# DMR-ID csv, get it from http://www.dmr-marc.net/cgi-bin/trbo-database/
+dmrids = dmrid.csv
+
+dmrid {
+    9           = local
+    91          = WW
+    92          = EU
+    204         = NL
+    205         = NL
+    206         = BE
+    922         = nl_NL
+    9000        = echo
+}
+
+repeater {
+    script      = noisebridge.lua
+    timeout     = 180
+}
+
+httpd {
+    bind        = ::
+#    port        = 8042
+    root        = html
+}
 
 homebrew {
     name        = master_nl
     host        = brandmeister.pd0zry.ampr.org
-    auth        = secret
+    #host        = 2001:888:2000:86::197
+    auth        = <password>
     call        = N0CALL
     repeater_id = 1234567
     color_code  = 1
@@ -13,25 +36,14 @@ homebrew {
     #tx_freq     = 438787500
     tx_power    = 99
     height      = 999
-    latitude    = 12.3456
-    longitude   = 7.8901
+    latitude    = 52.2969
+    longitude   = 4.5961
 }
 
-#mbe {
-#    name        = audio
-#    quality     = 3
-#}
-
 mmdvm {
-    name        = modem
-    model       = dvmega
-    # Linux:
-    port        = /dev/ttyACM0
-    #port        = /dev/ttyUSB0
-    # OS X:
-    #port        = /dev/cu.usbmodem1421
-    # OS X (Chinese knock-off CH340 chip):
-    #port        = /dev/cu.wchusbserial1420
-    # Windows:
-    #port        = COM5
+    name  = modem
+    model = dvmega
+    port  = /dev/ttyACM0
+    rx_freq = 435000000
+    tx_freq = 435000000
 }

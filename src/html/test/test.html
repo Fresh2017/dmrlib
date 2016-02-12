@@ -32,6 +32,12 @@
     t(1, 'Local');
     t(3100, 'United States (Nation wide)');
   });
+  QUnit.test('dmrlib custom', function(assert) {
+    DMR.ID[1234666] = {country: 've', area: 'Non existant'};
+    DMR.ID[12346667] = {name: 'Test', call: 'T3ST'};
+    assert.equal(DMR.countryName(1234666), 'Venezuela');
+    assert.equal(DMR.description(12346667), 'Test (T3ST)');
+  });
   </script>
 </head>
 <body>

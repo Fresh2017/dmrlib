@@ -59,6 +59,7 @@ extern const uint8_t ip6mappedv4prefix[12];
 extern const ip6_t   ip6loopback;
 extern const ip6_t   ip6any;
 extern bool          ip6disabled;
+extern int           ip6resolve(ip6_t ip, const char *host);
 
 /* Wrapper functions */
 socket_t   *socket_new(uint8_t v, uint32_t scope_id);

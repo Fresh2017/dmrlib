@@ -1,5 +1,6 @@
 #include <talloc.h>
 #include "common/buffer.h"
+#include "common/byte.h"
 
 buffer_t *buffer_new(size_t a)
 {

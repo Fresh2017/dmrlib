@@ -12,7 +12,11 @@ extern "C" {
 // Portable version
 #define DMR_UNUSED(x) (void)(x)
 
-//#define uint24_t __uint24;
+#if defined __uint24
+#define uint24_t __uint24
+#else
+#define uint24_t uint32_t
+#endif
 
 #ifdef __cplusplus
 }

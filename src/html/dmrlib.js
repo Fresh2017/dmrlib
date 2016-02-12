@@ -284,14 +284,23 @@
         id = parseId(id);
         var bits = [], prefix;
         if (DMR.ID[id]) {
-            if (DMR.ID[id].special) {
-                bits.push(DMR.ID[id].special);
-            }
-            if (DMR.ID[id].country) {
-                bits.push(iso3166[DMR.ID[id].country]);
-            }
-            if (DMR.ID[id].area) {
-                bits.push('(' + DMR.ID[id].area + ')');
+            if (DMR.ID[id].name) {
+                /* This is a person */
+                bits.push(DMR.ID[id].name);
+                if (DMR.ID[id].call) {
+                    bits.push('(' + DMR.ID[id].call + ')');
+                }
+            } else {
+                /* This is a group (or something else) */
+                if (DMR.ID[id].special) {
+                    bits.push(DMR.ID[id].special);
+                }
+                if (DMR.ID[id].country) {
+                    bits.push(iso3166[DMR.ID[id].country]);
+                }
+                if (DMR.ID[id].area) {
+                    bits.push('(' + DMR.ID[id].area + ')');
+                }
             }
         } else if (id > 999) {
             prefix = (id % 1000);

@@ -61,10 +61,10 @@ extern "C" {
 #endif
 
 typedef enum {
-    SERIAL_TRANSPORT_INVALID = -1,
-	SERIAL_TRANSPORT_NATIVE = 0,
-	SERIAL_TRANSPORT_USB = 1,
-	SERIAL_TRANSPORT_BLUETOOTH = 2
+    SERIAL_TRANSPORT_INVALID   = 0x00,
+	SERIAL_TRANSPORT_NATIVE    = 0x01,
+	SERIAL_TRANSPORT_USB       = 0x02,
+	SERIAL_TRANSPORT_BLUETOOTH = 0x04,
 } serial_transport_t;
 
 /** Parity settings. */
@@ -186,6 +186,7 @@ typedef struct {
 } serial_t;
 
 int                serial_open(serial_t *port, char mode);
+int                serial_find(const char *identifier, char **found);
 int                serial_close(serial_t *port);
 int                serial_config_new(serial_config_t **config_ptr);
 void               serial_config_free(serial_config_t *config);

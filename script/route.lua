@@ -10,17 +10,19 @@ function route(src, dst, packet)
         ..proto_name(dst.type).."("..dst.name..")")
 
     -- Same proto is denied
-    if src.type == dst.type then
+    if src.name == dst.name then
         -- Reject
         return false
     end
 
     -- All frames to the MMDVM modem should go unmodified
     if dst.type == PROTO_MMDVM then
-	if (packet.dst_id >= 200 and packet.dst_id < 300) and packet.rs == TS2 then
-	    log.debug("route.lua: rejecting TG on TS2")
-	    return false
+        if packet.src_id == 0 then
+            packet.color_code = 1
+            packet.ts = TS2
+            return packet
         end
+
         -- Permit unmodified
         return true
     end

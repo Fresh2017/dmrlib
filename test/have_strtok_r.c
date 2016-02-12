@@ -3,7 +3,7 @@
 
 int main()
 {
-    char *str = NULL, *delim = NULL, *saveptr = NULL;
+    char *str = "hello:world", *delim = ":", *saveptr = NULL;
     strtok_r(str, delim, &saveptr);
     return 0;
 }

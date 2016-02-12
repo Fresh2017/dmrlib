@@ -1,5 +1,6 @@
 #include "config.h"
 #if !defined(HAVE_STRTOK_R)
+#include <string.h>
 /*
  * public domain strtok_r() by Charlie Gordon
  *

@@ -1,3 +1,5 @@
+#include <dmr/id.h>
+#include <dmr/packet.h>
 #include "common/format.h"
 #include "common/scan.h"
 #include "config.h"
@@ -40,12 +42,14 @@ static int lua_log_priority(lua_State *L)
 
 static int lua_log_trace(lua_State *L)
 {
+    (void)L;
     dmr_log_trace(lua_tostring(L, -1));
     return 0;
 }
 
 static int lua_log_debug(lua_State *L)
 {
+    (void)L;
     dmr_log_debug(lua_tostring(L, -1));
     return 0;
 }
@@ -155,6 +159,9 @@ int lua_pass_packet(lua_State *L, dmr_parsed_packet *packet)
 
 void lua_modify_packet(lua_State *L, dmr_parsed_packet *packet)
 {
+    dmr_parsed_packet modify;
+    byte_copy(&modify, packet, sizeof(dmr_parsed_packet));
+
     luaL_checktype(L, 1, LUA_TTABLE);
     lua_getfield(L, 1, "ts");
     lua_getfield(L, 1, "flco");
@@ -163,13 +170,28 @@ void lua_modify_packet(lua_State *L, dmr_parsed_packet *packet)
     lua_getfield(L, 1, "repeater_id");
     lua_getfield(L, 1, "data_type");
     lua_getfield(L, 1, "color_code");
-    packet->ts          = luaL_checkinteger(L, -7);
-    packet->flco        = luaL_checkinteger(L, -6);
-    packet->src_id      = luaL_checkinteger(L, -5);
-    packet->dst_id      = luaL_checkinteger(L, -4);
-    packet->repeater_id = luaL_checkinteger(L, -3);
-    packet->data_type   = luaL_checkinteger(L, -2);
-    packet->color_code  = luaL_checkinteger(L, -1);
+    modify.ts          = luaL_checkinteger(L, -7);
+    modify.flco        = luaL_checkinteger(L, -6);
+    modify.src_id      = luaL_checkinteger(L, -5);
+    modify.dst_id      = luaL_checkinteger(L, -4);
+    modify.repeater_id = luaL_checkinteger(L, -3);
+    modify.data_type   = luaL_checkinteger(L, -2);
+    modify.color_code  = luaL_checkinteger(L, -1);
+
+#define CHECK(field,fmt,rep) do { \
+    if (packet->field != modify.field) { \
+        dmr_log_debug("script: update "#field" "fmt"->"fmt, rep(packet->field), rep(modify.field)); \
+        packet->field = modify.field; \
+    } \
+} while(0)
+    CHECK(ts, "%s", dmr_ts_name);
+    CHECK(flco, "%s", dmr_flco_name);
+    //CHECK(src_id, "%s", dmr_id_name);
+    //CHECK(dst_id, "%s", dmr_id_name);
+    CHECK(repeater_id, "%u", (dmr_id));
+    //CHECK(data_type, "%s", dmr_data_type_name);
+    CHECK(color_code, "%u", (dmr_color_code));
+#undef CHECK
 }
 
 int init_script(void)

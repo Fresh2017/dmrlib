@@ -8,10 +8,13 @@ extern "C" {
 #endif
 
 typedef enum {
-    DMR_PROTOCOL_UNKNOWN = 0,
-    DMR_PROTOCOL_HOMEBREW,
-    DMR_PROTOCOL_MBE,
-    DMR_PROTOCOL_MMDVM
+    DMR_PROTOCOL_UNKNOWN  = 0x00,
+    /* 0x01-0x3f: IPSC */
+    DMR_PROTOCOL_HOMEBREW = 0x01,
+    /* 0x40-0x7f: modem */
+    DMR_PROTOCOL_MMDVM    = 0x40,
+    /* 0xf0-0xff: builtin */
+    DMR_PROTOCOL_MBE      = 0xf0,
 } dmr_protocol_type;
 
 typedef struct dmr_protocol dmr_protocol;

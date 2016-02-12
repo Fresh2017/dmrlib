@@ -50,6 +50,7 @@ typedef struct {
             char            *port;
             int             baud;
             dmr_mmdvm_model model;
+            dmr_color_code  color_code;
             uint32_t        rx_freq;
             uint32_t        tx_freq;
         } mmdvm;

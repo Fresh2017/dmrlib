@@ -1,6 +1,6 @@
 #include "dmr/error.h"
 #include "dmr/malloc.h"
-
+#include "dmr/id.h"
 #include "dmr/log.h"
 #include "dmr/protocol.h"
 #include "dmr/protocol/mmdvm.h"
@@ -104,7 +104,7 @@ DMR_API const char *dmr_mmdvm_state_name(dmr_mmdvm_state state)
     return "unknown";
 }
 
-DMR_API dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model model)
+DMR_API dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model model, dmr_color_code color_code)
 {
     DMR_MALLOC_CHECK(dmr_mmdvm, mmdvm);
     DMR_NULL_CHECK_FREE(mmdvm->id = dmr_palloc_size(mmdvm, 64), mmdvm);
@@ -142,6 +142,7 @@ DMR_API dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model mod
     mmdvm->started = false;
     mmdvm->serial = serial;
     mmdvm->model = model;
+    mmdvm->color_code = color_code;
 
     /* clear ack buffer */
     byte_zero((void *)mmdvm->ack, sizeof(mmdvm->ack));
@@ -176,6 +177,14 @@ DMR_API int dmr_mmdvm_start(dmr_mmdvm *mmdvm)
     TRY_SERIAL(xon_xoff, SERIAL_XON_XOFF_DISABLED);
 #undef TRY_SERIAL
 
+    int ret;
+    if ((ret = dmr_mmdvm_set_mode(mmdvm, DMR_MMDVM_MODE_DMR)) != 0)
+        goto error;
+
+    if ((ret = dmr_mmdvm_set_config(mmdvm, 0, DMR_MMDVM_MODE_DMR, 0, DMR_MMDVM_STATE_DMR, 0, 0, mmdvm->color_code)) != 0)
+        goto error;
+
+    DMR_MM_INFO("modem started");
     mmdvm->started = true;
     return 0;
 
@@ -261,17 +270,22 @@ DMR_API int dmr_mmdvm_read(dmr_mmdvm *mmdvm, dmr_parsed_packet **parsed_out)
 {
     serial_t *serial = (serial_t *)mmdvm->serial;
     bool again = true;
-    int ret;
+    int ret, retry;
     size_t len = DMR_MMDVM_FRAME_MAX - mmdvm->pos;
 
 read_again:
+    errno = 0;
+    retry = 0;
     do {
         ret = serial_read_nonblock(serial, mmdvm->frame + mmdvm->pos, len);
-    } while (ret == -1 && (errno == EAGAIN || errno == EINTR));
-    if (ret == -1) {
-        DMR_MM_ERROR("read(%s): %s", mmdvm->port, strerror(errno));
-        return -1;
-    }
+        if (ret <= 0 && errno != 0) {
+            DMR_MM_ERROR("read: %s", strerror(errno));
+        }
+        if (++retry > 16)
+            break;
+    } while (ret <= 0 && (errno == EAGAIN || errno == EINTR));
+    if (ret <= 0)
+        return ret;
 
 #if defined(DMR_DEBUG)
     dmr_dump_hex(mmdvm->frame + mmdvm->pos, ret);
@@ -344,6 +358,15 @@ DMR_API int dmr_mmdvm_send(dmr_mmdvm *mmdvm, dmr_parsed_packet *parsed)
     DMR_ERROR_IF_NULL(mmdvm, DMR_EINVAL);
     DMR_ERROR_IF_NULL(parsed, DMR_EINVAL);
 
+    const char *src_call = dmr_id_name(parsed->src_id);
+    const char *dst_call = dmr_id_name(parsed->dst_id);
+    DMR_MM_DEBUG("%s/%02x, type=%s from %u(%s)->%u(%s), privacy=%u, stream=%08x",
+        dmr_ts_name(parsed->ts), parsed->sequence,
+        dmr_data_type_name(parsed->data_type),
+        parsed->src_id, src_call == NULL ? "?" : src_call,
+        parsed->dst_id, dst_call == NULL ? "?" : dst_call,
+        parsed->flco, parsed->stream_id);
+
     uint8_t control = 0;
     switch (dmr_sync_pattern_decode(parsed->packet)) {
     case DMR_SYNC_PATTERN_BS_SOURCED_VOICE:
@@ -391,13 +414,16 @@ DMR_API int dmr_mmdvm_send_raw(dmr_mmdvm *mmdvm, dmr_raw *raw)
 #endif
 
     serial_t *serial = (serial_t *)mmdvm->serial;
-    int ret = 0;
+    int ret = 0, retry = 0;
     size_t pos = 0;
     do {
         ret = serial_write_nonblock(serial, raw->buf + pos, raw->len - pos);
         if (ret > 0) {
             pos += ret;
             DMR_MM_DEBUG("sent %u/%d", pos, raw->len);
+        } else if (++retry > 16) {
+            DMR_MM_ERROR("send(%u) failed after %d retries: %s", raw->len, retry, strerror(errno));
+            return -1;
         }
     } while (ret == -1 && (errno == EINVAL || errno == EAGAIN));
     if (ret == -1) {
@@ -445,37 +471,25 @@ DMR_API int dmr_mmdvm_get_version(dmr_mmdvm *mmdvm)
     //return dmr_rawq_add(mmdvm->trq, raw);
 }
 
-DMR_API int dmr_mmdvm_set_config(dmr_mmdvm *mmdvm, uint8_t invert, uint8_t mode, uint8_t delay_ms, dmr_mmdvm_state state, uint8_t rx_level, uint8_t tx_level)
+DMR_API int dmr_mmdvm_set_config(dmr_mmdvm *mmdvm, uint8_t invert, uint8_t mode, uint8_t delay_ms, dmr_mmdvm_state state, uint8_t rx_level, uint8_t tx_level, dmr_color_code color_code)
 {
     DMR_ERROR_IF_NULL(mmdvm, DMR_EINVAL);
 
-    dmr_raw *raw = dmr_raw_new(9);
+    dmr_raw *raw = dmr_raw_new(10);
     DMR_ERROR_IF_NULL(raw, DMR_ENOMEM);
     dmr_raw_add_uint8(raw, DMR_MMDVM_FRAME_START);
-    dmr_raw_add_uint8(raw, 9);
+    dmr_raw_add_uint8(raw, 10);
+    dmr_raw_add_uint8(raw, DMR_MMDVM_SET_CONFIG);
     dmr_raw_add_uint8(raw, invert);
     dmr_raw_add_uint8(raw, mode);
     dmr_raw_add_uint8(raw, delay_ms);
     dmr_raw_add_uint8(raw, state);
     dmr_raw_add_uint8(raw, rx_level);
     dmr_raw_add_uint8(raw, tx_level);
+    dmr_raw_add_uint8(raw, color_code);
     return dmr_mmdvm_send_raw(mmdvm, raw);
     //return dmr_rawq_add(mmdvm->trq, raw);
 } 
-
-int dmr_mmdvm_set_mode(dmr_mmdvm *mmdvm, uint8_t state)
-{
-    DMR_ERROR_IF_NULL(mmdvm, DMR_EINVAL);
-    
-    dmr_raw *raw = dmr_raw_new(4);
-    DMR_ERROR_IF_NULL(raw, DMR_ENOMEM);
-    dmr_raw_add_uint8(raw, DMR_MMDVM_FRAME_START);
-    dmr_raw_add_uint8(raw, 4);
-    dmr_raw_add_uint8(raw, DMR_MMDVM_SET_MODE);
-    dmr_raw_add_uint8(raw, state);
-    return dmr_mmdvm_send_raw(mmdvm, raw);
-    //return dmr_rawq_add(mmdvm->trq, raw);
-}
 
 DMR_API int dmr_mmdvm_set_rf_config(dmr_mmdvm *mmdvm, uint32_t rx_freq, uint32_t tx_freq)
 {
@@ -504,6 +518,20 @@ DMR_API int dmr_mmdvm_set_rf_config(dmr_mmdvm *mmdvm, uint32_t rx_freq, uint32_t
     dmr_raw_add_uint8(raw, 0); /* flags, reserved */
     dmr_raw_add_uint32(raw, rx_freq);
     dmr_raw_add_uint32(raw, tx_freq);
+    return dmr_mmdvm_send_raw(mmdvm, raw);
+    //return dmr_rawq_add(mmdvm->trq, raw);
+}
+
+DMR_API int dmr_mmdvm_set_mode(dmr_mmdvm *mmdvm, dmr_mmdvm_mode mode)
+{
+    DMR_ERROR_IF_NULL(mmdvm, DMR_EINVAL);
+    
+    dmr_raw *raw = dmr_raw_new(4);
+    DMR_ERROR_IF_NULL(raw, DMR_ENOMEM);
+    dmr_raw_add_uint8(raw, DMR_MMDVM_FRAME_START);
+    dmr_raw_add_uint8(raw, 4);
+    dmr_raw_add_uint8(raw, DMR_MMDVM_SET_MODE);
+    dmr_raw_add_uint8(raw, mode);
     return dmr_mmdvm_send_raw(mmdvm, raw);
     //return dmr_rawq_add(mmdvm->trq, raw);
 }

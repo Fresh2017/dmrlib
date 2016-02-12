@@ -32,6 +32,15 @@ DMR_PRV static int homebrew_io_init(dmr_io *io, void *homebrewptr)
     return 0;
 }
 
+DMR_PRV static int homebrew_io_stop(dmr_io *io, dmr_homebrew *homebrew, int fd)
+{
+    DMR_UNUSED(homebrew);
+    dmr_io_del_timer(io,     homebrew_io_ping_timer);
+    dmr_io_del_read (io, fd, homebrew_io_readable);
+    dmr_io_del_error(io, fd, homebrew_io_error);
+    return 0;
+}
+
 DMR_PRV int homebrew_io_register(dmr_io *io, void *homebrewptr)
 {
     DMR_ERROR_IF_NULL(io, DMR_EINVAL);
@@ -49,7 +58,6 @@ DMR_PRV int homebrew_io_register(dmr_io *io, void *homebrewptr)
     dmr_io_reg_timer(io, ping_timer, homebrew_io_ping_timer, homebrew, false);
     dmr_io_reg_read (io, sock->fd,   homebrew_io_readable,   homebrew, false);
     dmr_io_reg_error(io, sock->fd,   homebrew_io_error,      homebrew, false);
-    dmr_io_reg_close(io,             homebrew_io_close,      homebrew       );
 
     return 0;
 }
@@ -116,7 +124,8 @@ DMR_PRV static int homebrew_io_error(dmr_io *io, void *homebrewptr, int fd)
     dmr_homebrew *homebrew = (dmr_homebrew *)homebrewptr;
     dmr_log_critical("homebrew io: socket error");
     dmr_free(homebrew);
-    return 0;
+
+    return homebrew_io_stop(io, homebrew, fd);
 }
 
 DMR_PRV static int homebrew_io_close(dmr_io *io, void *homebrewptr)

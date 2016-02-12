@@ -58,7 +58,6 @@ int ip6resolve(ip6_t ip, const char *host)
         }
     }
 
-done:
     DEBUGF("%s resolved to %s", host, format_ip6s(ip));
     freeaddrinfo(ai0);
     return ret;

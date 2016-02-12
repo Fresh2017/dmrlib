@@ -119,12 +119,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if ((ret = init_http()) != 0) {
-        dmr_log_critical("noisebridge: init http failed with %d: %s",
-            ret, dmr_error_get());
-        goto bail;
-    }
-
     if ((ret = init_script()) != 0) {
         dmr_log_critical("noisebridge: init script failed with %d: %s",
             ret, dmr_error_get());

@@ -1,4 +1,3 @@
-#include <talloc.h>
 #include <signal.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -12,7 +11,7 @@ DMR_API dmr_io *dmr_io_new(void)
     dmr_io *io;
     int i;
 
-    if ((io = talloc_zero(NULL, dmr_io)) == NULL) {
+    if ((io = dmr_malloc(dmr_io)) == NULL) {
         dmr_error(DMR_ENOMEM);
         return NULL;
     }
@@ -35,6 +34,8 @@ DMR_API dmr_io *dmr_io_new(void)
     FD_ZERO(&io->writers);
     FD_ZERO(&io->errors);
 
+    io->timeout.tv_sec = 1;
+    io->timeout.tv_usec = 0;
     gettimeofday(&io->wallclock, NULL);
 
     return io;
@@ -68,14 +69,16 @@ DMR_API int dmr_io_add_protocol(dmr_io *io, dmr_protocol protocol, void *instanc
 
 DMR_PRV int io_handle_readable(dmr_io *io, int fd)
 {
+    dmr_log_debug("io: fd %d readable", fd);
     dmr_io_entry *entry, *next;
     DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_READ]->head, entries, next) {
         if (entry->fd == fd) {
             ((dmr_read_cb)entry->cb)(io, entry->userdata, fd);
-            if (entry->once) {
+            /* entry may be freed by callback */
+            if (entry && entry->once) {
                 DMR_LIST_REMOVE(entry, entries);
                 io->entries--;
-                TALLOC_FREE(entry);
+                dmr_free(entry);
                 FD_CLR(fd, &io->readers);
             }
         }
@@ -86,14 +89,16 @@ DMR_PRV int io_handle_readable(dmr_io *io, int fd)
 
 DMR_PRV int io_handle_writable(dmr_io *io, int fd)
 {
+    dmr_log_debug("io: fd %d writable", fd);
     dmr_io_entry *entry, *next;
     DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_WRITE]->head, entries, next) {
         if (entry->fd == fd) {
             ((dmr_write_cb)entry->cb)(io, entry->userdata, fd);
-            if (entry->once) {
+            /* entry may be freed by callback */
+            if (entry && entry->once) {
                 DMR_LIST_REMOVE(entry, entries);
                 io->entries--;
-                TALLOC_FREE(entry);
+                dmr_free(entry);
                 FD_CLR(fd, &io->writers);
             }
             return 1;
@@ -105,14 +110,16 @@ DMR_PRV int io_handle_writable(dmr_io *io, int fd)
 
 DMR_PRV int io_handle_error(dmr_io *io, int fd)
 {
+    dmr_log_debug("io: fd %d error", fd);
     dmr_io_entry *entry, *next;
     DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_ERROR]->head, entries, next) {
         if (entry->fd == fd) {
             ((dmr_error_cb)entry->cb)(io, entry->userdata, fd);
-            if (entry->once) {
+            /* entry may be freed by callback */
+            if (entry && entry->once) {
                 DMR_LIST_REMOVE(entry, entries);
                 io->entries--;
-                TALLOC_FREE(entry);
+                dmr_free(entry);
                 FD_CLR(fd, &io->writers);
             }
             return 1;
@@ -128,7 +135,7 @@ DMR_PRV int io_handle_close(dmr_io *io)
     DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_CLOSE]->head, entries, next) {
         ((dmr_close_cb)entry->cb)(io, entry->userdata);
         DMR_LIST_REMOVE(entry, entries);
-        TALLOC_FREE(entry);
+        dmr_free(entry);
     }
 
     return 0;
@@ -140,10 +147,11 @@ DMR_PRV int io_handle_signal(dmr_io *io, int sig)
     DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_SIGNAL]->head, entries, next) {
         if (entry->fd == sig) {
             ((dmr_signal_cb)entry->cb)(io, entry->userdata, sig);
-            if (entry->once) {
+            /* entry may be freed by callback */
+            if (entry && entry->once) {
                 DMR_LIST_REMOVE(entry, entries);
                 io->entries--;
-                TALLOC_FREE(entry);
+                dmr_free(entry);
             }
             return 1;
         }
@@ -175,7 +183,7 @@ DMR_PRV int io_sig_add(dmr_io *io, int sig, bool *reg)
             break;
     }
     if (!found) {
-        if ((entry = talloc_zero(NULL, io_sig)) == NULL)
+        if ((entry = dmr_malloc(io_sig)) == NULL)
             return dmr_error(DMR_ENOMEM);
         entry->io = io;
         entry->sig = sig;
@@ -212,6 +220,8 @@ DMR_PRV int io_timeout(dmr_io *io, struct timeval *timeout)
 
     /* Default timeout */
     byte_copy(timeout, &io->timeout, sizeof(struct timeval));
+    dmr_log_debug("io: default timeout %ld.%06d",
+        timeout->tv_sec, timeout->tv_usec);
 
     if (DMR_LIST_EMPTY(&io->timer->head))
         return 0;
@@ -224,14 +234,25 @@ DMR_PRV int io_timeout(dmr_io *io, struct timeval *timeout)
      * delta between current wall clock and timer wall clock to find out what
      * the smallest required timeout is. */
     DMR_LIST_FOREACH_SAFE(timer, &io->timer->head, entries, next) {
+        if (timer == NULL)
+            continue;
+
         timersub(&timer->wallclock, &io->wallclock, &delta);
-        if (!timercmp(&delta, timeout, <)) {
+        /* If we detect an expired timer, return immediately. */
+        if (delta.tv_sec < 0 || delta.tv_usec < 0) {
+            timeout->tv_sec = 0;
+            timeout->tv_usec = 0;
+            return 1;
+        }
+        /* Otherwise, see if the timer is smaller and apply. */
+        if (!timercmp(&delta, timeout, >)) {
             /* Timer timeout is smaller than current timeout. */
             byte_copy(timeout, &delta, sizeof(struct timeval));
+            dmr_log_debug("io: new timeout %ld.%06ld",
+                timeout->tv_sec, timeout->tv_usec);
         }
         timers++;
     }
-
     return timers;
 }
 
@@ -239,6 +260,7 @@ DMR_PRV int io_timeout(dmr_io *io, struct timeval *timeout)
 DMR_PRV void io_handle_timers(dmr_io *io)
 {
     dmr_io_timer *timer, *next;
+    gettimeofday(&io->wallclock, NULL);
 
     /* Check for each of the timers if they are past current wall clock time,
      * if so, execute their callback. */
@@ -250,10 +272,14 @@ DMR_PRV void io_handle_timers(dmr_io *io)
         if (timer->once) {
             DMR_LIST_REMOVE(timer, entries);
             io->entries--;
-            TALLOC_FREE(timer);
+            dmr_free(timer);
         } else {
             /* Update next timer wakeup */
+            dmr_log_debug("io: timer: %ld.%06ld",
+                timer->wallclock.tv_sec, timer->wallclock.tv_usec);
             timeradd(&io->wallclock, &timer->timeout, &timer->wallclock);
+            dmr_log_debug("io: timer: %ld.%06ld (new)",
+                timer->wallclock.tv_sec, timer->wallclock.tv_usec);
         }
     }
 }
@@ -264,9 +290,7 @@ DMR_API int dmr_io_loop(dmr_io *io)
         return dmr_error(DMR_EINVAL);
 
     int ret, i;
-    struct timeval *timeout = dmr_palloc(io, struct timeval);
-    if (timeout == NULL)
-        return dmr_error(DMR_ENOMEM);
+    struct timeval timeout;
 
     io->closed = false;
     while (io->entries > 0 && !io->closed) {
@@ -277,23 +301,35 @@ DMR_API int dmr_io_loop(dmr_io *io)
         gettimeofday(&io->wallclock, NULL);
 
         do {
-            if (io_timeout(io, timeout))
-                ret = select(io->maxfd + 1, &rfds, &wfds, &efds, timeout);
-            else
+            if (io_timeout(io, &timeout)) {
+                dmr_log_debug("io: select with timeout %ld.%06ld",
+                    timeout.tv_sec, timeout.tv_usec);
+                ret = select(io->maxfd + 1, &rfds, &wfds, &efds, &timeout);
+            } else {
+                dmr_log_debug("io: select with no timeout");
                 ret = select(io->maxfd + 1, &rfds, &wfds, &efds, NULL);
+            }
         } while (ret == -1 && (errno == EAGAIN || errno == EINTR));
 
         io_handle_timers(io);
-        for (i = 0; i < io->maxfd; i++) {
+        int handled = 0;
+        for (i = 0; i < io->maxfd + 1; i++) {
             if (FD_ISSET(i, &efds)) {
                 io_handle_error(io, i);
+                handled++;
             }
             if (FD_ISSET(i, &rfds)) {
                 io_handle_readable(io, i);
+                handled++;
             }
             if (FD_ISSET(i, &wfds)) {
                 io_handle_writable(io, i);
+                handled++;
             }
+        }
+
+        if (handled < ret) {
+            dmr_log_warn("io: %d/%d events handled", handled, ret);
         }
     }
 
@@ -334,7 +370,7 @@ DMR_API int dmr_io_reg_signal(dmr_io *io, int sig, dmr_signal_cb cb, void *userd
         return dmr_error(DMR_EINVAL);
 
     dmr_io_entry *e;
-    if ((e = talloc_zero(io, dmr_io_entry)) == NULL) {
+    if ((e = dmr_malloc(dmr_io_entry)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -364,7 +400,7 @@ DMR_API int dmr_io_reg_read(dmr_io *io, int fd, dmr_read_cb cb, void *userdata, 
         return dmr_error(DMR_EINVAL);
 
     dmr_io_entry *e;
-    if ((e = talloc_zero(io, dmr_io_entry)) == NULL) {
+    if ((e = dmr_malloc(dmr_io_entry)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -380,13 +416,33 @@ DMR_API int dmr_io_reg_read(dmr_io *io, int fd, dmr_read_cb cb, void *userdata, 
     return 0;
 }
 
+DMR_API int dmr_io_del_read(dmr_io *io, int fd, dmr_read_cb cb)
+{
+    if (io == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    dmr_io_entry *entry, *next;
+    DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_READ]->head, entries, next) {
+        if (entry->fd == fd && entry->cb == cb) {
+            DMR_LIST_REMOVE(entry, entries);
+            io->entries--;
+            dmr_free(entry);
+            FD_CLR(fd, &io->readers);
+            return 0;
+        }
+    }
+
+    dmr_log_error("io: no cb to del for fd %d", fd);
+    return 1;
+}
+
 DMR_API int dmr_io_reg_write(dmr_io *io, int fd, dmr_write_cb cb, void *userdata, bool once)
 {
     if (io == NULL)
         return dmr_error(DMR_EINVAL);
 
     dmr_io_entry *e;
-    if ((e = talloc_zero(io, dmr_io_entry)) == NULL) {
+    if ((e = dmr_malloc(dmr_io_entry)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -402,13 +458,33 @@ DMR_API int dmr_io_reg_write(dmr_io *io, int fd, dmr_write_cb cb, void *userdata
     return 0;
 }
 
+DMR_API int dmr_io_del_write(dmr_io *io, int fd, dmr_read_cb cb)
+{
+    if (io == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    dmr_io_entry *entry, *next;
+    DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_WRITE]->head, entries, next) {
+        if (entry->fd == fd && entry->cb == cb) {
+            DMR_LIST_REMOVE(entry, entries);
+            io->entries--;
+            dmr_free(entry);
+            FD_CLR(fd, &io->writers);
+            return 0;
+        }
+    }
+
+    dmr_log_error("io: no cb to del for fd %d", fd);
+    return 1;
+}
+
 DMR_API int dmr_io_reg_error(dmr_io *io, int fd, dmr_error_cb cb, void *userdata, bool once)
 {
     if (io == NULL)
         return dmr_error(DMR_EINVAL);
 
     dmr_io_entry *e;
-    if ((e = talloc_zero(io, dmr_io_entry)) == NULL) {
+    if ((e = dmr_malloc(dmr_io_entry)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -424,13 +500,33 @@ DMR_API int dmr_io_reg_error(dmr_io *io, int fd, dmr_error_cb cb, void *userdata
     return 0;
 }
 
+DMR_API int dmr_io_del_error(dmr_io *io, int fd, dmr_read_cb cb)
+{
+    if (io == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    dmr_io_entry *entry, *next;
+    DMR_LIST_FOREACH_SAFE(entry, &io->entry[DMR_REQUEST_ERROR]->head, entries, next) {
+        if (entry->fd == fd && entry->cb == cb) {
+            DMR_LIST_REMOVE(entry, entries);
+            io->entries--;
+            dmr_free(entry);
+            FD_CLR(fd, &io->errors);
+            return 0;
+        }
+    }
+
+    dmr_log_error("io: no cb to del for fd %d", fd);
+    return 1;
+}
+
 DMR_API int dmr_io_reg_close(dmr_io *io, dmr_close_cb cb, void *userdata)
 {
     if (io == NULL)
         return dmr_error(DMR_EINVAL);
 
     dmr_io_entry *e;
-    if ((e = talloc_zero(io, dmr_io_entry)) == NULL) {
+    if ((e = dmr_malloc(dmr_io_entry)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -449,7 +545,7 @@ DMR_API int dmr_io_reg_timer(dmr_io *io, struct timeval timeout, dmr_timer_cb cb
         return dmr_error(DMR_EINVAL);
 
     dmr_io_timer *t;
-    if ((t = talloc_zero(io, dmr_io_timer)) == NULL) {
+    if ((t = dmr_malloc(dmr_io_timer)) == NULL) {
         return dmr_error(DMR_ENOMEM);
     }
 
@@ -463,5 +559,23 @@ DMR_API int dmr_io_reg_timer(dmr_io *io, struct timeval timeout, dmr_timer_cb cb
     t->once = once;
     DMR_LIST_INSERT_HEAD(&io->timer->head, t, entries);
     io->entries++;
+    return 0;
+}
+
+DMR_API int dmr_io_del_timer(dmr_io *io, dmr_timer_cb cb)
+{
+    if (io == NULL)
+        return dmr_error(DMR_EINVAL);
+
+    dmr_io_timer *timer, *next;
+    DMR_LIST_FOREACH_SAFE(timer, &io->timer->head, entries, next) {
+        if (timer->cb == cb) {
+            DMR_LIST_REMOVE(timer, entries);
+            io->entries--;
+            dmr_free(timer);
+            return 0;
+        }
+    }
+
     return 0;
 }

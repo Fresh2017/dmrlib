@@ -1,5 +1,5 @@
 #include <dmr/malloc.h>
-#include <dmr/thread.h>
+#include <dmr/raw.h>
 #include "common/config.h"
 #include "common/format.h"
 #include "common/platform.h"
@@ -40,8 +40,7 @@ typedef struct {
     ip6_t       ip;
     socket_t    *s;
 	size_t		parser_pos;
-    char        *buf;
-    size_t      pos;
+    dmr_raw     *raw;
     http_parser parser;
 	http_parser_settings parser_settings;
     struct {
@@ -61,13 +60,8 @@ typedef struct {
 } client_t;
 
 typedef struct {
-	dmr_thread_t *thread;
+    dmr_io       *io;
     socket_t	 *server;
-    client_t	 **client;
-	int			 clientfds[HTTPD_MAX_CLIENTS];
-    size_t		 clients;
-	fd_set		 readers;
-	fd_set		 writers;
     bool         active;
 } httpd_t;
 
@@ -171,12 +165,12 @@ typedef struct {
 
 static headers_t *headers_new(void *parent)
 {
-    headers_t *headers = talloc_zero(parent, headers_t);
+    headers_t *headers = dmr_palloc(parent, headers_t);
     if (headers == NULL)
         return NULL;
 
     //headers->header = talloc_array(headers, header_t *, 8);
-    headers->header = talloc_zero_size(headers, sizeof(header_t *) * 8);
+    headers->header = dmr_palloc_size(headers, sizeof(header_t *) * 8);
     headers->alloc = 8;
     return headers;
 }
@@ -189,7 +183,7 @@ static int headers_add(headers_t *headers, const char *key, const char *fmt, ...
     }
 
     if ((headers->len + 1) == headers->alloc) {
-        header_t **tmp = talloc_realloc(
+        header_t **tmp = dmr_realloc(
             headers,
             headers->header,
             header_t *,
@@ -203,12 +197,12 @@ static int headers_add(headers_t *headers, const char *key, const char *fmt, ...
         headers->header = tmp;
     }
 
-    header_t *header = talloc_zero(headers, header_t);
+    header_t *header = dmr_palloc(headers, header_t);
     if (header == NULL) {
         dmr_log_error("headers add: out of memory");
         return -1;
     }
-    header->key = talloc_strdup(header, key);
+    header->key = dmr_strdup(header, key);
 
     va_list ap;
     va_start(ap, fmt);
@@ -216,7 +210,7 @@ static int headers_add(headers_t *headers, const char *key, const char *fmt, ...
     va_end(ap);
     if (header->value == NULL) {
         dmr_log_error("headers add: out of memory");
-        TALLOC_FREE(header);
+        dmr_free(header);
         return -1;
     }
     headers->header[headers->len] = header;
@@ -272,20 +266,20 @@ static int respond_header(client_t *client, int status, headers_t *headers, size
 
     if (headers_add(headers, "Server", "Noisebridge") == -1 ||
         headers_add(headers, "Date", datebuf) == -1) {
-        TALLOC_FREE(headers);
+        dmr_free(headers);
         return -1;
     }
     if (!headers_contain(headers, "Content-Length") && content_length) {
         dmr_log_debug("adding missing Content-Length header");
         if (headers_add(headers, "Content-Length", "%lld", content_length) == -1) {
-            TALLOC_FREE(headers);
+            dmr_free(headers);
             return -1;
         }
     }
     if (!headers_contain(headers, "Content-Type")) {
         dmr_log_debug("adding missing Content-Type header");
         if (headers_add(headers, "Content-Type", "text/html") == -1) {
-            TALLOC_FREE(headers);
+            dmr_free(headers);
             return -1;
         }
     }
@@ -298,7 +292,7 @@ static int respond_header(client_t *client, int status, headers_t *headers, size
 		status, message,
         headers_str(headers));
 
-    TALLOC_FREE(headers);
+    dmr_free(headers);
 
 	dmr_log_info("[%s]: %s %s HTTP/%d.%d %d %llu",
 		format_ip6s(client->ip),
@@ -354,7 +348,7 @@ static int respond_error(client_t *client, int status)
 
     headers_t *headers = headers_new(NULL);
     if (headers_add(headers, "Content-Type", "text/html; charset=UTF-8") == -1) {
-        TALLOC_FREE(headers);
+        dmr_free(headers);
         return -1;
     }
 	if (respond_header(client, status, headers, strlen(html)) == -1)
@@ -384,8 +378,6 @@ static int respond_repeater_config(client_t *client)
         if (proto == NULL)
             continue;
 
-        dmr_protocol p = proto->protocol;
-           
         if (i > 0) {
             S(",\n    {\n");
         } else {
@@ -466,7 +458,7 @@ static int respond_repeater_config(client_t *client)
     headers_t *headers = headers_new(NULL);
     if (headers_add(headers, "Cache-Control", "no-cache") == -1 ||
         headers_add(headers, "Content-Type", "application/json") == -1) {
-        TALLOC_FREE(headers);
+        dmr_free(headers);
         return -1;
     }
     if (respond_header(client, 200, headers, strlen(json)) == -1) {
@@ -541,6 +533,24 @@ static int respond_client_live_ts_write(client_t *client)
     return 0;
 }
 
+static int handle_writable(dmr_io *io, void *clientptr, int fd)
+{
+    DMR_ERROR_IF_NULL(io, DMR_EINVAL);
+    DMR_ERROR_IF_NULL(clientptr, DMR_EINVAL);
+    DMR_UNUSED(fd);
+
+	client_t *client = (client_t *)clientptr;
+
+	switch (client->live.type) {
+    case LIVE_NONE:
+        return -1;
+    case LIVE_TS:
+        return respond_client_live_ts_write(client);
+    }
+
+    return -1;
+}
+
 static int respond_repeater_live_ts(client_t *client)
 {
     client->live.type = LIVE_TS;
@@ -551,15 +561,15 @@ static int respond_repeater_live_ts(client_t *client)
         headers_add(headers, "Content-Type", "text/octet-stream") == -1 ||
         headers_add(headers, "X-Accel-Buffering", "no")           == -1 ||
         headers_add(headers, "Access-Control-Allow-Origin", "*")  == -1) {
-        TALLOC_FREE(headers);
+        dmr_free(headers);
         return -1;
     }
     if (respond_header(client, 200, headers, 0) == -1) {
         return -1;
     }
 
-    /* Tell the httpd we want to start writing */
-    FD_SET(client->s->fd, &httpd.writers);
+    /* Tell the io loop we want to start writing */
+    //dmr_io_reg_write(io, client->s->fd, ...);
     return 0;
 }
 
@@ -628,18 +638,18 @@ static int handle_client_headers_complete(http_parser *parser)
 	if (!strncmp(request_path, "/", 2)) {
 		sprintf(request_path, "/index.html");
 	}
-	client->request.file = talloc_zero_size(client, PATH_MAX + 1);
-	client->request.path = talloc_strdup(client, request_path);
+	client->request.file = dmr_palloc_size(client, PATH_MAX + 1);
+	client->request.path = dmr_strdup(client, request_path);
 
 	format_path_join(request_file, PATH_MAX, config->httpd.root, request_path);
 	format_path_canonical(client->request.file, PATH_MAX, request_file);
     dmr_log_trace("[%s]: resolved %s to %s", format_ip6s(client->ip), request_file, client->request.file);
 
 	if (strlen(client->request.file) == 0) {
-        TALLOC_FREE(client->request.file);
+        dmr_free(client->request.file);
 	} else if (strncmp(config->httpd.root, client->request.file, strlen(config->httpd.root))) {
 		dmr_log_warn("[%s]: attempted to request a file outside the root", format_ip6s(client->ip));
-		TALLOC_FREE(client->request.file);
+		dmr_free(client->request.file);
 	}
 
 	return 0;
@@ -657,8 +667,80 @@ static int handle_client_url(http_parser *parser, const char *buf, size_t len)
 	return http_parser_parse_url(buf, len, 0, &client->request.url);
 }
 
-static int handle_accept(void)
+static int handle_readable(dmr_io *io, void *clientptr, int fd);
+
+static int handle_error(dmr_io *io, void *clientptr, int fd)
 {
+    DMR_ERROR_IF_NULL(io, DMR_EINVAL);
+    DMR_ERROR_IF_NULL(clientptr, DMR_EINVAL);
+
+	client_t *client = (client_t *)clientptr;
+
+	socket_close(client->s);
+    dmr_io_del_read (io, fd, handle_readable);
+    dmr_io_del_error(io, fd, handle_error);
+    dmr_free(client);
+
+    return 0;
+}
+
+static int handle_readable(dmr_io *io, void *clientptr, int fd)
+{
+    DMR_ERROR_IF_NULL(io, DMR_EINVAL);
+    DMR_ERROR_IF_NULL(clientptr, DMR_EINVAL);
+
+	client_t *client = (client_t *)clientptr;
+
+    ssize_t ret = 0;
+    do {
+        ret = socket_read(client->s,
+            client->raw->buf + client->raw->len,
+            HTTPD_MAX_REQUEST - client->raw->len);
+        if (ret != -1) {
+            client->raw->len += ret;
+        }
+        dmr_log_trace("[%s]: read %llu/%llu", format_ip6s(client->ip), client->raw->len, HTTPD_MAX_REQUEST);
+    } while (ret != 0 && (ret == -1 && (errno == EINVAL || errno == EAGAIN)));
+    if (ret == -1) {
+        dmr_log_error("[%s]: read failed: %s", format_ip6s(client->ip), strerror(errno));
+        return -1;
+    }
+
+    size_t pos = (ssize_t)http_parser_execute(
+        &client->parser,
+        &client->parser_settings,
+        (const char *)client->raw->buf, client->raw->len);
+    if (client->parser.http_errno != 0) {
+        dmr_log_error("[%s]: parser error: %s", format_ip6s(client->ip),
+            http_errno_description(client->parser.http_errno));
+        respond_error(client, 400);
+    } else if (client->parser.upgrade) {
+        dmr_log_error("[%s]: requested unsupported upgrade", format_ip6s(client->ip));
+        respond_error(client, 400);
+    } else if (client->raw->len != pos) {
+        dmr_log_error("[%s]: unable to parse full request, dropping");
+    } else if (client->request.file == NULL) {
+        /* File was not found */
+        if (respond_content(client) == 0) {
+            /* Not done sending */
+            return 0;
+        }
+    } else {
+        /* Write requested file to the client */
+        dmr_log_debug("[%s]: serving %s", format_ip6s(client->ip), client->request.file);
+        respond_write(client);
+    }
+
+	/* We're done here */
+	return handle_error(io, client, fd);
+}
+
+static int handle_server_accept(dmr_io *io, void *unused, int sfd)
+{
+    DMR_UNUSED(unused);
+
+    dmr_log_debug("httpd: accept new client");
+
 #if defined(HAVE_STRUCT_SOCKADDR_STORAGE)
     struct sockaddr_storage addr;
 #elif defined(HAVE_STRUCT_SOCKADDR_IN6)
@@ -671,30 +753,26 @@ static int handle_accept(void)
     int fd;
 	byte_zero(&addr, addrlen);
 
-	if ((fd = accept(httpd.server->fd, (struct sockaddr *)&addr, &addrlen)) == -1) {
+	if ((fd = accept(sfd, (struct sockaddr *)&addr, &addrlen)) == -1) {
 		if (errno == EINTR || errno == EAGAIN) {
 			return 0;
 		}
 		return -1;
 	}
 
-	if (httpd.clients == (HTTPD_MAX_CLIENTS - 1)) {
-		dmr_log_error("refused new client: too many connections");
-		close(fd);
-		return 0;
-	}
-	if ((client = talloc_zero(NULL, client_t)) == NULL) {
+	if ((client = dmr_malloc(client_t)) == NULL) {
+        close(fd);
 		dmr_log_error("out of memory");
 		errno = ENOMEM;
 		return -1;
 	}
-    if ((client->buf = talloc_zero_size(client, HTTPD_MAX_REQUEST)) == NULL) {
+    if ((client->raw = dmr_raw_new(HTTPD_MAX_REQUEST)) == NULL) {
+        close(fd);
         dmr_log_error("out of memory");
         errno = ENOMEM;
-        TALLOC_FREE(client);
+        dmr_free(client);
         return -1;
     }
-    client->pos = 0;
     client->request.file = NULL;
     client->request.path = NULL;
 
@@ -721,20 +799,19 @@ static int handle_accept(void)
 	byte_copy(client->ip, (void *)ip6mappedv4prefix, 12);
 	byte_copy(client->ip + 12, (void *)&addr.sin_addr, 4);
 #endif
-	dmr_log_trace("[%s]: new client on fd %d", format_ip6s(client->ip), fd);
+	dmr_log_debug("[%s]: new client on fd %d", format_ip6s(client->ip), fd);
 	if (socket_set_blocking(client->s, 0) == -1) {
+        close(fd);
+        dmr_free(client);
 		dmr_log_errno("socket set blocking off");
 		return -1;
 	}
 	if (socket_set_nopipe(client->s, 1) == -1) {
+        close(fd);
+        dmr_free(client);
 		dmr_log_errno("socket set nopipe on");
 		return -1;
 	}
-
-	FD_SET(fd, &httpd.readers);
-	int i;
-	for (i = 0; httpd.client[i] != NULL; i++);
-	httpd.client[i] = client;
 
 	byte_zero(&client->parser, sizeof(struct http_parser));
 	byte_zero(&client->parser_settings, sizeof(struct http_parser_settings));
@@ -744,100 +821,19 @@ static int handle_accept(void)
 	client->parser_settings.on_headers_complete = handle_client_headers_complete;
     client->parser_settings.on_url = handle_client_url;
 
-	return fd;
+    dmr_io_reg_read (io, fd, handle_readable, client, true);
+    dmr_io_reg_error(io, fd, handle_error,    client, true);
+
+	return 0;
 }
 
-static int handle_reader(int fd)
+static int handle_server_error(dmr_io *io, void *unused, int sfd)
 {
-	client_t *client = NULL;
-	int i;
-
-	for (i = 0; i < HTTPD_MAX_CLIENTS; i++) {
-		if (httpd.client[i] != NULL && httpd.client[i]->s->fd == fd) {
-			client = httpd.client[i];
-			break;
-		}
-	}
-	if (client == NULL) {
-		dmr_log_error("reader: can't find client for fd %d", fd);
-		close(fd);
-		return -1;
-	}
-
-    ssize_t ret;
-    do {
-        ret = socket_read(client->s,
-            client->buf + client->pos,
-            HTTPD_MAX_REQUEST - client->pos);
-        if (ret != -1) {
-            client->pos += ret;
-        }
-        dmr_log_trace("[%s]: read %llu/%llu", format_ip6s(client->ip), client->pos, HTTPD_MAX_REQUEST);
-    } while (ret != 0 && (ret == -1 && (errno == EINVAL || errno == EAGAIN)));
-    if (ret == -1) {
-        dmr_log_error("[%s]: read failed: %s", format_ip6s(client->ip), strerror(errno));
-        return -1;
-    }
-
-    size_t pos = (ssize_t)http_parser_execute(
-        &client->parser,
-        &client->parser_settings,
-        client->buf, client->pos);
-    if (client->parser.http_errno != 0) {
-        dmr_log_error("[%s]: parser error: %s", format_ip6s(client->ip),
-            http_errno_description(client->parser.http_errno));
-        respond_error(client, 400);
-    } else if (client->parser.upgrade) {
-        dmr_log_error("[%s]: requested unsupported upgrade", format_ip6s(client->ip));
-        respond_error(client, 400);
-    } else if (client->pos != pos) {
-        dmr_log_error("[%s]: unable to parse full request, dropping");
-    } else if (client->request.file == NULL) {
-        /* File was not found */
-        if (respond_content(client) == 0) {
-            /* Not done sending */
-            return -1;
-        }
-    } else {
-        /* Write requested file to the client */
-        dmr_log_debug("[%s]: serving %s", format_ip6s(client->ip), client->request.file);
-        respond_write(client);
-    }
-
-	httpd.client[i] = NULL;
-	httpd.clients--;
-	socket_close(client->s);
-	TALLOC_FREE(client);
-
-	/* We're done here */
-	return -1;
-}
-
-static int handle_writer(int fd)
-{
-	client_t *client = NULL;
-	int i;
-
-	for (i = 0; i < HTTPD_MAX_CLIENTS; i++) {
-		if (httpd.client[i] != NULL && httpd.client[i]->s->fd == fd) {
-			client = httpd.client[i];
-			break;
-		}
-	}
-	if (client == NULL) {
-		dmr_log_error("writer: can't find client for fd %d", fd);
-		close(fd);
-		return -1;
-	}
-
-	switch (client->live.type) {
-    case LIVE_NONE:
-        return -1;
-    case LIVE_TS:
-        return respond_client_live_ts_write(client);
-    }
-
-    return -1;
+    DMR_UNUSED(io);
+    DMR_UNUSED(unused);
+    DMR_UNUSED(sfd);
+    dmr_log_critical("httpd: error on server socket: %s", strerror(errno));
+    return 1;
 }
 
 void stop_http(void)
@@ -847,89 +843,42 @@ void stop_http(void)
 
 int start_http(void *unused)
 {
-    config_t *config = load_config();
 	(void)unused;
 
-	dmr_thread_name_set("httpd");
-	dmr_log_info("starting on http://[%s]:%u",
+    config_t *config = load_config();
+    int ret = 0;
+
+	dmr_log_info("httpd: starting on http://[%s]:%u",
 		format_ip6s(config->httpd.bind),
 		config->httpd.port);
 
-	if (socket_bind(httpd.server, config->httpd.bind, config->httpd.port) == -1) {
+	if ((ret = socket_bind(httpd.server, config->httpd.bind, config->httpd.port)) == -1)
 		goto bail;
-	}
-	if (socket_listen(httpd.server, HTTPD_MAX_CLIENTS) == -1) {
+	if ((ret = socket_listen(httpd.server, HTTPD_MAX_CLIENTS)) == -1)
 		goto bail;
-	}
-#if defined(HAVE_SIGPIPE)
-    signal(SIGPIPE, SIG_IGN);
-#endif
 
-	FD_ZERO(&httpd.readers);
-	FD_ZERO(&httpd.writers);
-	FD_SET(httpd.server->fd, &httpd.readers);
-	int maxfd = httpd.server->fd, newfd;
-	
-	fd_set rfds, wfds;
-	int ret, i;
-    struct timeval lastwrite = { 0, 0 };
-    struct timeval timeout = { 0, 100 };
-    httpd.active = true;
-	while (httpd.active) {
-		memcpy(&rfds, &httpd.readers, sizeof(rfds));
-        /* Writers get really low priority as they do expensive operations */
-        if (dmr_time_ms_since(lastwrite) >= 400) {
-    		memcpy(&wfds, &httpd.writers, sizeof(wfds));
-            gettimeofday(&lastwrite, NULL);
-        } else {
-            memset(&wfds, 0, sizeof(wfds));
-        }
+    /* io callback for new clients */
+    if ((ret = dmr_io_reg_read (httpd.io, httpd.server->fd, handle_server_accept, NULL, false)) != 0)
+        goto bail;
+    if ((ret = dmr_io_reg_error(httpd.io, httpd.server->fd, handle_server_error, NULL, false)) != 0)
+        goto bail;
 
-		if ((ret = select(maxfd + 1, &rfds, &wfds, NULL, &timeout)) == -1) {
-			if (errno == EINTR || errno == EAGAIN) {
-				continue;
-			}
-			goto bail;
-		}
-
-		for (i = 0; i <= maxfd; i++) {
-			if (FD_ISSET(i, &rfds)) {
-				if (i == httpd.server->fd) {
-					if ((newfd = handle_accept()) == -1)
-						goto bail;
-					if (newfd > maxfd) {
-						maxfd = newfd;
-					}
-				} else if (handle_reader(i) == -1) {
-					FD_CLR(i, &httpd.readers);
-				}
-			}
-			if (FD_ISSET(i, &wfds)) {
-				if (handle_writer(i) == -1) {
-					FD_CLR(i, &httpd.writers);
-				}
-			}
-		}
-	}
-
-	dmr_thread_exit(dmr_thread_success);
-	return dmr_thread_success;
+    return 0;
 
 bail:
-	dmr_log_error("server failure: %s", strerror(errno));
-	socket_close(httpd.server);
-
-	dmr_thread_exit(dmr_thread_error);
-	return dmr_thread_error;
+    dmr_log_critical("httpd: start failed: %s", strerror(errno));
+    return -1;
 }
 
-int init_http(void)
+int init_http(dmr_io *io)
 {
     config_t *config = load_config();
     if (!config->httpd.enabled) {
         dmr_log_info("httpd: not enabled");
         return 0;
     }
+
+    httpd.io = io;
 
 #if defined(HAVE_MAGIC_H)
     if ((magic = magic_open(MAGIC_MIME_TYPE | MAGIC_MIME_ENCODING)) == NULL) {
@@ -947,17 +896,12 @@ int init_http(void)
     }
 #endif
 
-	if ((httpd.thread = talloc_zero(NULL, dmr_thread_t)) == NULL) {
-		dmr_log_error("out of memory");
-		goto bail;
-	}
     if ((httpd.server = socket_tcp6(0)) == NULL) {
-		dmr_log_error("out of memory");
+		dmr_log_error("httpd: out of memory");
         goto bail;
     }
-    if ((httpd.client = talloc_zero_size(NULL, sizeof(void *) * HTTPD_MAX_CLIENTS)) == NULL) {
-		dmr_log_error("out of memory");
-		goto bail;
+	if (socket_set_blocking(httpd.server, 0) == -1) {
+		dmr_log_errno("socket set reuseport");
     }
 	if (socket_set_ipv6only(httpd.server, 0) == -1) {
 		dmr_log_errno("socket set ipv6only");
@@ -968,16 +912,10 @@ int init_http(void)
 	if (socket_set_reuseport(httpd.server, 1) == -1) {
 		dmr_log_errno("socket set reuseport");
     }
-	if (dmr_thread_create(httpd.thread, start_http, NULL) != dmr_thread_success) {
-		dmr_log_error("can't start thread");
-		goto bail;
-	}
 
-    return 0;
+    return start_http(io);
 
 bail:
-    TALLOC_FREE(httpd.thread);
-    TALLOC_FREE(httpd.server);
-    TALLOC_FREE(httpd.client);
+    dmr_free(httpd.server);
     return -1;
 }

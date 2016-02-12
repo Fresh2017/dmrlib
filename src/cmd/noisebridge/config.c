@@ -11,6 +11,7 @@
 #include "common/byte.h"
 #include "common/format.h"
 #include "common/scan.h"
+#include "common/serial.h"
 
 #if defined(DMR_HAVE_NETDB_H)
 #include <netdb.h>
@@ -280,6 +281,7 @@ int read_config_mmdvm(char *line, char *filename, size_t lineno)
     }
     dmr_log_debug("noisebridge: config %s = \"%s\"", k, v);
     CONFIG_STR(proto, "name", proto->name)
+    else CONFIG_INT(proto, "color_code", proto->settings.mmdvm.color_code)
     else CONFIG_INT(proto, "rx_freq", proto->settings.mmdvm.rx_freq)
     else CONFIG_INT(proto, "tx_freq", proto->settings.mmdvm.tx_freq)
     else if (!strcmp(k, "port")) {
@@ -418,6 +420,7 @@ int read_config(char *line, char *filename, size_t lineno)
             config->proto[config->protos]->type = DMR_PROTOCOL_MMDVM;
             config->proto[config->protos]->settings.mmdvm.baud = DMR_MMDVM_BAUD;
             config->proto[config->protos]->settings.mmdvm.model = DMR_MMDVM_MODEL_G4KLX;
+            config->proto[config->protos]->settings.mmdvm.color_code = 1;
             config->protos++;
             return 0;
         }

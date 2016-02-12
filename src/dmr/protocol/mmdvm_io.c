@@ -9,7 +9,7 @@
 
 DMR_PRV static int mmdvm_io_status_timer(dmr_io *io, void *mmdvmptr);
 DMR_PRV static int mmdvm_io_readable(dmr_io *io, void *mmdvmptr, int fd);
-DMR_PRV static int mmdvm_io_writable(dmr_io *io, void *mmdvmptr, int fd);
+//DMR_PRV static int mmdvm_io_writable(dmr_io *io, void *mmdvmptr, int fd);
 DMR_PRV static int mmdvm_io_error(dmr_io *io, void *mmdvmptr, int fd);
 
 DMR_PRV static int mmdvm_io_init(dmr_io *io, void *mmdvmptr)
@@ -31,6 +31,7 @@ DMR_PRV static int mmdvm_io_init(dmr_io *io, void *mmdvmptr)
     if (!mmdvm->started) {
         ret = dmr_mmdvm_start(mmdvm);
     }
+    /*
     if (ret == 0 && (mmdvm->rx_freq != 0 || mmdvm->tx_freq != 0)) {
         if (!mmdvm->ack[DMR_MMDVM_SET_RF_CONFIG]) {
             DMR_MM_DEBUG("io: no set RF config ack, retry");
@@ -41,8 +42,20 @@ DMR_PRV static int mmdvm_io_init(dmr_io *io, void *mmdvmptr)
             ret = dmr_mmdvm_set_rf_config(mmdvm, mmdvm->rx_freq, mmdvm->tx_freq);
         }
     }
+    */
 
     return ret;
+}
+
+DMR_PRV static int mmdvm_io_stop(dmr_io *io, dmr_mmdvm *mmdvm, int fd)
+{
+    DMR_UNUSED(mmdvm);
+
+    /* unregister events */
+    dmr_io_del_read (io, fd, mmdvm_io_readable);
+    dmr_io_del_error(io, fd, mmdvm_io_error);
+
+    return 0;
 }
 
 DMR_PRV static int mmdvm_io_register(dmr_io *io, void *mmdvmptr)
@@ -57,12 +70,12 @@ DMR_PRV static int mmdvm_io_register(dmr_io *io, void *mmdvmptr)
     serial_t *serial = (serial_t *)mmdvm->serial;
 
     /* poll the modem status every second */
-    struct timeval status_timer = { 1, 0 };
+    //struct timeval status_timer = { 3, 0 };
     
     /* register events */
-    dmr_io_reg_timer(io, status_timer, mmdvm_io_status_timer, mmdvm, false);
+    (void)mmdvm_io_status_timer;
+    //dmr_io_reg_timer(io, status_timer, mmdvm_io_status_timer, mmdvm, false);
     dmr_io_reg_read (io, serial->fd,   mmdvm_io_readable,     mmdvm, false);
-    dmr_io_reg_write(io, serial->fd,   mmdvm_io_writable,     mmdvm, false);
     dmr_io_reg_error(io, serial->fd,   mmdvm_io_error,        mmdvm, false);
 
     return 0;
@@ -117,19 +130,6 @@ DMR_PRV static int mmdvm_io_readable(dmr_io *io, void *mmdvmptr, int fd)
     return ret;
 }
 
-DMR_PRV static int mmdvm_io_writable(dmr_io *io, void *mmdvmptr, int fd)
-{
-    DMR_UNUSED(fd);
-    DMR_ERROR_IF_NULL(io, DMR_EINVAL);
-    DMR_ERROR_IF_NULL(mmdvmptr, DMR_EINVAL);
-
-    dmr_mmdvm *mmdvm = (dmr_mmdvm *)mmdvmptr;
-
-    DMR_MM_TRACE("io: writable");
-
-    return dmr_mmdvm_write(mmdvm);
-}
-
 DMR_PRV static int mmdvm_io_error(dmr_io *io, void *mmdvmptr, int fd)
 {
     DMR_UNUSED(fd);
@@ -141,7 +141,9 @@ DMR_PRV static int mmdvm_io_error(dmr_io *io, void *mmdvmptr, int fd)
     DMR_MM_TRACE("io: error");
 
     DMR_MM_FATAL("io: serial error");
-    return dmr_mmdvm_close(mmdvm);
+    dmr_mmdvm_close(mmdvm);
+
+    return mmdvm_io_stop(io, mmdvm, fd);
 }
 
 DMR_API dmr_protocol dmr_mmdvm_protocol = {

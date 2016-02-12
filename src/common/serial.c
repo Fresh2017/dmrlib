@@ -378,7 +378,7 @@ int serial_find(const char *identifier, char **found)
     char *token = NULL;
     char *arg   = NULL;
     char *val   = NULL;
-    size_t i, len;
+    size_t i;
     int ret;
     struct find_port find;
     byte_zero(&find, sizeof find);

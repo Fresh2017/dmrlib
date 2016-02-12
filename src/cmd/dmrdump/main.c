@@ -18,7 +18,7 @@
 
 #include <dmr.h>
 #include <dmr/log.h>
-#include <dmr/proto/homebrew.h>
+#include <dmr/protocol/homebrew.h>
 #include <dmr/fec.h>
 
 #define ETHER_TYPE_IP (0x0800)
@@ -75,50 +75,11 @@ void usage(const char *program)
     fprintf(stderr, "\t-q\tDecrease verbosity.\n");
 }
 
-void dump_dmr_packet(dmr_packet_t *packet)
+void dump_dmr_packet(dmr_parsed_packet *packet)
 {
-    dmr_sync_pattern_t sync_pattern;
-    dmr_emb_t emb;
-
-    printf("[ts%d][%u->%u(%u)][%02x/%08x] %s",
-        packet->ts + 1,
-        packet->src_id, packet->dst_id,
-        packet->repeater_id,
-        packet->meta.sequence,
-        packet->meta.stream_id,
-        dmr_data_type_name(packet->data_type));
-
-    sync_pattern = dmr_sync_pattern_decode(packet);
-    if (sync_pattern != DMR_SYNC_PATTERN_UNKNOWN) {
-        printf(", sync pattern: %s\n", dmr_sync_pattern_name(sync_pattern));
-    } else if (packet->data_type == DMR_DATA_TYPE_VOICE) {
-        printf(", frame %c\n", 'A' + packet->meta.voice_frame);
-    } else {
-        putchar('\n');
-    }
-
-    dmr_dump_packet(packet);
-
-    /* For data types that have slot type encoding, try decoding on a test packet. */
-    if (packet->data_type == DMR_DATA_TYPE_VOICE_PI           ||
-        packet->data_type == DMR_DATA_TYPE_VOICE_LC           ||
-        packet->data_type == DMR_DATA_TYPE_TERMINATOR_WITH_LC ||
-        packet->data_type == DMR_DATA_TYPE_CSBK               ||
-        packet->data_type == DMR_DATA_TYPE_MBC_HEADER         ||
-        packet->data_type == DMR_DATA_TYPE_MBC_CONTINUATION   ||
-        packet->data_type == DMR_DATA_TYPE_DATA_HEADER        ||
-        packet->data_type == DMR_DATA_TYPE_RATE12_DATA        ||
-        packet->data_type == DMR_DATA_TYPE_RATE34_DATA        ||
-        packet->data_type == DMR_DATA_TYPE_IDLE) {
-        dmr_packet_t test_packet;
-        memcpy(&test_packet, packet, sizeof(dmr_packet_t));
-        dmr_slot_type_decode(&test_packet);
-        if (packet->data_type != test_packet.data_type) {
-            dmr_log_error("packet: data type mismatch!!!, protocol said %s (%d), but we decoded %s (%d)",
-                dmr_data_type_name(packet->data_type), packet->data_type,
-                dmr_data_type_name(test_packet.data_type), test_packet.data_type);
-        }
-    }
+    dmr_dump_parsed_packet(packet);
+    //dmr_sync_pattern sync_pattern;
+    dmr_emb emb;
 
     switch (packet->data_type) {
     /*
@@ -144,8 +105,8 @@ void dump_dmr_packet(dmr_packet_t *packet)
 
     case DMR_DATA_TYPE_VOICE_LC:
     {
-        dmr_full_lc_t full_lc;
-        if (dmr_full_lc_decode(&full_lc, packet) != 0) {
+        dmr_full_lc full_lc;
+        if (dmr_full_lc_decode(packet->packet, &full_lc, packet->data_type) != 0) {
             fprintf(stderr, "full LC decode failed: %s\n", dmr_error_get());
             return;
         }
@@ -154,14 +115,14 @@ void dump_dmr_packet(dmr_packet_t *packet)
             DMR_LOG_BOOL(full_lc.pf),
             dmr_fid_name(full_lc.fid), full_lc.fid,
             full_lc.src_id, full_lc.dst_id);
-        dmr_dump_hex(&full_lc, sizeof(dmr_full_lc_t));
-        dmr_packet_t debug;
-        memcpy(&debug, packet, sizeof(dmr_packet_t));
-        if (dmr_full_lc_encode(&full_lc, &debug) != 0) {
+        dmr_dump_hex(&full_lc, sizeof(dmr_full_lc));
+        dmr_packet debug;
+        memcpy(&debug, packet->packet, sizeof(dmr_packet));
+        if (dmr_full_lc_encode(debug, &full_lc, packet->data_type) != 0) {
             fprintf(stderr, "full LC encode failed: %s\n", dmr_error_get());
             return;
         }
-        dmr_dump_packet(&debug);
+        dmr_dump_packet(debug);
         printf("full LC: flco=%s (%d), pf=%s, fid=%s (%d), %u->%u\n",
             dmr_flco_pdu_name(full_lc.flco_pdu), full_lc.flco_pdu,
             DMR_LOG_BOOL(full_lc.pf),
@@ -176,7 +137,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
     case DMR_DATA_TYPE_VOICE:
     {
         // Frame should contain embedded signalling.
-        if (dmr_emb_decode(&emb, packet) != 0) {
+        if (dmr_emb_decode(packet->packet, &emb) != 0) {
             fprintf(stderr, "embedded signalling decode failed: %s\n", dmr_error_get());
             return;
         }
@@ -189,7 +150,7 @@ void dump_dmr_packet(dmr_packet_t *packet)
         {
             printf(", single fragment");
             uint8_t bytes[4];
-            if (dmr_emb_bytes_decode(bytes, packet) != 0) {
+            if (dmr_emb_bytes_decode(packet->packet, bytes) != 0) {
                 printf(", bytes decode failed: %s\n", dmr_error_get());
                 return;
             }
@@ -220,45 +181,27 @@ void dump_dmr_packet(dmr_packet_t *packet)
     }
 }
 
-void dump_homebrew(struct my_ip *ip_hdr, struct my_udpheader *udp, const uint8_t *bytes, unsigned int len)
+void dump_homebrew(struct my_ip *ip_hdr, struct my_udpheader *udp, uint8_t *bytes, unsigned int len)
 {
-    dmr_packet_t *packet;
-    dmr_homebrew_frame_type_t frame_type = dmr_homebrew_dump((uint8_t *)bytes, len);
+    dmr_homebrew homebrew;
+    dmr_raw raw;
+    raw.buf = bytes;
+    raw.len = len;
 
     printf("%s:%d->%s:%d (%u bytes), ",
         inet_ntoa(ip_hdr->ip_src), ntohs(udp->uh_sport),
         inet_ntoa(ip_hdr->ip_dst), ntohs(udp->uh_dport),
         len);
 
-    switch (frame_type) {
-    case DMR_HOMEBREW_DMR_DATA_FRAME:
-    {
-        printf("DMR data frame\n");
-        packet = dmr_homebrew_parse_packet(bytes, len);
-        if (packet == NULL) {
-            fprintf(stderr, "failed to parse frame: %s\n", dmr_error_get());
-            return;
-        }
+    dmr_parsed_packet *packet = NULL;
+    if (dmr_homebrew_parse_dmrd(&homebrew, &raw, &packet) != 0) {
+        fprintf(stderr, "failed to parse frame: %s", dmr_error_get());
+        return;
+    }
+    if (packet == NULL)
+        return;
 
-        dump_dmr_packet(packet);
-        if (packet != NULL)
-            talloc_free(packet);
-        break;
-    }
-    case DMR_HOMEBREW_INVALID:
-    {
-        printf("\x1b[1;31mnot a homebrew frame frame:\x1b[0m\n");
-        dmr_dump_hex((void *)bytes, len);
-        break;
-    }
-    default:
-        printf("\x1b[1;31munknown frame:\x1b[0m\n");
-        dmr_dump_hex((void *)bytes, len);
-        break;
-    }
-    printf("\n");
-    fflush(stdout);
-    fflush(stderr);
+    dump_dmr_packet(packet);
 }
 
 int main(int argc, char **argv)

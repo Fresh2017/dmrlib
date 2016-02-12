@@ -90,16 +90,26 @@ struct dmr_io {
 #include <dmr/protocol.h>
 
 extern dmr_io * dmr_io_new(void);
-extern int      dmr_io_add_protocol(dmr_io *io, dmr_protocol protocol, void *instance);
-extern int      dmr_io_free(dmr_io *io);
-extern int      dmr_io_loop(dmr_io *io);
-extern int      dmr_io_close(dmr_io *io);
-extern int      dmr_io_reg_signal(dmr_io *io, int signal, dmr_signal_cb cb, void *userdata, bool once);
-extern int      dmr_io_reg_read(dmr_io *io, int fd, dmr_read_cb cb, void *userdata, bool once);
-extern int      dmr_io_reg_write(dmr_io *io, int fd, dmr_write_cb cb, void *userdata, bool once);
-extern int      dmr_io_reg_error(dmr_io *io, int fd, dmr_error_cb cb, void *userdata, bool once);
-extern int      dmr_io_reg_timer(dmr_io *io, struct timeval timeout, dmr_timer_cb cb, void *userdata, bool once);
-extern int      dmr_io_reg_close(dmr_io *io, dmr_close_cb cb, void *userdata);
+extern int dmr_io_add_protocol(dmr_io *io, dmr_protocol protocol, void *instance);
+extern int dmr_io_free(dmr_io *io);
+extern int dmr_io_loop(dmr_io *io);
+extern int dmr_io_close(dmr_io *io);
+
+extern int dmr_io_reg_signal(dmr_io *io, int signal, dmr_signal_cb cb, void *userdata, bool once);
+
+extern int dmr_io_reg_read(dmr_io *io, int fd, dmr_read_cb cb, void *userdata, bool once);
+extern int dmr_io_del_read(dmr_io *io, int fd, dmr_read_cb cb);
+
+extern int dmr_io_reg_write(dmr_io *io, int fd, dmr_write_cb cb, void *userdata, bool once);
+extern int dmr_io_del_write(dmr_io *io, int fd, dmr_write_cb cb);
+
+extern int dmr_io_reg_error(dmr_io *io, int fd, dmr_error_cb cb, void *userdata, bool once);
+extern int dmr_io_del_error(dmr_io *io, int fd, dmr_error_cb cb);
+
+extern int dmr_io_reg_timer(dmr_io *io, struct timeval timeout, dmr_timer_cb cb, void *userdata, bool once);
+extern int dmr_io_del_timer(dmr_io *io, dmr_timer_cb cb);
+
+extern int dmr_io_reg_close(dmr_io *io, dmr_close_cb cb, void *userdata);
 
 /* Unexport private data */
 #undef REQUEST_FIELDS

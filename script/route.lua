@@ -6,31 +6,46 @@ function route(src, dst, packet)
     end
 
     log.debug("route.lua: "
-        ..proto_name(src.type).."("..src.name..")->"
-        ..proto_name(dst.type).."("..dst.name..")")
+        ..protocol_name(src.type).."("..src.name..")->"
+        ..protocol_name(dst.type).."("..dst.name.."): "
+        ..packet.src_id.."->"..packet.dst_id)
 
-    -- Same proto is denied
+    -- Same protocol is denied
     if src.name == dst.name then
         -- Reject
         return false
     end
 
-    -- All frames to the MMDVM modem should go unmodified
-    if dst.type == PROTO_MMDVM then
+    -- All frames to the MMDVM modem
+    if dst.type == PROTOCOL_MMDVM then
+        local modified = false
+
+        -- if packet.ts == TS1 then
+        --     log.debug("route.lua: redirect to TS2")
+        --     packet.ts = TS2
+        --     modified = true
+        -- end
+
         if packet.src_id == 0 then
+            log.debug("route.lua: setting color code")
             packet.color_code = 1
-            packet.ts = TS2
+            modified = true
+        end
+
+        if modified then
+            log.debug("route.lua: modified packet to MMDVM")
             return packet
         end
 
         -- Permit unmodified
+        log.debug("route.lua: permit unmodified to MMDVM")
         return true
     end
 
     -- Frames from MMDVM to Homebrew may need correcting
-    if src.type == PROTO_MMDVM and dst.type == PROTO_HOMEBREW then
+    if src.type == PROTOCOL_MMDVM and dst.type == PROTOCOL_HOMEBREW then
         -- Retrieve Homebrew config
-        local cfg = proto_config(dst)
+        local cfg = protocol_config(dst)
 
         -- Always update repeater ID
         packet.repeater_id = cfg.repeater_id
@@ -56,4 +71,4 @@ function route(src, dst, packet)
     return true
 end
 
-io.write(proto_name(PROTO_HOMEBREW))
+io.write(protocol_name(PROTOCOL_HOMEBREW))

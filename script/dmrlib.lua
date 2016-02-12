@@ -20,40 +20,39 @@ DATA_TYPE_SYNC_VOICE         = 0x20
 DATA_TYPE_VOICE_SYNC         = 0xf0
 DATA_TYPE_VOICE              = 0xf1
 
--- defined in dmr/proto.h
-PROTO_UNKNOWN  = 0x00
-PROTO_HOMEBREW = 0x01
-PROTO_MMDVM    = 0x10
-PROTO_MBE      = 0x20
-PROTO_REPEATER = 0xf0
-PROTO_SMS      = 0xf1
+-- defined in dmr/protocol.h
+PROTOCOL_UNKNOWN  = 0x00
+PROTOCOL_HOMEBREW = 0x01
+PROTOCOL_MMDVM    = 0x40
+PROTOCOL_MBE      = 0xf0
+PROTOCOL_SMS      = 0xf1
 
 -- helper functions
-local protos   = {
-    {proto = PROTO_UNKNOWN,  name = "unknown"},
-    {proto = PROTO_HOMEBREW, name = "homebrew"},
-    {proto = PROTO_MMDVM,    name = "mmdvm"},
-    {proto = PROTO_MBE,      name = "mbe"},
-    {proto = PROTO_REPEATER, name = "repeater"},
-    {proto = PROTO_SMS,      name = "sms"},
+local protocols   = {
+    {protocol = PROTOCOL_UNKNOWN,  name = "unknown"},
+    {protocol = PROTOCOL_HOMEBREW, name = "homebrew"},
+    {protocol = PROTOCOL_MMDVM,    name = "mmdvm"},
+    {protocol = PROTOCOL_MBE,      name = "mbe"},
+    {protocol = PROTOCOL_REPEATER, name = "repeater"},
+    {protocol = PROTOCOL_SMS,      name = "sms"},
 }
 
-function proto_name(proto_type)
-    for i = 1, #protos do
-        if protos[i].proto == proto_type then
-            return protos[i].name
+function protocol_name(protocol_type)
+    for i = 1, #protocols do
+        if protocols[i].protocol == protocol_type then
+            return protocols[i].name
         end
     end
     return "?"
 end
 
-function proto_config(proto)
+function protocol_config(protocol)
     for i = 1, #config do
         -- log.debug("dmrlib.lua: iterate " .. tostring(i) .. ": " .. config[i].name)
-        if config[i].name == proto.name then
+        if config[i].name == protocol.name then
             return config[i]
         end
     end
-    log.error("dmrlib.lua: no config found for proto " .. proto.name)
+    log.error("dmrlib.lua: no config found for protocol " .. protocol.name)
     return nil
 end

@@ -112,6 +112,7 @@ typedef struct {
     char              *port;
     int               baud;
     dmr_mmdvm_model   model;
+    dmr_color_code    color_code;
     /* these come from the modem */
     int               protocol_version;
     char              *description;
@@ -141,7 +142,7 @@ extern const char *dmr_mmdvm_reason_name(dmr_mmdvm_reason reason);
 extern const char *dmr_mmdvm_model_name(dmr_mmdvm_model model);
 
 /** Setup serial communications with an MMDVM modem. */
-extern dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model model);
+extern dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model model, dmr_color_code color_code);
 
 /** Start serial communications with an MMDVM modem. */
 extern int dmr_mmdvm_start(dmr_mmdvm *mmdvm);
@@ -164,10 +165,13 @@ extern int dmr_mmdvm_get_status(dmr_mmdvm *mmdvm);
 extern int dmr_mmdvm_get_version(dmr_mmdvm *mmdvm);
 
 /** Send configuration to the modem. */
-extern int dmr_mmdvm_set_config(dmr_mmdvm *mmdvm, uint8_t invert, uint8_t mode, uint8_t delay_ms, dmr_mmdvm_state state, uint8_t rx_level, uint8_t tx_level);
+extern int dmr_mmdvm_set_config(dmr_mmdvm *mmdvm, uint8_t invert, uint8_t mode, uint8_t delay_ms, dmr_mmdvm_state state, uint8_t rx_level, uint8_t tx_level, dmr_color_code color_code);
 
 /** Tune the modem to a frequency in Hz. */
 extern int dmr_mmdvm_set_rf_config(dmr_mmdvm *mmdvm, uint32_t rx_freq, uint32_t tx_freq);
+
+/** Set modem mode. */
+extern int dmr_mmdvm_set_mode(dmr_mmdvm *mmdvm, dmr_mmdvm_mode mode);
 
 /** Send a DMR frame to the modem. */
 extern int dmr_mmdvm_send(dmr_mmdvm *mmdvm, dmr_parsed_packet *packet);
@@ -200,6 +204,8 @@ extern dmr_protocol dmr_mmdvm_protocol;
 
 #if defined(DMR_TRACE)
 #define DMR_MM_TRACE(fmt,...) dmr_log_trace("%s: "fmt, mmdvm->id, ##__VA_ARGS__)
+#else
+#define DMR_MM_TRACE(fmt,...)
 #endif
 #if defined(DMR_DEBUG)
 #define DMR_MM_DEBUG(fmt,...) dmr_log_debug("%s: "fmt, mmdvm->id, ##__VA_ARGS__)

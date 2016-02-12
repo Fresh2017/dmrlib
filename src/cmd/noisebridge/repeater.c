@@ -141,14 +141,61 @@ bail:
     }
 }
 
-static void end_voice_call(dmr_parsed_packet *packet);
+int slot_timer(dmr_io *io, void *unused)
+{
+    DMR_UNUSED(io);
+    DMR_UNUSED(unused);
+
+    config_t *config = load_config();
+    dmr_ts ts;
+    for (ts = 0; ts < DMR_TS_INVALID; ts++) {
+        repeater_slot_t *rts = &repeater->ts[ts];
+
+        if (rts->state == STATE_IDLE)
+            continue;
+
+        struct timeval delta;
+        timersub(&io->wallclock, &rts->last_frame_received, &delta);
+        uint32_t ms = dmr_time_ms_since(delta);
+        if (ms > config->repeater.timeout) {
+            dmr_log_info("noisebridge: timeout on %s after %ums",
+                dmr_ts_name(ts), ms);
+            rts->state = STATE_IDLE;
+        }
+    }
+
+    return 0;
+}
+
+static void end_io_timer(void)
+{
+    /* Cancel high resolution slot timeout timer. */
+    dmr_io_del_timer(repeater->io, slot_timer);
+}
+
+static void new_io_timer(void)
+{
+    config_t *config = load_config();
+
+    /* Timeouts on timeslots */
+    struct timeval slottimeout;
+    slottimeout.tv_sec = (config->repeater.timeout / 1000);
+    slottimeout.tv_usec = ((config->repeater.timeout % 1000) * 1000);
+
+    /* Register timer */
+    dmr_io_reg_timer(repeater->io, slottimeout, slot_timer, NULL, false);
+}
+
+static void end_voice_call(dmr_parsed_packet *packet, bool kill_timer);
 
 static void new_data_call(dmr_parsed_packet *parsed)
 {
     dmr_ts ts = parsed->ts;
     repeater_slot_t *rts = &repeater->ts[ts];
     if (rts->state == STATE_VOICE_CALL)
-        end_voice_call(parsed);
+        end_voice_call(parsed, false);
+    else
+        new_io_timer();
 
     rts->state = STATE_DATA_CALL;
 
@@ -161,11 +208,14 @@ static void new_data_call(dmr_parsed_packet *parsed)
         parsed->flco, parsed->repeater_id);
 }
 
-static void end_data_call(dmr_parsed_packet *parsed)
+static void end_data_call(dmr_parsed_packet *parsed, bool kill_timer)
 {
     dmr_ts ts = parsed->ts;
     repeater_slot_t *rts = &repeater->ts[ts];
     rts->state = STATE_IDLE;
+
+    if (kill_timer)
+        end_io_timer();
 
     const char *src_name = dmr_id_name(parsed->src_id);
     const char *dst_name = dmr_id_name(parsed->dst_id);
@@ -181,7 +231,9 @@ static void new_voice_call(dmr_parsed_packet *parsed)
     dmr_ts ts = parsed->ts;
     repeater_slot_t *rts = &repeater->ts[ts];
     if (rts->state == STATE_DATA_CALL)
-        end_data_call(parsed);
+        end_data_call(parsed, false);
+    else
+        new_io_timer();
 
     rts->state = STATE_VOICE_CALL;
 
@@ -194,11 +246,14 @@ static void new_voice_call(dmr_parsed_packet *parsed)
         parsed->flco, parsed->repeater_id);
 }
 
-static void end_voice_call(dmr_parsed_packet *parsed)
+static void end_voice_call(dmr_parsed_packet *parsed, bool kill_timer)
 {
     dmr_ts ts = parsed->ts;
     repeater_slot_t *rts = &repeater->ts[ts];
     rts->state = STATE_IDLE;
+
+    if (kill_timer)
+        end_io_timer();
 
     const char *src_name = dmr_id_name(parsed->src_id);
     const char *dst_name = dmr_id_name(parsed->dst_id);
@@ -261,7 +316,7 @@ int push_proto(proto_t *src, dmr_parsed_packet *parsed)
         case DMR_DATA_TYPE_VOICE_PI:
         case DMR_DATA_TYPE_VOICE_LC:
         case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-            end_data_call(parsed);
+            end_data_call(parsed, true);
             break;
 
         default:
@@ -284,7 +339,7 @@ int push_proto(proto_t *src, dmr_parsed_packet *parsed)
             break;
 
         case DMR_DATA_TYPE_TERMINATOR_WITH_LC:
-            end_voice_call(parsed);
+            end_voice_call(parsed, true);
             break;
 
         default:
@@ -474,7 +529,8 @@ int init_proto_mmdvm(config_t *config, proto_t *proto)
     dmr_mmdvm *mmdvm = dmr_mmdvm_new(
         proto->settings.mmdvm.port,
         proto->settings.mmdvm.baud,
-        proto->settings.mmdvm.model);
+        proto->settings.mmdvm.model,
+        proto->settings.mmdvm.color_code);
 
     mmdvm->rx_freq = proto->settings.mmdvm.rx_freq;
     mmdvm->tx_freq = proto->settings.mmdvm.tx_freq;
@@ -503,32 +559,6 @@ int stop_repeater(dmr_io *io, void *unused, int sig)
     return dmr_io_close(io);
 }
 
-int slot_timer(dmr_io *io, void *unused)
-{
-    DMR_UNUSED(io);
-    DMR_UNUSED(unused);
-
-    config_t *config = load_config();
-    dmr_ts ts;
-    for (ts = 0; ts < DMR_TS_INVALID; ts++) {
-        repeater_slot_t *rts = &repeater->ts[ts];
-
-        if (rts->state == STATE_IDLE)
-            continue;
-
-        struct timeval delta;
-        timersub(&io->wallclock, &rts->last_frame_received, &delta);
-        uint32_t ms = dmr_time_ms_since(delta);
-        if (ms > config->repeater.timeout) {
-            dmr_log_info("noisebridge: timeout on %s after %ums",
-                dmr_ts_name(ts), ms);
-            rts->state = STATE_IDLE;
-        }
-    }
-
-    return 0;
-}
-
 int init_repeater(void)
 {
     int ret = 0;
@@ -545,18 +575,12 @@ int init_repeater(void)
         goto bail;
     }
 
-    /* Timeouts on timeslots */
-    struct timeval slottimeout;
-    slottimeout.tv_sec = (config->repeater.timeout / 1000);
-    slottimeout.tv_usec = ((config->repeater.timeout % 1000) * 1000);
-    dmr_io_reg_timer(repeater->io, slottimeout, slot_timer, NULL, false);
-
     /* Close repeater on SIGINT (^C) */
     dmr_io_reg_signal(repeater->io, SIGINT, stop_repeater, NULL, true);
 
-    /* Default timeout: duration of one DMR frame on-air */
-    repeater->io->timeout.tv_sec = 0;
-    repeater->io->timeout.tv_usec = 30 * 1000;
+    /* Default timeout */
+    repeater->io->timeout.tv_sec = 1;
+    repeater->io->timeout.tv_usec = 0;
 
     dmr_log_debug("noisebridge: init repeater");
 
@@ -615,6 +639,11 @@ int loop_repeater(void)
 {
     int ret = 0;
     config_t *config = load_config();
+
+    if ((ret = init_http(repeater->io)) != 0) {
+        dmr_log_critical("noisebridge: http return error");
+        return ret;
+    }
 
     dmr_log_info("noisebridge: running repeater");
     if ((ret = dmr_io_loop(repeater->io)) != 0) {

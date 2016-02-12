@@ -47,9 +47,10 @@ void trim(char *str)
     ltrim(str);
 }
 
-#define CONFIG_ERROR(x,...) \
+#define CONFIG_ERROR(x,...) do { \
     dmr_log_error("noisebridge: %s[%zu]: " x, filename, lineno, ##__VA_ARGS__); \
-    return dmr_error(DMR_EINVAL)
+    return dmr_error(DMR_EINVAL); \
+} while(0)
 
 #define CONFIG_STR(_b, _m, _t) \
 if (!strcmp(k, _m)) { \
@@ -279,10 +280,16 @@ int read_config_mmdvm(char *line, char *filename, size_t lineno)
     }
     dmr_log_debug("noisebridge: config %s = \"%s\"", k, v);
     CONFIG_STR(proto, "name", proto->name)
-    else CONFIG_STR(proto, "port", proto->settings.mmdvm.port)
     else CONFIG_INT(proto, "rx_freq", proto->settings.mmdvm.rx_freq)
     else CONFIG_INT(proto, "tx_freq", proto->settings.mmdvm.tx_freq)
-    else if (!strcmp(k, "model")) {
+    else if (!strcmp(k, "port")) {
+        if (v[0] == '/' || !strcmp(v, "COM")) {
+            proto->settings.mmdvm.port = talloc_strdup(proto, v);
+        } else {
+            if (serial_find(v, &proto->settings.mmdvm.port) != 0)
+                CONFIG_ERROR("error finding port %s: %s", v, strerror(errno));
+        }
+    } else if (!strcmp(k, "model")) {
         if (!strcmp(v, "generic")) {
             proto->settings.mmdvm.model = DMR_MMDVM_MODEL_G4KLX;
         } else if (!strcmp(v, "g4klx")) {
@@ -292,8 +299,7 @@ int read_config_mmdvm(char *line, char *filename, size_t lineno)
         } else {
             CONFIG_ERROR("unknown MMDVM model \"%s\"", v);
         }
-    }
-    else {
+    } else {
         CONFIG_ERROR("unknown key \"%s\"", k);
     }
     return 0;

@@ -29,6 +29,7 @@ typedef enum {
     DMR_MMDVM_SET_CONFIG    	= 0x02,
     DMR_MMDVM_SET_MODE      	= 0x03,
     DMR_MMDVM_SET_RF_CONFIG 	= 0x04,
+    DMR_MMDVM_SET_MAX           = 0x0f,
 
     DMR_MMDVM_DSTAR_HEADER  	= 0x10,
     DMR_MMDVM_DSTAR_DATA    	= 0x11,
@@ -104,28 +105,34 @@ typedef enum {
     DMR_MMDVM_INVERT_TRANSMIT
 } dmr_mmdvm_invert;
 
+#define DMR_MMDVM_ACK_BUF_MAX 0xff
+
 typedef struct {
-    char             *id;               /* ident */
-    char             *port;
-    int              baud;
-    dmr_mmdvm_model  model;
+    char              *id;               /* ident */
+    char              *port;
+    int               baud;
+    dmr_mmdvm_model   model;
     /* these come from the modem */
-    int              protocol_version;
-    char             *description;
-    uint8_t          modes;
-    uint8_t          status;
-    uint8_t          buffer_size[4];     /* see dmr_mmdvm_bufsize for offsets */
-    uint32_t         rx_freq, tx_freq;
-    bool             rx_on, tx_on;
+    int               protocol_version;
+    char              *description;
+    uint8_t           modes;
+    uint8_t           status;
+    uint8_t           buffer_size[4];     /* see dmr_mmdvm_bufsize for offsets */
+    uint32_t          rx_freq, tx_freq;
+    bool              rx_on, tx_on;
     /* private */
-    uint32_t         sent;               /* sent DMR frame counter */
-    bool             started;
-    void             *serial;            /* internal serial struct */
-    dmr_packetq      *rxq;               /* packets received from the modem */
-    dmr_packetq      *txq;               /* packets to be transmitted by the modem */
-    dmr_mmdvm_frame  frame;              /* raw frame currently being decoded */
-    dmr_rawq         *trq;               /* raw frame to be transmitted to the modem */
-    size_t           pos;
+    uint32_t          sent;               /* sent DMR frame counter */
+    volatile bool     ack[DMR_MMDVM_SET_MAX]; /* ack buffer for set commands */
+    volatile uint8_t  set[DMR_MMDVM_SET_MAX]; /* set counter for set commands */
+    bool              set_rf_config_sent; /* sent RF config frame */
+    bool              set_rf_config_recv; /* received an RF config ACK/NAK */
+    bool              started;
+    void              *serial;            /* internal serial struct */
+    dmr_packetq       *rxq;               /* packets received from the modem */
+    dmr_packetq       *txq;               /* packets to be transmitted by the modem */
+    dmr_mmdvm_frame   frame;              /* raw frame currently being decoded */
+    dmr_rawq          *trq;               /* raw frame to be transmitted to the modem */
+    size_t            pos;
 } dmr_mmdvm;
 
 

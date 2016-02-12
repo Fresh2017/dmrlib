@@ -84,6 +84,26 @@ DMR_API const char *dmr_mmdvm_model_name(dmr_mmdvm_model model)
     return "unknown";
 }
 
+DMR_PRV static struct { dmr_mmdvm_state state; const char *name; } states[] = {
+    { DMR_MMDVM_STATE_IDLE,      "idle"          },
+    { DMR_MMDVM_STATE_DSTAR,     "D-STAR"        },
+    { DMR_MMDVM_STATE_DMR,       "DMR"           },
+    { DMR_MMDVM_STATE_YSF,       "System Fusion" },
+    { DMR_MMDVM_STATE_CALIBRATE, "calibration"   },
+    { 0,                         NULL            }
+};
+
+DMR_API const char *dmr_mmdvm_state_name(dmr_mmdvm_state state)
+{
+    int i;
+    for (i = 0; states[i].name != NULL; i++) {
+        if (states[i].state == state) {
+            return states[i].name;
+        }
+    }
+    return "unknown";
+}
+
 DMR_API dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model model)
 {
     DMR_MALLOC_CHECK(dmr_mmdvm, mmdvm);
@@ -122,6 +142,9 @@ DMR_API dmr_mmdvm *dmr_mmdvm_new(const char *port, int baud, dmr_mmdvm_model mod
     mmdvm->started = false;
     mmdvm->serial = serial;
     mmdvm->model = model;
+
+    /* clear ack buffer */
+    byte_zero((void *)mmdvm->ack, sizeof(mmdvm->ack));
 
     return mmdvm;
 }
@@ -193,7 +216,13 @@ DMR_API int dmr_mmdvm_parse_frame(dmr_mmdvm *mmdvm, dmr_mmdvm_frame frame, dmr_p
         mmdvm->status = frame[4];
         mmdvm->tx_on = (bool)frame[5];
         byte_copy(mmdvm->buffer_size, frame + 6, 4);
-        return 0;
+        DMR_MM_DEBUG("status: dmr=%u, state=%s, tx=%s, TS1 buf=%u, TS2 buf=%u",
+            (mmdvm->modes & DMR_MMDVM_MODE_DMR) >> 1,
+            dmr_mmdvm_state_name(mmdvm->status),
+            mmdvm->tx_on ? "on" : "off",
+            mmdvm->buffer_size[DMR_MMDVM_BUFSIZE_DMR_TS1],
+            mmdvm->buffer_size[DMR_MMDVM_BUFSIZE_DMR_TS2]);
+        break;
 
     case DMR_MMDVM_DMR_DATA1:
     case DMR_MMDVM_DMR_DATA2:
@@ -204,18 +233,28 @@ DMR_API int dmr_mmdvm_parse_frame(dmr_mmdvm *mmdvm, dmr_mmdvm_frame frame, dmr_p
         *parsed_out = parsed;
         DMR_MM_DEBUG("received DMR packet on %s %u->%u",
             dmr_ts_name(parsed->ts), parsed->src_id, parsed->dst_id);
-        return 0;
+        break;
+
+    case DMR_MMDVM_ACK:
+        DMR_MM_INFO("modem sent ACK in reply to %s",
+            dmr_mmdvm_command_name(mmdvm->frame[3]));
+        mmdvm->ack[mmdvm->frame[3]] = true;
+#if defined(DMR_DEBUG)
+        dmr_dump_hex((void *)mmdvm->ack, sizeof(mmdvm->ack));
+#endif
+        break;
 
     case DMR_MMDVM_NAK:
         DMR_MM_WARN("modem sent NAK in reply to %s, reason: %s",
             dmr_mmdvm_command_name(mmdvm->frame[3]),
             dmr_mmdvm_reason_name(mmdvm->frame[4]));
-        return 0;
+        break;
 
     default:
         DMR_MM_WARN("modem sent unknown command %#02x", frame[2]);
-        return 0;
+        break;
     }
+    return 0;
 }
 
 DMR_API int dmr_mmdvm_read(dmr_mmdvm *mmdvm, dmr_parsed_packet **parsed_out)
@@ -226,7 +265,10 @@ DMR_API int dmr_mmdvm_read(dmr_mmdvm *mmdvm, dmr_parsed_packet **parsed_out)
     size_t len = DMR_MMDVM_FRAME_MAX - mmdvm->pos;
 
 read_again:
-    if ((ret = serial_read(serial, mmdvm->frame + mmdvm->pos, len, 30)) == -1) {
+    do {
+        ret = serial_read_nonblock(serial, mmdvm->frame + mmdvm->pos, len);
+    } while (ret == -1 && (errno == EAGAIN || errno == EINTR));
+    if (ret == -1) {
         DMR_MM_ERROR("read(%s): %s", mmdvm->port, strerror(errno));
         return -1;
     }
@@ -352,7 +394,7 @@ DMR_API int dmr_mmdvm_send_raw(dmr_mmdvm *mmdvm, dmr_raw *raw)
     int ret = 0;
     size_t pos = 0;
     do {
-        ret = serial_write(serial, raw->buf + pos, raw->len - pos, 30);
+        ret = serial_write_nonblock(serial, raw->buf + pos, raw->len - pos);
         if (ret > 0) {
             pos += ret;
             DMR_MM_DEBUG("sent %u/%d", pos, raw->len);
@@ -443,6 +485,15 @@ DMR_API int dmr_mmdvm_set_rf_config(dmr_mmdvm *mmdvm, uint32_t rx_freq, uint32_t
         DMR_MM_WARN("set RF config not supported by model \"%s\"",
             dmr_mmdvm_model_name(mmdvm->model));
         return -1;
+    }
+
+    if (mmdvm->rx_freq != rx_freq || mmdvm->tx_freq != tx_freq) {
+        DMR_MM_DEBUG("reset RF config ACK state, rx %u->%u, tx %u->%u",
+            mmdvm->rx_freq, rx_freq,
+            mmdvm->tx_freq, tx_freq);
+        mmdvm->ack[DMR_MMDVM_SET_RF_CONFIG] = false;
+        mmdvm->rx_freq = rx_freq;
+        mmdvm->tx_freq = tx_freq;
     }
 
     dmr_raw *raw = dmr_raw_new(12);

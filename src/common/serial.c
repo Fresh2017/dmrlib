@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "common/serial.h"
 #include "common/debug.h"
 #include "common/platform.h"
@@ -299,6 +300,163 @@ PRIVATE int serial_open(serial_t *port, char mode)
 	}
 
 	return 0;
+}
+
+static int find_next_arg(char **save, char **arg, char **val)
+{
+    char *saveptr;
+    char *token = strtok_r(NULL, " ", save);
+
+    if (!token)
+        return 0;
+
+    *arg = strtok_r(token, "=", &saveptr);
+    if (!*arg) {
+        *val = NULL;
+        return -1;
+    }
+
+    *val = strtok_r(NULL, "", &saveptr);
+    if (!*val) {
+        return -1;
+    }
+
+    return 1;
+}
+
+struct find_port {
+    uint8_t transports;
+    const char *serial;
+    const char *product;
+    const char *manufacturer;
+};
+
+static int find_by_serial(struct find_port *find, char *val)
+{
+    size_t i, len;
+    if (val == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    len = strlen(val);
+    for (i = 0; i < len; i++) {
+        char c = val[i];
+        if (c >= 'A' && c <= 'F') {
+            c = val[i] = tolower(c);
+        }
+        if ((c < 'a' || c > 'f') && (c < '0' || c > '9')) {
+            DEBUGF("bad serial: %s (%c)", val, c);
+            errno = EINVAL;
+            return -1;
+        }
+    }
+
+    find->transports = SERIAL_TRANSPORT_USB;
+    find->serial = val;
+    return 0;
+}
+
+static int find_by_product(struct find_port *find, char *val)
+{
+    find->transports = SERIAL_TRANSPORT_USB;
+    find->product = val;
+    return 0;
+}
+
+static int find_by_manufacturer(struct find_port *find, char *val)
+{
+    find->transports = SERIAL_TRANSPORT_USB;
+    find->manufacturer = val;
+    return 0;
+}
+
+int serial_find(const char *identifier, char **found)
+{
+    char *id    = NULL;
+    char *save  = NULL;
+    char *token = NULL;
+    char *arg   = NULL;
+    char *val   = NULL;
+    size_t i, len;
+    int ret;
+    struct find_port find;
+    byte_zero(&find, sizeof find);
+    find.transports = SERIAL_TRANSPORT_NATIVE |
+                      SERIAL_TRANSPORT_USB |
+                      SERIAL_TRANSPORT_BLUETOOTH;
+ 
+    serial_t *port = NULL;
+    serial_t **ports = talloc_zero(NULL, serial_t *);
+    if (ports == NULL)
+        RETURN_ERROR(ENOMEM, "out of memory");
+
+    if (identifier == NULL || strlen(identifier) == 0)
+        RETURN_ERROR(EINVAL, "empty identifier");
+
+    id = talloc_strdup(NULL, identifier);
+    if (id == NULL) {
+        TALLOC_FREE(ports);
+        RETURN_ERROR(ENOMEM, "out of memory");
+    }
+
+    token = strtok_r(id, ":", &save);
+    if (token) {
+        if (serial_list(&ports) != 0) {
+            fprintf(stderr, "serial port iteration failed: %s\n", strerror(errno));
+            TALLOC_FREE(ports);
+            RETURN_ERROR(errno, "iteration failed");
+        }
+        
+        ret = 0;
+        while (ret == 0 && find_next_arg(&save, &arg, &val) == 1) {
+            if (!strcmp("serial", arg)) {
+                ret = find_by_serial(&find, val);
+            } else if (!strcmp("product", arg)) {
+                ret = find_by_product(&find, val);
+            } else if (!strcmp("manufacturer", arg)) {
+                ret = find_by_manufacturer(&find, val);
+            } else {
+                ret = -1;
+                errno = EINVAL;
+            }               
+        }
+
+        ret = -1;
+        for (i = 0; ports[i] != NULL; i++) {
+            port = ports[i];
+
+            if ((find.transports & serial_transport(port)) == 0)
+                continue;
+            if (find.serial) {
+                val = serial_usb_serial(port);
+                if (val == NULL || strcmp(find.serial, val))
+                    continue;
+            }
+            if (find.product) {
+                val = serial_usb_product(port);
+                if (val == NULL || strcmp(find.product, val))
+                    continue;
+            }
+            if (find.manufacturer) {
+                val = serial_usb_manufacturer(port);
+                if (val == NULL || strcmp(find.manufacturer, val))
+                    continue;
+            }
+
+            /* all criteria match */
+            ret = 0;
+            errno = 0;
+            *found = talloc_strdup(NULL, serial_name(port));
+            break;
+        }
+    } else {
+        ret = -1;
+        errno = EINVAL;
+    }
+
+    TALLOC_FREE(ports);
+    RETURN_CODEVAL(ret);
 }
 
 PRIVATE int serial_by_name(const char *portname, serial_t **port_ptr)

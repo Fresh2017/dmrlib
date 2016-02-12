@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "common/config.h"
 #include "common/platform.h"
 #include "common/serial.h"
@@ -15,7 +16,7 @@ PRIVATE int serial_details(serial_t *port)
 	char sub_dir[32] = "", file_name[PATH_MAX];
 	char *ptr, *dev = port->name + 5;
 	FILE *file;
-	int i, count;
+	int i, j, count, len;
 	struct stat statbuf;
 
     if (strncmp(port->name, "/dev/", 5)) {
@@ -128,6 +129,10 @@ PRIVATE int serial_details(serial_t *port)
 					if (ptr >= serial && *ptr == '\n')
 						*ptr = 0;
 					port->usb_serial = strdup(serial);
+                    len = strlen(port->usb_serial);
+                    for (i = 0; i < len; i++) {
+                        port->usb_serial[i] = tolower(port->usb_serial[i]);
+                    }
 				}
 				fclose(file);
 			}

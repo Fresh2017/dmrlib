@@ -9,7 +9,7 @@ env:
     - CONFIGURE_ARGS=""
     - CFLAGS=-Iinstall/lua/include
     - LDFLAGS=-Linstall/lua/lib
-    - MAKE_TEST=1
+    - MAKE_TEST=0
     - LUA=x
     - LUAROCKS=2.3.0
     - OSX=x

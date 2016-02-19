@@ -103,7 +103,7 @@ CFLAGS  += -O2
 LDFLAGS ?= {{ LDFLAGS|join(" ") }}
 LDFLAGS += -L. {% for path in LIBPATH %}-L{{ path }} {% endfor %}
 
-COMMON_SOURCES 		 = $(wildcard src/common/**/*.c src/common/*.c)
+COMMON_SOURCES 		 = $(wildcard common/**/*.c common/*.c common/*/{{ env.PLATFORM }}.c)
 COMMON_OBJECTS 		 = $(patsubst %.c,%.o,$(COMMON_SOURCES))
 COMMON_DEPS 		 = $(patsubst %.c,%.d,$(COMMON_SOURCES))
 COMMON_CFLAGS 		 = $(CFLAGS)
@@ -223,11 +223,11 @@ $(COMMON_ARCHIVE): $(COMMON_OBJECTS)
 
 build-common: $(COMMON_ARCHIVE)
 
-src/common/%.o: src/common/%.c
-src/common/%.o: src/common/%.c src/common/%.d
+common/%.o: common/%.c
+common/%.o: common/%.c common/%.d
 	$(QCC) -c $(COMMON_CFLAGS) -o $@ $<
 
-src/common/%.d: src/common/%.c
+common/%.d: common/%.c
 	$(QMM) -MM $(DEPFLAGS) $(COMMON_CFLAGS) -MT $(patsubst %.d,%.o,$@) -o $@ $<
 
 ifneq ($(MAKECMDGOALS),clean)

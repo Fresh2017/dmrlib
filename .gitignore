@@ -37,7 +37,7 @@ src/cmd/noisebridge/noisebridge
 # Generated files
 build/
 dist/
-doc/Doxyfile
+docs/build/
 include/dmr/config.h
 include/dmr/version.h
 src/cmd/noisebridge/version.h

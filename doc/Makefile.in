@@ -1,9 +1,0 @@
-.PHONY: all
-
-PREFIX     ?= {{ PREFIX }}
-BINDIR     ?= $(DEST)$(PREFIX)/bin
-LIBDIR     ?= $(DEST)$(PREFIX)/lib
-INCLUDEDIR ?= $(DEST)$(PREFIX)/include
-
-all:
-	doxygen

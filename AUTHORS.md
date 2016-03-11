@@ -2,7 +2,9 @@
 
 ## `dmrlib`
 
-Wijnand Modderman-Lenstra wrote most parts of the library.
+Wijnand Modderman-Lenstra wrote most parts of the library, some parts are
+borrowed from the dmrshark project by [Norbert Varga](http://www.nonoo.hu/)
+HA2NON, see the [COPYING.dmrshark](COPYING.dmrshark.md) document.
 
 Rudy Hardeman did most of the testing and initial bug reporting.
 
